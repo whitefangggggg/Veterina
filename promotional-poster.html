@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Veterina — A4 Marketing Flyer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: { ink: '#173B42', teal: '#157B7B', mint: '#DDF5EF', sky: '#4F9EF8', coral: '#FFB36B' },
+            fontFamily: { display: ['Poppins', 'ui-sans-serif', 'system-ui'], sans: ['Inter', 'ui-sans-serif', 'system-ui'] },
+          },
+        },
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+    <style type="text/tailwindcss">
+      @layer components {
+        .paw-print {
+          background-image: radial-gradient(circle at 12px 12px, rgba(21,123,123,.11) 0 4px, transparent 4.5px), radial-gradient(circle at 5px 5px, rgba(21,123,123,.11) 0 2px, transparent 2.5px), radial-gradient(circle at 19px 5px, rgba(21,123,123,.11) 0 2px, transparent 2.5px), radial-gradient(circle at 5px 19px, rgba(21,123,123,.11) 0 2px, transparent 2.5px), radial-gradient(circle at 19px 19px, rgba(21,123,123,.11) 0 2px, transparent 2.5px);
+          background-size: 46px 46px;
+        }
+        .feature { border: 1px solid #DCEDE9; border-radius: 3.2mm; background: #fff; padding: 3.3mm; box-shadow: 0 1.5mm 4mm rgba(22,76,82,.055); }
+        .benefit { border: 1px solid #CDE8E0; border-radius: 3mm; background: rgba(255,255,255,.9); padding: 3mm; }
+        .mockup { overflow: hidden; border: 1px solid #D7E8E3; border-radius: 3.5mm; background: #fff; box-shadow: 0 2mm 5mm rgba(22,76,82,.11); }
+      }
+      body { margin: 0; background: #E2E8F0; font-family: Inter, ui-sans-serif, system-ui; color: #173B42; -webkit-font-smoothing: antialiased; }
+      .flyer {
+        position: relative;
+        width: 210mm;
+        height: 297mm;
+        overflow: hidden;
+        background: #F6FBFA;
+      }
+      @media screen {
+        .flyer { margin: 12mm auto; box-shadow: 0 5mm 18mm rgba(23,59,66,.20); }
+      }
+      @media print {
+        @page { size: A4 portrait; margin: 0; }
+        html, body { width: 210mm; height: 297mm; overflow: hidden; background: #fff; }
+        body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .flyer { margin: 0; box-shadow: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="flyer">
+      <div class="paw-print absolute -left-[15mm] top-[52mm] h-[80mm] w-[80mm] rotate-12 opacity-50"></div>
+      <div class="paw-print absolute -right-[14mm] bottom-[28mm] h-[65mm] w-[65mm] -rotate-12 opacity-40"></div>
+      <div class="absolute -right-[32mm] top-[35mm] h-[100mm] w-[100mm] rounded-full bg-sky/10 blur-3xl"></div>
+      <div class="absolute -left-[35mm] bottom-[32mm] h-[72mm] w-[72mm] rounded-full bg-mint blur-3xl"></div>
+
+      <div class="relative z-10 grid h-full grid-rows-[auto_55mm_auto_1fr_auto] gap-[4mm] px-[14mm] pb-[11mm] pt-[11mm]">
+        <header class="flex items-start justify-between">
+          <div class="flex items-center gap-[3mm]">
+            <div class="grid h-[12mm] w-[12mm] place-items-center rounded-[3.5mm] bg-teal text-white shadow-[0_1.5mm_3mm_rgba(21,123,123,.25)]">
+              <i data-lucide="stethoscope" class="h-[6mm] w-[6mm]"></i>
+            </div>
+            <div>
+              <p class="font-display text-[5.5mm] font-bold leading-none tracking-tight">Veterina</p>
+              <p class="mt-[1mm] text-[2mm] font-extrabold tracking-[.14em] text-teal uppercase">Clinic care system</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-[2mm] text-right">
+            <span class="h-px w-[9mm] bg-teal/35"></span>
+            <p class="text-[1.9mm] font-extrabold tracking-[.13em] text-teal uppercase">Made for veterinary teams</p>
+          </div>
+        </header>
+
+        <section class="grid grid-cols-[1.08fr_.92fr] items-center gap-[5mm]">
+          <div>
+            <div class="flex items-center gap-[1.8mm] text-teal">
+              <i data-lucide="heart-handshake" class="h-[3.2mm] w-[3.2mm]"></i>
+              <span class="h-px w-[8mm] bg-teal/35"></span>
+              <p class="text-[1.9mm] font-extrabold tracking-[.12em] uppercase">Thoughtful care, better organized</p>
+            </div>
+            <h1 class="mt-[2.5mm] font-display text-[9.4mm] font-extrabold leading-[1.02] tracking-[-.055em] text-ink">More time for <span class="text-teal">wagging tails.</span></h1>
+            <p class="mt-[2.5mm] max-w-[107mm] text-[2.75mm] leading-[1.5] text-[#47646A]">Patient care, appointments, reminders, stock, and clinic records—one calm workspace for every busy clinic day.</p>
+          </div>
+          <div class="relative h-[54mm]">
+            <div class="absolute inset-[2mm] rounded-[8mm] bg-gradient-to-br from-teal/15 to-sky/20 blur-xl"></div>
+            <div class="relative h-full overflow-hidden rounded-[7mm] border border-white bg-gradient-to-br from-white to-[#EDF8F7] p-[1.7mm] shadow-[0_3mm_7mm_rgba(22,76,82,.12)]">
+              <img src="file:///C:/Users/63976/.cursor/projects/d-Projects-Clients-Veterina/assets/veterina-pet-hero.png" alt="Dog, cat, rabbit, and bird receiving veterinary care" class="h-full w-full rounded-[5.5mm] object-contain" />
+              <div class="absolute bottom-[3mm] left-[3mm] flex items-center gap-[1.8mm] rounded-[3mm] border border-white/80 bg-white/90 px-[2.2mm] py-[1.7mm] shadow-md">
+                <span class="grid h-[6mm] w-[6mm] place-items-center rounded-[2mm] bg-mint text-teal"><i data-lucide="heart-pulse" class="h-[3.5mm] w-[3.5mm]"></i></span>
+                <span><strong class="block text-[2.25mm]">Care that keeps up</strong><small class="block text-[1.75mm] text-[#5C7478]">From front desk to exam room</small></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="mb-[2.3mm] flex items-end justify-between">
+            <div>
+              <p class="text-[1.9mm] font-extrabold tracking-[.16em] text-teal uppercase">One connected clinic workspace</p>
+              <h2 class="font-display text-[4.8mm] font-extrabold tracking-tight">Everything your day needs, in its place.</h2>
+            </div>
+            <p class="max-w-[45mm] text-right text-[2.05mm] leading-[1.45] text-[#5A7377]">Easy to scan. Easier to use.</p>
+          </div>
+          <div class="grid grid-cols-3 gap-[2.5mm]">
+            <article class="feature">
+              <span class="grid h-[8mm] w-[8mm] place-items-center rounded-[2.5mm] bg-mint text-teal"><i data-lucide="paw-print" class="h-[4mm] w-[4mm]"></i></span>
+              <h3 class="mt-[2mm] font-display text-[2.8mm] font-bold">Digital Pet Records</h3>
+              <p class="mt-[.8mm] text-[1.9mm] leading-[1.45] text-[#5A7377]">Pets, owners, health alerts, and details together.</p>
+            </article>
+            <article class="feature">
+              <span class="grid h-[8mm] w-[8mm] place-items-center rounded-[2.5mm] bg-[#E8F3FF] text-sky"><i data-lucide="clipboard-plus" class="h-[4mm] w-[4mm]"></i></span>
+              <h3 class="mt-[2mm] font-display text-[2.8mm] font-bold">Clinical History</h3>
+              <p class="mt-[.8mm] text-[1.9mm] leading-[1.45] text-[#5A7377]">Checkups, vitals, notes, and care plans—clearly logged.</p>
+            </article>
+            <article class="feature">
+              <span class="grid h-[8mm] w-[8mm] place-items-center rounded-[2.5mm] bg-[#FFF0DE] text-[#E98B34]"><i data-lucide="syringe" class="h-[4mm] w-[4mm]"></i></span>
+              <h3 class="mt-[2mm] font-display text-[2.8mm] font-bold">Vaccinations</h3>
+              <p class="mt-[.8mm] text-[1.9mm] leading-[1.45] text-[#5A7377]">Log doses, next-due dates, and follow-up reminders.</p>
+            </article>
+            <article class="feature">
+              <span class="grid h-[8mm] w-[8mm] place-items-center rounded-[2.5mm] bg-[#EEEAFE] text-[#6E60AE]"><i data-lucide="calendar-days" class="h-[4mm] w-[4mm]"></i></span>
+              <h3 class="mt-[2mm] font-display text-[2.8mm] font-bold">Appointments</h3>
+              <p class="mt-[.8mm] text-[1.9mm] leading-[1.45] text-[#5A7377]">A calm month view with a focused daily agenda.</p>
+            </article>
+            <article class="feature">
+              <span class="grid h-[8mm] w-[8mm] place-items-center rounded-[2.5mm] bg-[#E4F8F1] text-[#168D69]"><i data-lucide="bell-ring" class="h-[4mm] w-[4mm]"></i></span>
+              <h3 class="mt-[2mm] font-display text-[2.8mm] font-bold">Reminders</h3>
+              <p class="mt-[.8mm] text-[1.9mm] leading-[1.45] text-[#5A7377]">Follow-up calls, vaccine due dates, and outcomes.</p>
+            </article>
+            <article class="feature">
+              <span class="grid h-[8mm] w-[8mm] place-items-center rounded-[2.5mm] bg-[#FFF0EE] text-[#D4675B]"><i data-lucide="package-check" class="h-[4mm] w-[4mm]"></i></span>
+              <h3 class="mt-[2mm] font-display text-[2.8mm] font-bold">Stock & Suppliers</h3>
+              <p class="mt-[.8mm] text-[1.9mm] leading-[1.45] text-[#5A7377]">Quantities, expiries, movement updates, and contacts.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="grid min-h-0 grid-cols-[.78fr_1.22fr] items-stretch gap-[4mm]">
+          <div class="flex h-full flex-col rounded-[5mm] bg-gradient-to-br from-[#11666B] to-[#227D92] p-[4mm] text-white shadow-[0_2mm_5mm_rgba(22,76,82,.12)]">
+            <div>
+              <p class="text-[1.9mm] font-extrabold tracking-[.16em] text-[#B7EFE0] uppercase">Why clinics love it</p>
+              <h2 class="mt-[1.3mm] font-display text-[4.6mm] font-extrabold leading-[1.13]">A better flow for every kind of busy.</h2>
+              <p class="mt-[1.7mm] text-[2mm] leading-[1.45] text-[#D5F0EA]">Less searching, less switching, more focus on the animals in front of you.</p>
+            </div>
+            <div class="mt-[3mm] grid grid-cols-2 gap-[2mm]">
+              <div class="benefit"><i data-lucide="search-check" class="h-[4mm] w-[4mm] text-teal"></i><p class="mt-[1mm] text-[2.1mm] font-bold text-ink">Find records fast</p></div>
+              <div class="benefit"><i data-lucide="layers-3" class="h-[4mm] w-[4mm] text-sky"></i><p class="mt-[1mm] text-[2.1mm] font-bold text-ink">Stay organized</p></div>
+              <div class="benefit"><i data-lucide="heart" class="h-[4mm] w-[4mm] text-[#E16B70]"></i><p class="mt-[1mm] text-[2.1mm] font-bold text-ink">Keep care connected</p></div>
+              <div class="benefit"><i data-lucide="tablet-smartphone" class="h-[4mm] w-[4mm] text-[#E98B34]"></i><p class="mt-[1mm] text-[2.1mm] font-bold text-ink">Tablet-first comfort</p></div>
+            </div>
+            <div class="mt-auto flex items-center gap-[2mm] border-t border-white/20 pt-[3mm]">
+              <span class="grid h-[8mm] w-[8mm] shrink-0 place-items-center rounded-[2.5mm] bg-white/10 text-[#B7EFE0]"><i data-lucide="stethoscope" class="h-[4.2mm] w-[4.2mm]"></i></span>
+              <p class="font-display text-[2.5mm] font-bold leading-[1.3]">One calm system.<br><span class="font-sans text-[1.8mm] font-medium text-[#CDEAE4]">Every part of the clinic day.</span></p>
+            </div>
+          </div>
+
+          <div class="flex h-full min-h-0 flex-col">
+            <div class="mb-[2mm] flex items-center justify-between">
+              <p class="text-[1.9mm] font-extrabold tracking-[.16em] text-teal uppercase">System preview</p>
+              <span class="rounded-full bg-[#E6F5F1] px-[2mm] py-[.8mm] text-[1.8mm] font-bold text-teal">Designed for daily clinic work</span>
+            </div>
+            <div class="grid min-h-0 flex-1 grid-cols-2 gap-[2.5mm]">
+              <div class="mockup flex h-full flex-col p-[2.2mm]">
+                <div class="flex items-center gap-[1mm] border-b border-[#E8F0ED] pb-[1.5mm] text-[1.65mm] text-[#80918E]"><span class="h-[1.5mm] w-[1.5mm] rounded-full bg-[#FFB36B]"></span><span class="h-[1.5mm] w-[1.5mm] rounded-full bg-[#A9D9C8]"></span><span class="h-[1.5mm] w-[1.5mm] rounded-full bg-[#A8D5F4]"></span><span class="ml-[1mm] font-bold">Veterina / Patients</span></div>
+                <div class="mt-[2mm] rounded-[2mm] bg-[#F5F9F7] p-[1.8mm]">
+                  <p class="text-[1.65mm] font-bold text-[#627A77]">Patient records</p>
+                  <p class="mt-[.5mm] text-[3mm] font-extrabold text-ink">Patients & owners</p>
+                  <div class="mt-[1.7mm] flex items-center gap-[1.3mm] rounded-[1.5mm] bg-white px-[1.5mm] py-[1.2mm] text-[1.55mm] text-[#849692]"><i data-lucide="search" class="h-[2.2mm] w-[2.2mm]"></i> Search pet, owner or record</div>
+                </div>
+                <div class="mt-[1.5mm] space-y-[1.2mm]">
+                  <div class="flex items-center gap-[1.5mm] rounded-[2mm] border border-[#E4ECE8] p-[1.4mm]"><span class="grid h-[5mm] w-[5mm] place-items-center rounded-[1.5mm] bg-[#E6F5F1] text-[2.6mm]">🐶</span><span class="flex-1"><b class="block text-[1.9mm]">Max</b><small class="text-[1.45mm] text-[#6B817E]">Golden Retriever</small></span><span class="rounded-full bg-[#DEF4EA] px-[1.2mm] py-[.4mm] text-[1.3mm] font-bold text-[#236656]">Active</span></div>
+                  <div class="flex items-center gap-[1.5mm] rounded-[2mm] border border-[#E4ECE8] p-[1.4mm]"><span class="grid h-[5mm] w-[5mm] place-items-center rounded-[1.5mm] bg-[#E8F3FF] text-[2.6mm]">🐱</span><span class="flex-1"><b class="block text-[1.9mm]">Luna</b><small class="text-[1.45mm] text-[#6B817E]">Domestic shorthair</small></span><i data-lucide="chevron-right" class="h-[2.5mm] w-[2.5mm] text-[#7C928F]"></i></div>
+                </div>
+                <div class="mt-auto grid grid-cols-2 gap-[1.2mm] pt-[1.5mm]">
+                  <div class="rounded-[1.6mm] bg-[#EAF6F2] p-[1.3mm]"><small class="block text-[1.25mm] font-bold text-[#6C817E]">CLINICAL HISTORY</small><b class="mt-[.4mm] block text-[1.8mm] text-teal">Visits & vitals</b></div>
+                  <div class="rounded-[1.6mm] bg-[#EEF5FC] p-[1.3mm]"><small class="block text-[1.25mm] font-bold text-[#6C817E]">FOLLOW-UPS</small><b class="mt-[.4mm] block text-[1.8mm] text-sky">Always visible</b></div>
+                </div>
+              </div>
+              <div class="mockup flex h-full flex-col p-[2.2mm]">
+                <div class="flex items-center gap-[1mm] border-b border-[#E8F0ED] pb-[1.5mm] text-[1.65mm] text-[#80918E]"><span class="h-[1.5mm] w-[1.5mm] rounded-full bg-[#FFB36B]"></span><span class="h-[1.5mm] w-[1.5mm] rounded-full bg-[#A9D9C8]"></span><span class="h-[1.5mm] w-[1.5mm] rounded-full bg-[#A8D5F4]"></span><span class="ml-[1mm] font-bold">Veterina / Appointments</span></div>
+                <div class="mt-[2mm] flex items-center justify-between"><span><small class="block text-[1.5mm] text-[#6B817E]">2026</small><b class="font-display text-[3.3mm]">July</b></span><span class="rounded-[1.5mm] bg-mint px-[1.3mm] py-[.8mm] text-[1.55mm] font-bold text-teal">New appointment</span></div>
+                <div class="mt-[1.7mm] grid grid-cols-7 gap-[.6mm] text-center text-[1.35mm] text-[#7D928F]"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+                <div class="mt-[.7mm] grid grid-cols-7 gap-[.6mm] text-center text-[1.55mm]">
+                  <span></span><span></span><span></span><span class="rounded-full bg-teal py-[1mm] font-bold text-white">1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span class="rounded-full bg-[#E6F5F1] py-[1mm] font-bold text-teal">8</span><span>9</span><span>10</span><span>11</span>
+                </div>
+                <div class="mt-[2mm] rounded-[2mm] bg-[#F6FBFA] p-[1.5mm]"><p class="text-[1.45mm] font-bold text-[#69817E]">TODAY'S AGENDA</p><div class="mt-[1mm] border-l-[1.2mm] border-teal bg-white p-[1.2mm] text-[1.55mm]"><b>09:00 · Max</b><br><span class="text-[#6B817E]">Wellness check</span></div></div>
+                <div class="mt-auto grid grid-cols-3 gap-[1mm] pt-[1.5mm] text-center">
+                  <div class="rounded-[1.5mm] bg-[#EAF6F2] p-[1mm]"><b class="block text-[2.1mm] text-teal">8</b><small class="text-[1.2mm] text-[#6B817E]">Visits</small></div>
+                  <div class="rounded-[1.5mm] bg-[#FFF3E6] p-[1mm]"><b class="block text-[2.1mm] text-[#D67C2C]">2</b><small class="text-[1.2mm] text-[#6B817E]">Pending</small></div>
+                  <div class="rounded-[1.5mm] bg-[#EEF5FC] p-[1mm]"><b class="block text-[2.1mm] text-sky">6</b><small class="text-[1.2mm] text-[#6B817E]">Confirmed</small></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer class="relative flex items-center justify-between rounded-[4.5mm] bg-white px-[4mm] py-[3mm] shadow-[0_1.5mm_4mm_rgba(22,76,82,.07)]">
+          <div class="max-w-[125mm]">
+            <p class="font-display text-[3.35mm] font-bold">Spend less time on paperwork. More time caring for pets.</p>
+            <p class="mt-[.7mm] text-[1.9mm] text-[#5A7377]">For veterinary clinics, animal hospitals & pet wellness teams.</p>
+            <p class="mt-[1.2mm] text-[1.85mm] font-semibold text-teal">ezekielwhitefang@gmail.com &nbsp;•&nbsp; +63 976 099 2209</p>
+          </div>
+          <div class="flex items-center gap-[2mm] rounded-[3mm] bg-teal px-[3mm] py-[2.4mm] text-white shadow-[0_1.2mm_3mm_rgba(21,123,123,.2)]">
+            <span><small class="block text-[1.45mm] font-semibold text-[#CDEAE4]">DISCOVER VETERINA</small><strong class="block text-[2.35mm]">Book a private demo</strong></span>
+            <i data-lucide="arrow-up-right" class="h-[4mm] w-[4mm]"></i>
+          </div>
+        </footer>
+      </div>
+    </main>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>lucide.createIcons()</script>
+  </body>
+</html>
