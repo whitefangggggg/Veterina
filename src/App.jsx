@@ -12,6 +12,9 @@ const Inventory = lazy(() => import('./pages/Stock').then((module) => ({ default
 const Suppliers = lazy(() => import('./pages/Stock').then((module) => ({ default: module.Suppliers })))
 const Reports = lazy(() => import('./pages/Admin').then((module) => ({ default: module.Reports })))
 const Settings = lazy(() => import('./pages/Admin').then((module) => ({ default: module.Settings })))
+const Login = lazy(() => import('./pages/Login'))
+const DemoEntry = lazy(() => import('./pages/Login').then((module) => ({ default: module.DemoEntry })))
+const Knowledge = lazy(() => import('./pages/Knowledge'))
 
 function PageLoader({ children }) {
   return <Suspense fallback={<div className="page-loader"><span /><p>Loading clinic records...</p></div>}>{children}</Suspense>
@@ -20,6 +23,8 @@ function PageLoader({ children }) {
 const load = (element) => <PageLoader>{element}</PageLoader>
 
 const router = createBrowserRouter([
+  { path:'/login',element:load(<Login />) },
+  { path:'/demo',element:load(<DemoEntry />) },
   // Marketing-safe paths (/). Clinic workspaces can later live under /:clinicSlug or /app/:clinicSlug.
   {
     path: '/',
@@ -37,6 +42,7 @@ const router = createBrowserRouter([
       { path: '/suppliers', element: load(<Suppliers />) },
       { path: '/reports', element: load(<Reports />) },
       { path: '/settings', element: load(<Settings />) },
+      { path: '/knowledge', element: load(<Knowledge />) },
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
   },

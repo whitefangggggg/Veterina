@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   BellRinging,
   CalendarDots,
@@ -17,6 +17,7 @@ import {
 } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
 import PetSticker from './PetSticker'
+import { useAuth } from '../context/AuthContext'
 
 const workspaces = [
   { to: '/patients', label: 'Patients', detail: 'Owners and clinical records', icon: PawPrint, color: 'sage' },
@@ -26,6 +27,7 @@ const workspaces = [
   { to: '/suppliers', label: 'Suppliers', detail: 'Ordering contacts', icon: Truck, color: 'amber' },
   { to: '/reports', label: 'Reports', detail: 'Clinic exports and summaries', icon: ChartBar, color: 'mint' },
   { to: '/settings', label: 'Settings', detail: 'Staff and clinic profile', icon: Gear, color: 'slate' },
+  { to: '/knowledge', label: 'Knowledge', detail: 'Approved documents and cited recall', icon: FirstAidKit, color: 'sage' },
 ]
 
 function Brand() {
@@ -121,7 +123,9 @@ function GlobalSearch({ onClose }) {
 export default function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
-  const { reminders } = useClinicData()
+  const { reminders,profile,loading,error,refresh } = useClinicData()
+  const auth = useAuth()
+  const [signOutError,setSignOutError] = useState('')
   const dueCount = reminders.filter((item) => item.status === 'Due' || item.status === 'Overdue').length
   const overlayOpen = searchOpen || workspacesOpen
 
@@ -145,6 +149,10 @@ export default function AppShell() {
     return () => document.body.classList.remove('overlay-open')
   }, [overlayOpen])
 
+  if (auth.loading) return <div className="page-loader">Checking session…</div>
+  if (!auth.isDemo && !auth.session) return <Navigate to="/login" replace />
+  if (!auth.isDemo && loading) return <div className="page-loader">Loading clinic records…</div>
+  if (!auth.isDemo && !profile) return <div className="auth-page"><section className="section-card auth-card"><h1>Clinic access required</h1><p>{error || 'Your account has no active staff profile. Contact the clinic owner.'}</p><button className="button button-secondary" onClick={()=>auth.signOut().catch((e)=>setSignOutError(e.message))}>Sign out</button>{signOutError && <p role="alert">{signOutError}</p>}</section></div>
   return (
     <div className="app-shell spacious-shell">
       <header className="workspace-header">
@@ -161,11 +169,11 @@ export default function AppShell() {
               <BellRinging size={21} weight="duotone" />
               {dueCount > 0 && <span>{dueCount}</span>}
             </Link>
-            <button className="profile-chip"><span className="avatar small-avatar">AV</span><span><strong>Dr. Andrea</strong><small>Head doctor</small></span><CaretDown size={13} /></button>
+            <button className="profile-chip" title="Sign out" onClick={()=>auth.signOut().catch((e)=>setSignOutError(e.message))}><span className="avatar small-avatar">{auth.isDemo?'DE':profile?.full_name?.slice(0,2).toUpperCase()}</span><span><strong>{auth.isDemo?'Fictional demo':profile?.full_name}</strong><small>{auth.isDemo?'Exit demo':'Sign out'}</small></span><CaretDown size={13} /></button>
           </div>
         </div>
       </header>
-      <main className="main-content spacious-content"><Outlet /></main>
+      <main className="main-content spacious-content">{auth.isDemo && <p className="demo-banner">Fictional demo · changes are temporary · <Link to="/login">Staff sign in</Link></p>}{(error || signOutError) && <p role="alert" className="form-error">{error || signOutError} <button onClick={()=>refresh?.().catch((e)=>setSignOutError(e.message))}>Retry</button></p>}<Outlet /></main>
       {workspacesOpen && <WorkspaceSwitcher onClose={() => setWorkspacesOpen(false)} />}
       {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} />}
     </div>
