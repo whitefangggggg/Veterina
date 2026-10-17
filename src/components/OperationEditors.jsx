@@ -34,7 +34,7 @@ export function AppointmentEditor({ record, initialDate, onClose }) {
       { name: 'petId', label: 'Patient', type: 'select', required: true, span: true, options: [{ value: '', label: 'Select patient' }, ...pets.filter((pet) => pet.status === 'Active' || pet.id === record?.petId).map((pet) => ({ value: pet.id, label: pet.name + ' — ' + (owners.find((owner) => owner.id === pet.ownerId)?.fullName || '') }))] },
       { name: 'date', label: 'Date', type: 'date', required: true, min: minimum.date, onChange: (event) => setSelectedDate(event.target.value) },
       { name: 'time', render: () => <AppointmentTimePicker date={selectedDate} timezone={timezone} clock={clock} initialTime={initial.time} onRefresh={refreshClock} /> },
-      { name: 'service', label: 'Service', type: 'select', required: true, options: services.map((service) => service.name) },
+      { name: 'service', label: 'Service', type: 'select', required: true, options: [{ value: '', label: 'Select an active service' }, ...services.map((service) => service.name)] },
       { name: 'durationMinutes', label: 'Duration (minutes)', type: 'number', min: '5', max: '480', step: '1', hint: 'Leave blank to use the service duration.' },
       { name: 'veterinarianId', label: 'Veterinarian', type: 'select', required: true, options: profiles.filter((profile) => profile.is_active).map((profile) => ({ value: profile.id, label: profile.full_name || 'Clinic staff' })) },
       { name: 'notes', label: 'Notes', type: 'textarea', span: true },

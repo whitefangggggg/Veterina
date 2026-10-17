@@ -1,31 +1,37 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Field, Modal } from './ui'
 import { useClinicData } from '../context/ClinicDataContext'
 
-export function AsyncForm({ onSave, onClose, children, submitLabel = 'Save changes', className }) {
+export function AsyncForm({ onSave, onSaveDraft, onClose, children, submitLabel = 'Save changes', className }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const submitter = useRef(null)
+  useEffect(() => {
+    if (error && !busy) submitter.current?.focus()
+  }, [error, busy])
   const submit = async (event) => {
     event.preventDefault()
     if (busy) return
+    submitter.current = event.nativeEvent.submitter
     const values = Object.fromEntries(new FormData(event.currentTarget))
+    const saveDraft = event.nativeEvent.submitter?.value === 'draft'
     setBusy(true)
     setError('')
-    try { await onSave(values); onClose?.() }
+    try { await (saveDraft ? onSaveDraft : onSave)(values); onClose?.() }
     catch (error) { setError(error.message || 'Unable to save. Please try again.') }
     finally { setBusy(false) }
   }
   return <form onSubmit={submit} className={className} aria-busy={busy}>
     {error && <p className="auth-message auth-error" role="alert">{error}</p>}
     <fieldset disabled={busy} className="record-fieldset">{children}
-      <div className="form-actions">{onClose && <button type="button" className="button button-secondary" onClick={onClose}>Cancel</button>}<button type="submit" className="button button-primary">{busy ? 'Saving...' : submitLabel}</button></div>
+      <div className="form-actions">{onClose && <button type="button" className="button button-secondary" onClick={onClose}>Cancel</button>}<button type="submit" className="button button-primary">{busy ? 'Saving...' : submitLabel}</button>{onSaveDraft && <button type="submit" value="draft" formNoValidate className="button button-secondary">Save as draft</button>}</div>
     </fieldset>
   </form>
 }
 
-export function RecordEditor({ title, description, fields, initial = {}, onSave, onClose, submitLabel }) {
+export function RecordEditor({ title, description, fields, initial = {}, onSave, onSaveDraft, onClose, submitLabel }) {
   return <Modal title={title} description={description} onClose={onClose} wide={fields.length > 7}>
-    <AsyncForm onSave={onSave} onClose={onClose} submitLabel={submitLabel}>
+    <AsyncForm onSave={onSave} onSaveDraft={onSaveDraft} onClose={onClose} submitLabel={submitLabel}>
       <div className="form-grid">
         {fields.map(({ name, label, type = 'text', options, required, hint, span, render, ...props }) => render ? <Fragment key={name}>{render()}</Fragment> : <Field key={name} label={label} required={required} hint={hint} span={span}>
           {type === 'select' ? <select name={name} defaultValue={initial[name] ?? ''} required={required} {...props}>

@@ -2,6 +2,48 @@ import { describe, expect, it, vi } from 'vitest'
 import { clinicDate, clinicTime, clinicTimestamp, createMutationRunner, fetchClinicData, normalizeClinicData, unwrap } from './clinicRepository'
 
 describe('clinic dates and persisted record projection', () => {
+  it.each([['waiting', 'Waiting'], ['in_progress', 'In progress'], ['completed', 'Completed'], ['cancelled', 'Cancelled']])('shows %s care status on both linked record types', (status, label) => {
+    const snapshot = normalizeClinicData({
+      visits: [{ id: 'visit', visited_at: '2026-10-17T01:00:00Z' }],
+      vaccinations: [{ id: 'vaccine', administered_at: '2026-10-17', next_due_at: '2027-10-17' }],
+      queue_entries: [
+        { id: 'checkup-ticket', visit_id: 'visit', status, arrived_at: '2026-10-17T01:00:00Z', queue_number: 1, queue_date: '2026-10-17' },
+        { id: 'vaccine-ticket', vaccination_id: 'vaccine', status, arrived_at: '2026-10-17T01:01:00Z', queue_number: 2, queue_date: '2026-10-17' },
+      ],
+    }, new Date('2026-10-17T04:00:00Z'))
+    expect(snapshot.visits[0]).toMatchObject({ careStatus: label, careQueue: { queueNumber: 'Q-001' } })
+    expect(snapshot.vaccinations[0]).toMatchObject({ careStatus: label, careQueue: { queueNumber: 'Q-002' }, nextDoseStatus: 'Up to date' })
+  })
+  it('labels historical records without tickets as Recorded', () => {
+    const snapshot = normalizeClinicData({ visits: [{ id: 'visit', visited_at: '2026-10-01' }], vaccinations: [{ id: 'vaccine', administered_at: '2026-10-01' }] })
+    for (const record of [snapshot.visits[0], snapshot.vaccinations[0]]) expect(record).toMatchObject({ careStatus: 'Recorded', careQueue: null })
+  })
+  it('formats assigned tickets without changing their saved clinic date at midnight', () => {
+    const raw = { queue_entries: [
+      { id: 'early', arrived_at: '2026-10-16T15:30:00Z', queue_date: '2026-10-16', queue_number: 1 },
+      { id: 'late', arrived_at: '2026-10-16T16:30:00Z', queue_date: '2026-10-17', queue_number: 1000 },
+    ] }
+    const entries = normalizeClinicData(raw, new Date('2026-10-17T16:30:00Z')).queueEntries
+    expect(entries[0]).toMatchObject({ queueNumber: 'Q-001', queueSequence: 1, queueDate: '2026-10-16' })
+    expect(entries[1]).toMatchObject({ queueNumber: 'Q-1000', queueSequence: 1000, queueDate: '2026-10-17' })
+  })
+  it('refreshes vaccination status at clinic midnight and after due-date edits', () => {
+    const raw = { vaccinations: [{ id: 'dose', administered_at: '2026-10-01', next_due_at: '2026-10-17' }] }
+    expect(normalizeClinicData(raw, new Date('2026-10-16T15:59:00Z')).vaccinations[0].nextDoseStatus).toBe('Up to date')
+    expect(normalizeClinicData(raw, new Date('2026-10-16T16:00:00Z')).vaccinations[0].nextDoseStatus).toBe('Due today')
+    expect(normalizeClinicData(raw, new Date('2026-10-17T16:00:00Z')).vaccinations[0].nextDoseStatus).toBe('Overdue')
+    raw.vaccinations[0].next_due_at = null
+    expect(normalizeClinicData(raw).vaccinations[0].nextDoseStatus).toBe('No next dose scheduled')
+  })
+  it('projects queue history dates using the clinic timezone', () => {
+    const raw = { queue_entries: [{ id: 'queue', status: 'completed', pet_id: 'pet', service_name: 'Vaccination', arrived_at: '2026-10-16T15:30:00Z', finished_at: '2026-10-16T16:30:00Z' }] }
+    expect(normalizeClinicData(raw).queueEntries[0]).toMatchObject({ petId: 'pet', service: 'Vaccination', arrivedTime: '23:30', finishedDate: '2026-10-17', veterinarian: 'Unassigned' })
+  })
+  it('restores partial care drafts with their version and author', () => {
+    const partial = { vaccine: 'Rabies', lotNumber: '', administeredAt: '', nextDueAt: '2027-10-17' }
+    const snapshot = normalizeClinicData({ profiles: [{ id: 'staff', full_name: 'Draft author' }], queue_entries: [{ id: 'queue', arrived_at: '2026-10-17T01:00:00Z', care_draft: partial, draft_version: 2, draft_saved_at: '2026-10-17T02:00:00Z', draft_saved_by: 'staff' }] })
+    expect(snapshot.queueEntries[0]).toMatchObject({ careDraft: partial, draftVersion: 2, draftSavedBy: 'Draft author', draftSavedAt: '2026-10-17T02:00:00Z' })
+  })
   it('uses the clinic date across midnight independently of the browser timezone', () => {
     const now = new Date('2026-10-16T16:30:00Z')
     expect(clinicDate(now)).toBe('2026-10-17')

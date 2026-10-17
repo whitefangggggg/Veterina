@@ -34,7 +34,7 @@ begin
   perform public.portal_mutation('update_owner',data||jsonb_build_object('id',owner_id,'fullName','Updated rollback owner'),gen_random_uuid());
   if (select full_name from public.owners where id=owner_id)<>'Updated rollback owner' then raise exception 'TEST: owner update'; end if;
 
-  data:=jsonb_build_object('ownerId',owner_id,'name','Rollback patient','species','Rabbit','breed','Mixed','sex','Unknown','reproductiveStatus','Unknown','microchip','','latestWeight','2');
+  data:=jsonb_build_object('ownerId',owner_id,'name','Rollback patient','species','Rabbit','breed','Mixed','sex','Female','reproductiveStatus','Unknown','microchip','','latestWeight','2');
   pet_id:=(public.portal_mutation('create_pet',data,gen_random_uuid())->>'id')::uuid;
   second_pet:=(public.portal_mutation('create_pet',data||jsonb_build_object('name','Second rollback patient'),gen_random_uuid())->>'id')::uuid;
   if exists(select 1 from public.pets where id in (pet_id,second_pet) and microchip_number is not null) then raise exception 'TEST: empty microchips'; end if;
@@ -63,7 +63,8 @@ begin
   perform public.portal_mutation('correct_encounter',jsonb_build_object('id',visit_id,'reason','Rollback correction','correction','Corrected historical entry'),gen_random_uuid());
   if not exists(select 1 from public.visit_corrections c where c.visit_id=visit_id and c.before_data#>>'{visit,id}'=visit_id::text and c.after_data->>'appended_correction'='Corrected historical entry') then raise exception 'TEST: correction snapshots missing'; end if;
 
-  data:=jsonb_build_object('petId',pet_id,'vaccine','Rollback vaccine','lotNumber','ROLLBACK','administeredAt',care_date,'nextDueAt',care_date+10,'veterinarianId',current_setting('veterina_test.owner'));
+  perform set_config('veterina_test.vaccine_item',(public.portal_mutation('create_inventory_item',jsonb_build_object('name','Rollback vaccine','brand','Rollback Brand','category','Vaccines','unit','dose','minimumStock','0'),gen_random_uuid())->>'id'),true);
+  data:=jsonb_build_object('petId',pet_id,'inventoryItemId',current_setting('veterina_test.vaccine_item'),'administeredAt',care_date,'nextDueAt',care_date+10,'veterinarianId',current_setting('veterina_test.owner'));
   vaccine_id:=(public.portal_mutation('create_vaccination',data,gen_random_uuid())->>'id')::uuid;
   perform public.portal_mutation('update_vaccination',data||jsonb_build_object('id',vaccine_id,'nextDueAt',care_date+20),gen_random_uuid());
   if (select count(*) from public.reminders r where r.vaccination_id=vaccine_id and status not in ('completed','cancelled'))<>1 then raise exception 'TEST: vaccine reminder duplicate'; end if;
@@ -100,9 +101,11 @@ begin
   begin perform public.portal_mutation('book_appointment',data,gen_random_uuid()); exception when others then if sqlerrm like 'APPOINTMENT_CONFLICT%' then rejected:=true; else raise; end if; end;
   if not rejected then raise exception 'TEST: overlapping booking accepted'; end if;
   perform public.portal_mutation('reschedule_appointment',data||jsonb_build_object('id',appointment_id,'time','10:00'),gen_random_uuid());
-  perform public.portal_mutation('transition_appointment',jsonb_build_object('id',appointment_id,'status','arrived'),gen_random_uuid());
-  perform public.portal_mutation('transition_appointment',jsonb_build_object('id',appointment_id,'status','in_progress'),gen_random_uuid());
-  perform public.portal_mutation('transition_appointment',jsonb_build_object('id',appointment_id,'status','completed'),gen_random_uuid());
+  rejected:=false;
+  begin perform public.portal_mutation('transition_appointment',jsonb_build_object('id',appointment_id,'status','arrived'),gen_random_uuid());
+  exception when others then if sqlerrm like 'VALIDATION_FAILED: only today%' then rejected:=true; else raise; end if; end;
+  if not rejected then raise exception 'TEST: tomorrow appointment checked in early'; end if;
+  perform public.portal_mutation('transition_appointment',jsonb_build_object('id',appointment_id,'status','cancelled'),gen_random_uuid());
 
   data:=jsonb_build_object('name','Rollback supplier','phone','09171234567','address','Test','contactPerson','Test');
   supplier_id:=(public.portal_mutation('create_supplier',data,gen_random_uuid())->>'id')::uuid;

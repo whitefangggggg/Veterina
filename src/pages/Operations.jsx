@@ -18,9 +18,10 @@ import PetSticker from '../components/PetSticker'
 import { useAuth } from '../context/AuthContext'
 import { AppointmentEditor as AppointmentModal, ReminderEditor } from '../components/OperationEditors'
 import { ActionDialog, DeleteRecordDialog, RecordEditor } from '../components/RecordForm'
+import { QueueDialog } from '../components/QueueEditors'
 
 export function Appointments() {
-  const { appointments, getPet, getOwner, today: clinicDate } = useClinicData()
+  const { appointments, queueEntries, getPet, getOwner, today: clinicDate } = useClinicData()
   const { profile } = useAuth()
   const [selectedDay, setSelectedDay] = useState(() => parseISO(clinicDate))
   const [month, setMonth] = useState(() => startOfMonth(parseISO(clinicDate)))
@@ -91,6 +92,7 @@ export function Appointments() {
             {dayAppointments.length ? dayAppointments.map((appointment) => {
               const pet = getPet(appointment.petId)
               const owner = getOwner(pet?.ownerId)
+              const queueEntry = queueEntries.find((entry) => entry.appointmentId === appointment.id)
               return (
                 <article className="flow-appointment-card" key={appointment.id}>
                   <time>{format(parseISO(`${selectedDate}T${appointment.time}`), 'h:mm a')}</time>
@@ -100,9 +102,14 @@ export function Appointments() {
                     <h3>{appointment.service}</h3>
                     <p>{appointment.veterinarian}</p>
                     <Badge tone={appointment.status === 'Confirmed' ? 'success' : 'warning'}>{appointment.status}</Badge>
+                    {queueEntry && <Badge tone="blue">Queue {queueEntry.queueNumber} · {queueEntry.queueDate}</Badge>}
                     <div className="record-actions">
                       {['Pending', 'Confirmed'].includes(appointment.status) && <button className="button button-secondary small-button" onClick={() => setModal({ type: 'appointment', record: appointment })}>Reschedule</button>}
-                      {(appointment.status === 'Confirmed' ? ['arrived', 'cancelled', 'no_show'] : appointment.status === 'Arrived' ? ['in_progress', 'cancelled'] : appointment.status === 'In Progress' ? ['completed'] : []).map((status) => <button key={status} className="button button-secondary small-button" onClick={() => setModal({ type: 'transition', record: appointment, status })}>{status.replace('_', ' ')}</button>)}
+                      {['Pending', 'Confirmed'].includes(appointment.status) && appointment.date === clinicDate && <button className="button button-secondary small-button" onClick={() => setModal({ type: 'queue', dialog: { type: 'checkin', appointmentId: appointment.id } })}>Check in</button>}
+                      {appointment.status === 'Arrived' && queueEntry && <button className="button button-secondary small-button" onClick={() => setModal({ type: 'queue', dialog: { type: 'start', entry: queueEntry } })}>Start care</button>}
+                      {appointment.status === 'In Progress' && queueEntry && <button className="button button-primary small-button" onClick={() => setModal({ type: 'queue', dialog: { type: 'care', entry: queueEntry } })}>{queueEntry.draftSavedAt ? 'Resume' : 'Record'} {queueEntry.category === 'maintenance' ? queueEntry.service : queueEntry.category === 'vaccination' ? 'vaccination' : 'checkup'}</button>}
+                      {['Pending', 'Confirmed'].includes(appointment.status) && ['cancelled', 'no_show'].map((status) => <button key={status} className="button button-secondary small-button" onClick={() => setModal({ type: 'transition', record: appointment, status })}>{status === 'cancelled' ? 'Cancel' : 'No show'}</button>)}
+                      {['Arrived', 'In Progress'].includes(appointment.status) && queueEntry && <button className="text-link" onClick={() => setModal({ type: 'queue', dialog: { type: 'cancel', entry: queueEntry } })}>Cancel</button>}
                       {profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', record: appointment })}>Delete appointment</button>}
                     </div>
                   </div>
@@ -115,6 +122,7 @@ export function Appointments() {
         </aside>
       </div>
       {modal?.type === 'appointment' && <AppointmentModal record={modal.record} initialDate={selectedDate} onClose={() => setModal(null)} />}
+      {modal?.type === 'queue' && <QueueDialog modal={modal.dialog} onClose={() => setModal(null)} />}
       {modal?.type === 'transition' && <ActionDialog title={'Mark appointment ' + modal.status.replace('_', ' ') + '?'} action="transition_appointment" data={{ id: modal.record.id, status: modal.status }} onClose={() => setModal(null)} />}
       {modal?.type === 'delete' && <DeleteRecordDialog entity="appointment" record={modal.record} onClose={() => setModal(null)} />}
     </div>

@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useEffect, useId } from 'react'
+import { cloneElement, isValidElement, useEffect, useId, useRef } from 'react'
 import { X } from '@phosphor-icons/react'
 
 export function PageHeader({ eyebrow, title, description, actions }) {
@@ -43,14 +43,37 @@ export function EmptyState({ icon: Icon, title, description, action }) {
 }
 
 export function Modal({ title, description, children, onClose, wide = false }) {
+  const dialogRef = useRef(null)
   useEffect(() => {
+    const previousFocus = document.activeElement
     document.body.classList.add('overlay-open')
-    return () => document.body.classList.remove('overlay-open')
+    dialogRef.current?.querySelector('input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled])')?.focus()
+    return () => {
+      document.body.classList.remove('overlay-open')
+      if (previousFocus?.isConnected) previousFocus.focus()
+    }
   }, [])
 
+  const onKeyDown = (event) => {
+    const busy = Boolean(dialogRef.current?.querySelector('form[aria-busy="true"]'))
+    if (event.key === 'Escape' && !busy) { event.preventDefault(); event.stopPropagation(); onClose() }
+    if (event.key !== 'Tab') return
+    const controls = [...dialogRef.current.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')]
+      .filter((element) => !element.matches(':disabled') && element.getClientRects().length)
+    const first = controls[0]
+    const last = controls.at(-1)
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+  }
+  const close = () => {
+    if (!dialogRef.current?.querySelector('form[aria-busy="true"]')) onClose()
+  }
+
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="modal-backdrop" role="presentation" onMouseDown={close}>
       <section
+        ref={dialogRef}
+        onKeyDown={onKeyDown}
         className={`modal ${wide ? 'modal-wide' : ''}`}
         role="dialog"
         aria-modal="true"
@@ -59,7 +82,7 @@ export function Modal({ title, description, children, onClose, wide = false }) {
       >
         <header className="modal-header">
           <div><h2>{title}</h2>{description && <p>{description}</p>}</div>
-          <button className="icon-button" onClick={onClose} aria-label="Close"><X size={20} weight="bold" /></button>
+          <button className="icon-button" onClick={close} aria-label="Close"><X size={20} weight="bold" /></button>
         </header>
         <div className="modal-body">{children}</div>
       </section>

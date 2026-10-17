@@ -1,3 +1,37 @@
+export function vaccinationStatus(nextDueAt, today) {
+  if (!nextDueAt) return 'No next dose scheduled'
+  return nextDueAt < today ? 'Overdue' : nextDueAt === today ? 'Due today' : 'Up to date'
+}
+
+export function visibleQueueEntries(entries, { service = 'All', status = 'Active', date }) {
+  return entries.filter((entry) => {
+    const active = ['waiting', 'in_progress'].includes(entry.status)
+    return (service === 'All' || entry.category === service || `service:${entry.serviceTypeId || entry.service}` === service)
+      && (status === 'All' || (status === 'Active' ? active : entry.status === status))
+      && (active || entry.finishedDate === date)
+  }).sort((a, b) => {
+    if (a.queueDate && b.queueDate && a.queueSequence != null && b.queueSequence != null) {
+      return a.queueDate.localeCompare(b.queueDate) || a.queueSequence - b.queueSequence
+    }
+    return a.arrivedAt.localeCompare(b.arrivedAt) || a.id.localeCompare(b.id)
+  })
+}
+
+// Calendar-month subtraction matches Postgres interval arithmetic, including leap days.
+export function birthDateFromAge(today, years = '', months = '') {
+  if (years === '' && months === '') return ''
+  const y = Number(years || 0), m = Number(months || 0)
+  if (!Number.isInteger(y) || y < 0 || !Number.isInteger(m) || m < 0 || m > 11) return ''
+  const [year, month, day] = today.split('-').map(Number)
+  const total = year * 12 + month - 1 - y * 12 - m
+  const targetYear = Math.floor(total / 12), targetMonth = ((total % 12) + 12) % 12
+  if (targetYear < 1) return ''
+  const monthEnd = new Date(0)
+  monthEnd.setUTCFullYear(targetYear, targetMonth + 1, 0)
+  const lastDay = monthEnd.getUTCDate()
+  return `${String(targetYear).padStart(4, '0')}-${String(targetMonth + 1).padStart(2, '0')}-${String(Math.min(day, lastDay)).padStart(2, '0')}`
+}
+
 export function classifyReminder(dueDate, today, completed = false) {
   if (completed) return 'Completed'
   const due = new Date(`${dueDate}T00:00:00`)

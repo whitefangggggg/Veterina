@@ -18,6 +18,7 @@ import { Badge } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 
 const spaces = [
+  { to: '/queue', title: 'In-site queue', description: 'Walk-ins, check-ins, checkups and vaccinations.', icon: FirstAidKit, color: 'amber' },
   { to: '/patients', title: 'Patient records', description: 'Owners, pets, checkups and complete clinical histories.', icon: PawPrint, color: 'sage' },
   { to: '/appointments', title: 'Appointments', description: 'A calm monthly calendar and focused daily agenda.', icon: CalendarDots, color: 'mint' },
   { to: '/reminders', title: 'Reminder center', description: 'Today’s calls, follow-ups and upcoming vaccines.', icon: BellRinging, color: 'blue' },

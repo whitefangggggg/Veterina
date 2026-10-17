@@ -346,11 +346,17 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
 .record-layout { display: grid; grid-template-columns: minmax(0,1fr) 300px; align-items: start; gap: 16px; }
 .record-main { min-width: 0; }
 .record-sidebar { display: flex; flex-direction: column; gap: 14px; }
-.tabs { display: flex; gap: 6px; margin-bottom: 14px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
 .tabs button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 620; cursor: pointer; }
 .tabs button.active { color: var(--brand); background: var(--brand-soft); }
 .clinical-timeline { display: flex; flex-direction: column; gap: 12px; }
 .visit-card { display: grid; grid-template-columns: 60px 1fr; padding: 18px; }
+.visit-card:has(.visit-edit-trigger) { position: relative; }
+.visit-edit-trigger { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.visit-edit-trigger::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.visit-card:has(.visit-edit-trigger):hover { border-color: #a4c3b2; }
+.visit-card:has(.visit-edit-trigger:focus-visible) { outline: 2px solid var(--primary, #236656); outline-offset: 3px; }
+.visit-card button:not(.visit-edit-trigger), .visit-card a { position: relative; z-index: 2; }
 .visit-date { display: flex; flex-direction: column; align-items: center; padding-top: 3px; border-right: 1px solid #e6eae6; color: var(--brand); }
 .visit-date span { font-size: 12px; font-weight: 700; text-transform: uppercase; }
 .visit-date strong { color: var(--ink); font-size: 26px; line-height: 1.1; }
@@ -390,7 +396,8 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
 .vaccine-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: var(--brand); background: var(--brand-soft); }
 .vaccine-row > div:not(.vaccine-icon) { display: flex; flex-direction: column; }
 .vaccine-row strong { color: var(--ink); font-size: 13px; }
-.vaccine-row span { color: var(--muted); font-size: 12px; }
+.vaccine-row span:not(.badge) { color: var(--muted); font-size: 12px; }
+.vaccine-row .badge { align-self: flex-start; margin-top: 6px; max-width: 100%; white-space: normal; }
 .chart-wrap { padding: 0 15px 10px; }
 
 .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 14px; padding: 10px 14px; }
@@ -1773,3 +1780,47 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
 .assistant-answer label { display: grid; gap: 8px; margin: 16px 0; }
 .assistant-answer p,.document-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .staff-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #ddd; }
+
+/* Waiting-room arrivals */
+.queue-summary { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.queue-summary > div { display: flex; align-items: center; gap: 10px; background: white; border: 1px solid #e1e8e4; padding: 18px 24px; border-radius: 16px; }
+.queue-summary strong { font-size: 24px; }
+.queue-toolbar { flex-wrap: wrap; }
+.queue-toolbar label { display: flex; align-items: center; gap: 8px; }
+.queue-toolbar input { min-width: 0; border: 1px solid #dce5df; border-radius: 8px; padding: 8px; background: white; }
+.queue-hint { margin: 0 0 16px; color: #64786c; font-size: 13px; }
+.queue-list { display: grid; gap: 12px; }
+.queue-card { display: grid; grid-template-columns: minmax(180px,1.15fr) minmax(130px,1fr) minmax(140px,.85fr) minmax(180px,1fr); align-items: center; gap: 20px; padding: 22px; background: white; border: 1px solid #e1e8e4; border-radius: 18px; }
+.queue-card > div { min-width: 0; overflow-wrap: anywhere; }
+.queue-card { position: relative; }
+.queue-patient-link::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: 18px; }
+.queue-card:hover { border-color: #a4c3b2; }
+.queue-card:has(.queue-patient-link:focus-visible) { outline: 2px solid var(--primary, #236656); outline-offset: 3px; }
+.queue-card .record-actions { position: relative; z-index: 2; }
+.queue-patient { display: flex; gap: 12px; align-items: center; }
+.queue-patient small,.queue-care > span,.queue-arrival > span { display: block; color: #64786c; font-size: 12px; margin-top: 5px; }
+.queue-patient a { color: inherit; }
+.queue-ticket { display: grid; flex-shrink: 0; gap: 3px; padding: 10px 8px; border-radius: 10px; background: #eef5ef; text-align: center; }
+.queue-ticket > strong { font-size: 19px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.queue-ticket > small { font-size: 10px; margin: 0; }
+.queue-patient > div { min-width: 0; }
+.queue-care p { font-size: 13px; margin: 8px 0 0; white-space: pre-wrap; }
+.queue-arrival time { font-size: 13px; }
+.queue-actions { display: grid; justify-items: start; gap: 12px; }
+.queue-draft-note { display: grid; gap: 4px; }
+.queue-draft-note small { color: var(--muted); font-size: 11px; }
+.record-care-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.record-care-status > span:first-child,.record-care-status > small { color: var(--muted); font-size: 11px; }
+.form-actions { flex-wrap: wrap; }
+.queue-actions .record-actions { flex-wrap: wrap; }
+@media (max-width: 1100px) { .queue-card { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) {
+  .queue-card { grid-template-columns: minmax(0,1fr); gap: 14px; padding: 18px; }
+  .queue-toolbar label { flex-wrap: wrap; }
+  .queue-summary { gap: 8px; }
+  .queue-summary > div { flex: 1; padding: 12px; gap: 6px; font-size: 12px; }
+  .queue-page .page-actions { flex-wrap: wrap; }
+}
+.service-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.bcs-replace { display: flex; align-items: center; gap: 8px; }
+.field .bcs-replace input { width: 18px; height: 18px; min-height: 18px; flex: none; padding: 0; }

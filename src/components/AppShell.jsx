@@ -23,6 +23,7 @@ import { authErrorMessage } from '../lib/authAccess'
 import PetSticker from './PetSticker'
 
 const workspaces = [
+  { to: '/queue', label: 'In-site queue', detail: 'Arrivals and care in progress', icon: FirstAidKit, color: 'amber' },
   { to: '/patients', label: 'Patients', detail: 'Owners and clinical records', icon: PawPrint, color: 'sage' },
   { to: '/appointments', label: 'Appointments', detail: 'Calendar and daily agenda', icon: CalendarDots, color: 'mint' },
   { to: '/reminders', label: 'Reminders', detail: 'Calls, vaccines and follow-ups', icon: BellRinging, color: 'blue' },

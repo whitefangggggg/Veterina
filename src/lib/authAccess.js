@@ -1,4 +1,4 @@
-const clinicPath = /^\/(dashboard|patients|appointments|reminders|inventory|suppliers|reports|settings|knowledge)(\/|$)/
+const clinicPath = /^\/(dashboard|queue|patients|appointments|reminders|inventory|suppliers|reports|settings|knowledge)(\/|$)/
 
 // Only return to known clinic routes. Reject protocol-relative and encoded URLs.
 export function safeReturnTo(value) {

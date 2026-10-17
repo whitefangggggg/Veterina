@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "test:browser": "node scripts/check-frontend.mjs",
+    "test:queue": "node scripts/check-queue.mjs",
     "test:api": "node scripts/check-supabase.mjs"
   },
   "dependencies": {

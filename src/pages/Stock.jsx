@@ -15,11 +15,13 @@ const activeField = { name: 'isActive', label: 'Status', type: 'select', options
 
 function ItemEditor({ record, onClose }) {
   const { suppliers, execute } = useClinicData()
+  const [category, setCategory] = useState(record?.category || 'Medicine')
   return <RecordEditor title={record ? 'Edit inventory item' : 'New inventory item'} initial={record || { category: 'Medicine', minimumStock: 0, unit: 'unit', allowsFraction: 'false' }} onClose={onClose}
     onSave={(values) => execute(record ? 'update_inventory_item' : 'create_inventory_item', { ...values, ...(record ? { id: record.id } : {}) })}
     fields={[
       { name: 'name', label: 'Item name', required: true }, { name: 'sku', label: 'SKU', disabled: true, placeholder: 'Generated on save', hint: record ? 'Assigned automatically.' : 'Assigned automatically when you save the item.' },
-      { name: 'category', label: 'Category', type: 'select', options: ['Vaccines', 'Medicine', 'Consumables', 'Other'] },
+      { name: 'category', label: 'Category', type: 'select', options: ['Vaccines', 'Medicine', 'Consumables', 'Other'], onChange: (event) => setCategory(event.target.value) },
+      { name: 'brand', label: 'Brand', required: category === 'Vaccines', hint: 'Used as the brand when this vaccine is selected for a patient.' },
       { name: 'unit', label: 'Unit', required: true }, { name: 'minimumStock', label: 'Minimum stock', type: 'number', min: '0', step: '0.01', required: true },
       { name: 'supplierId', label: 'Preferred supplier', type: 'select', options: [{ value: '', label: 'No preferred supplier' }, ...suppliers.filter((supplier) => supplier.isActive || supplier.id === record?.supplierId).map((supplier) => ({ value: supplier.id, label: supplier.name }))] },
       ...(record ? [activeField] : [
@@ -82,6 +84,7 @@ export function Inventory() {
     </div>
     <div className="record-directory">{filtered.map((item) => <SectionCard key={item.id} className="inventory-record">
       <div className="directory-card"><div><h2>{item.name}</h2><code>{item.sku}</code> <Badge>{item.category}</Badge> {!item.isActive && <Badge>Archived</Badge>}
+        {item.brand && <p>Brand: {item.brand}</p>}
         <p><strong className={item.quantity <= item.minimumStock ? 'danger-text' : ''}>{item.quantity} {item.unit}</strong> · Minimum {item.minimumStock}</p>
         <p>Nearest expiry: {item.nearestExpiry ? format(parseISO(item.nearestExpiry), 'd MMM yyyy') : 'No stocked expiry-dated batches'} {item.nearestExpiry && item.nearestExpiry < today ? <Badge tone="danger">Expired stock</Badge> : item.nearestExpiry && item.nearestExpiry <= cutoff ? <Badge tone="warning">Expiring soon</Badge> : null}</p>
         <small>{suppliers.find((supplier) => supplier.id === item.supplierId)?.name || 'No preferred supplier'}</small></div>

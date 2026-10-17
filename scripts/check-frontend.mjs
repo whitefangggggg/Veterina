@@ -20,7 +20,7 @@ try {
   page.on('request', (request) => {
     if (/supabase\.co\/(rest|functions)\//.test(request.url())) clinicCalls.push(request.url())
   })
-  for (const route of ['/dashboard', '/patients', '/patients/pet-1', '/appointments', '/reminders', '/inventory', '/suppliers', '/reports', '/settings', '/knowledge']) {
+  for (const route of ['/dashboard', '/queue', '/patients', '/patients/pet-1', '/appointments', '/reminders', '/inventory', '/suppliers', '/reports', '/settings', '/knowledge']) {
     await page.goto(origin + route)
     await page.getByRole('heading', { name: 'Welcome back', exact: true }).waitFor()
     const url = new URL(page.url())

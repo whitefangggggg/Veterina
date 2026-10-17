@@ -25,7 +25,7 @@ describe('clinic access decisions', () => {
 })
 
 describe('sign-in return destinations', () => {
-  it.each(['/dashboard', '/patients/pet-1', '/appointments?date=2026-10-17#agenda', '/inventory', '/settings', '/knowledge#document-1'])('preserves clinic path %s', (path) => {
+  it.each(['/dashboard', '/queue', '/patients/pet-1', '/appointments?date=2026-10-17#agenda', '/inventory', '/settings', '/knowledge#document-1'])('preserves clinic path %s', (path) => {
     expect(safeReturnTo(path)).toBe(path)
   })
 

@@ -9,6 +9,7 @@ const Auth = lazy(() => import('./pages/Auth'))
 const PasswordRecovery = lazy(() => import('./pages/PasswordRecovery'))
 const AccessPending = lazy(() => import('./pages/AccessPending'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Queue = lazy(() => import('./pages/Queue'))
 const Patients = lazy(() => import('./pages/Patients'))
 const PetDetail = lazy(() => import('./pages/PetDetail'))
 const Appointments = lazy(() => import('./pages/Operations').then((module) => ({ default: module.Appointments })))
@@ -54,6 +55,7 @@ const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
     element: <ProtectedWorkspace />,
     children: [
       { path: '/dashboard', element: load(<Dashboard />) },
+      { path: '/queue', element: load(<Queue />) },
       { path: '/patients', element: load(<Patients />) },
       { path: '/patients/:petId', element: load(<PetDetail />) },
       { path: '/appointments', element: load(<Appointments />) },

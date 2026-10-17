@@ -49,7 +49,12 @@ export function ClinicDataProvider({ children }) {
       const result = await mutation(action, payload)
       await reload()
       return result
-    } catch (error) { throw new Error(clinicErrorMessage(error), { cause: error }) }
+    } catch (error) {
+      // Refresh concurrent saves while the open editor retains its own inputs.
+      // Closing and reopening then loads the draft or checkup that was saved.
+      if (['DRAFT_CONFLICT', 'CHECKUP_ALREADY_QUEUED', 'VACCINATION_ALREADY_QUEUED'].some((code) => error.message?.includes(code))) await reload()
+      throw new Error(clinicErrorMessage(error), { cause: error })
+    }
   }
   const data = useMemo(() => normalizeClinicData(raw || {}, clock), [raw, clock])
   const value = { ...data, execute, reload, refreshing,
@@ -61,8 +66,8 @@ export function ClinicDataProvider({ children }) {
     },
     addOwner: (payload) => execute('create_owner', payload),
     addPet: (payload) => execute('create_pet', payload),
-    addVisit: (payload) => execute('create_encounter', payload),
-    addVaccination: (payload) => execute('create_vaccination', payload),
+    addVisit: (payload) => execute('create_queued_encounter', payload),
+    addVaccination: (payload) => execute('create_queued_vaccination', payload),
     addAppointment: (payload) => execute('book_appointment', payload),
     completeReminder: (id, outcome) => execute('complete_reminder', { id, outcome }),
     getOwner: (id) => data.owners.find((owner) => owner.id === id),

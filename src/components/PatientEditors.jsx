@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { DeleteRecordDialog, RecordEditor } from './RecordForm'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
+import { Field } from './ui'
+import { birthDateFromAge } from '../utils/clinicRules'
 
 export function OwnerEditor({ record, onClose }) {
   const { execute, owners } = useClinicData()
@@ -22,20 +24,36 @@ export function OwnerEditor({ record, onClose }) {
 }
 
 export function PetEditor({ record, onClose }) {
-  const { owners, execute } = useClinicData()
+  const { owners, execute, today } = useClinicData()
+  const [birthMode, setBirthMode] = useState(record?.birthDateEstimated ? 'preserve' : 'date')
+  const [birthDate, setBirthDate] = useState(record?.birthDate || '')
+  const [ageYears, setAgeYears] = useState('')
+  const [ageMonths, setAgeMonths] = useState('')
+  const estimated = birthDateFromAge(today, ageYears, ageMonths)
   return <RecordEditor title={record ? 'Edit patient' : 'Register a new patient'} onClose={onClose}
-    initial={record ? { ...record, latestWeight: record.baseline_weight } : { ownerId: owners.find((owner) => owner.isActive)?.id, species: 'Dog', sex: 'Unknown', reproductiveStatus: 'Unknown' }}
+    initial={record ? { ...record, latestWeight: record.baseline_weight } : { ownerId: owners.find((owner) => owner.isActive)?.id, species: 'Dog', sex: '', reproductiveStatus: 'Unknown' }}
     onSave={(values) => execute(record ? 'update_pet' : 'create_pet', { ...values, ...(record ? { id: record.id } : {}) })}
     submitLabel={record ? 'Save patient' : 'Register patient'} fields={[
       { name: 'name', label: 'Pet name', required: true, maxLength: 120 },
       { name: 'ownerId', label: 'Owner', type: 'select', required: true, options: [{ value: '', label: 'Choose owner' }, ...owners.filter((owner) => owner.isActive || owner.id === record?.ownerId).map((owner) => ({ value: owner.id, label: owner.fullName }))] },
       { name: 'species', label: 'Species', type: 'select', options: ['Dog', 'Cat', 'Bird', 'Rabbit', 'Other'] },
       { name: 'breed', label: 'Breed', required: true },
-      { name: 'sex', label: 'Sex', type: 'select', options: ['Male', 'Female', 'Unknown'] },
+      { name: 'sex', label: 'Sex', type: 'select', required: true, options: [{ value: '', label: record?.sex === 'Unknown' ? 'Previously Unknown — select sex' : 'Select sex' }, 'Male', 'Female'] },
       { name: 'reproductiveStatus', label: 'Reproductive status', type: 'select', options: ['Intact', 'Neutered', 'Spayed', 'Unknown'] },
-      { name: 'birthDate', label: 'Birth date', type: 'date' },
+      { name: 'birthInformation', render: () => <>
+        <Field label="Birth information"><select aria-label="Birth information" name="birthMode" value={birthMode} onChange={(event) => setBirthMode(event.target.value)}>
+          {record?.birthDateEstimated && <option value="preserve">Keep estimated birth date</option>}
+          <option value="date">Birth date</option><option value="age">Enter age</option>
+        </select></Field>
+        {birthMode === 'age' ? <>
+          <Field label="Age in years"><input name="ageYears" type="number" min="0" step="1" value={ageYears} onChange={(event) => setAgeYears(event.target.value)} /></Field>
+          <Field label="Additional months"><input name="ageMonths" type="number" min="0" max="11" step="1" value={ageMonths} onChange={(event) => setAgeMonths(event.target.value)} /></Field>
+          <p className="full" role="status">{estimated ? `Estimated birth date: ${estimated} (based on ${today})` : 'Enter years or months to calculate an estimated birth date.'}</p>
+        </> : <Field label={birthMode === 'preserve' ? 'Estimated birth date' : 'Birth date'}><input name="birthDate" type="date" max={today} readOnly={birthMode === 'preserve'} value={birthDate} onChange={(event) => setBirthDate(event.target.value)} /></Field>}
+      </> },
       { name: 'latestWeight', label: 'Baseline weight (kg)', type: 'number', min: '0.01', step: '0.01' },
       { name: 'color', label: 'Color / markings' },
+      { name: 'diet', label: 'Diet / feeding notes', type: 'textarea', span: true },
       { name: 'microchip', label: 'Microchip number', pattern: '[0-9]{15}', hint: '15 digits, or leave blank.' },
       ...(record ? [{ name: 'status', label: 'Patient status', type: 'select', options: ['Active', 'Inactive', 'Deceased'] }] : [{ name: 'allergies', label: 'Known allergies', span: true }]),
     ]} />

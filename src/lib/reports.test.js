@@ -4,6 +4,10 @@ import { historyHtml } from './reports'
 import { csvCell, csvStream, reportCsv } from '../../supabase/functions/_shared/csv'
 
 describe('clinical exports', () => {
+  it('prints diet, estimated dates, score scales, brands and maintenance notes', () => {
+    const html = historyHtml({ patient: { name: 'Pet', diet: 'Diet <plan>', birth_date_estimated: true }, vitals: [{ body_condition_score: 3, body_condition_scale: 5 }, { body_condition_score: 7, body_condition_scale: 9 }], vaccinations: [{ brand: 'Brand A', lot_number: 'Old lot' }], maintenance: [{ service_name: 'Grooming', service_notes: 'Trimmed & brushed', status: 'completed' }] })
+    for (const value of ['Diet &lt;plan&gt;', 'Birth date estimated', 'Body condition (1–5)', 'Body condition (1–9)', 'Brand A', 'Old lot', 'Grooming', 'Trimmed &amp; brushed']) expect(html).toContain(value)
+  })
   it('neutralizes spreadsheet formulas and preserves quotes, newlines and Unicode', () => {
     for (const prefix of ['=', '+', '-', '@', '\t', '\r']) expect(csvCell(prefix + 'value')).toBe('"\'' + prefix + 'value"')
     expect(reportCsv([{ name: 'María "Mia"', note: 'line 1\nline 2' }])).toContain('"María ""Mia"""')
