@@ -9,7 +9,7 @@ import {
   Package,
   PawPrint,
   Plus,
-  Sparkle,
+  Heartbeat,
   Truck,
 } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
@@ -40,7 +40,7 @@ export default function Dashboard() {
     <div className="home-page">
       <section className="home-hero">
         <div className="home-greeting">
-          <span className="hero-kicker"><Sparkle size={15} weight="fill" /> {new Intl.DateTimeFormat('en-PH',{timeZone:'Asia/Manila',weekday:'long',day:'numeric',month:'long'}).format(new Date())}</span>
+          <span className="hero-kicker"><Heartbeat size={16} weight="duotone" /> {new Intl.DateTimeFormat('en-PH',{timeZone:'Asia/Manila',weekday:'long',day:'numeric',month:'long'}).format(new Date())}</span>
           <h1>Welcome,<br /><span>{isDemo?'Demo staff':profile?.full_name}.</span></h1>
           <p>Patient care, scheduling, and clinic operations — ready when you are.</p>
           <div className="hero-actions">
