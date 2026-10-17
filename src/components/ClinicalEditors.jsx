@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { RecordEditor } from './RecordForm'
+import { AsyncForm, RecordEditor } from './RecordForm'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { clinicDate, clinicTime, clinicTimestamp } from '../lib/clinicRepository'
-import { Badge, Field } from './ui'
+import { Badge, Field, Modal } from './ui'
+import { prescriptionMedications } from '../lib/prescriptions'
 
 const staffOptions = (profiles) => profiles.filter((profile) => profile.is_active).map((profile) => ({ value: profile.id, label: profile.full_name || 'Clinic staff' }))
 
@@ -96,13 +97,34 @@ export function VaccineEditor({ pet, record, queueEntry, onSaved, onClose }) {
 }
 
 export function PrescriptionEditor({ pet, record, onClose }) {
-  const { visits, execute } = useClinicData()
-  return <RecordEditor title={record ? 'Edit prescription' : 'Add prescription'} onClose={onClose}
-    initial={record ? { medicationName: record.medication_name, dose: record.dose, frequency: record.frequency, instructions: record.instructions } : {}}
-    onSave={(values) => execute(record ? 'update_prescription' : 'create_prescription', { ...values, ...(record ? { id: record.id } : {}) })}
-    fields={[
-      ...(!record ? [{ name: 'visitId', label: 'Open encounter', type: 'select', required: true, options: [{ value: '', label: 'Select an open encounter' }, ...visits.filter((visit) => visit.petId === pet.id && !visit.finalizedAt).map((visit) => ({ value: visit.id, label: visit.type + ' · ' + visit.visitedAt.slice(0, 10) }))] }] : []),
-      { name: 'medicationName', label: 'Medication name', required: true }, { name: 'dose', label: 'Dose', required: true },
-      { name: 'frequency', label: 'Frequency', required: true }, { name: 'instructions', label: 'Instructions', type: 'textarea', span: true },
-    ]} />
+  const { visits, execute, timezone } = useClinicData()
+  const emptyMedication = () => ({ key: crypto.randomUUID(), medicationName: '', dose: '', frequency: '', duration: '', instructions: '' })
+  const [medications, setMedications] = useState(() => record ? prescriptionMedications(record).map((medication) => ({ ...emptyMedication(), ...medication })) : [emptyMedication()])
+  const openVisits = visits.filter((visit) => visit.petId === pet.id && !visit.finalizedAt)
+  return <Modal title={record ? 'Edit prescription' : `Add prescription for ${pet.name}`} description="Add all medications to one prescription. Printed documents use your clinic settings and the prescriber's professional details." wide onClose={onClose}>
+    <AsyncForm onClose={onClose} submitLabel="Save prescription" onSave={(values) => {
+      const items = medications.map((medication) => Object.fromEntries(['medicationName', 'dose', 'frequency', 'duration', 'instructions'].map((field) => [field, (medication[field] || '').trim()])))
+      return execute(record ? 'update_prescription' : 'create_prescription', { ...values, ...items[0], medications: items, ...(record ? { id: record.id } : {}) })
+    }}>
+      {!record && <Field label="Open encounter" required><select name="visitId" required defaultValue={openVisits.length === 1 ? openVisits[0].id : ''}>
+        <option value="">Select an open encounter</option>{openVisits.map((visit) => <option key={visit.id} value={visit.id}>{visit.type} · {clinicDate(new Date(visit.visitedAt), timezone)}</option>)}
+      </select></Field>}
+      {!record && !openVisits.length && <p className="auth-message">Record an open checkup before adding a prescription.</p>}
+      <div className="prescription-medications">{medications.map((medication, index) => <fieldset className="medication-editor" key={medication.key}>
+        <legend>Medication {index + 1}</legend>
+        <div className="form-grid">{[
+          { name: 'medicationName', label: 'Medication name', required: true, span: true },
+          { name: 'dose', label: 'Dose', required: true },
+          { name: 'frequency', label: 'Frequency', required: true },
+          { name: 'duration', label: 'Duration', placeholder: 'e.g. 7 days' },
+          { name: 'instructions', label: 'Instructions', textarea: true, span: true },
+        ].map(({ name, label, required, span, textarea, placeholder }) => {
+          const props = { value: medication[name], required, placeholder, 'aria-label': `${label} ${index + 1}`, onChange: (event) => setMedications((current) => current.map((item) => item.key === medication.key ? { ...item, [name]: event.target.value } : item)) }
+          return <Field key={name} label={label} required={required} span={span}>{textarea ? <textarea {...props} rows={2} /> : <input {...props} />}</Field>
+        })}</div>
+        {medications.length > 1 && <button type="button" className="text-link danger-text" aria-label={`Remove medication ${index + 1}`} onClick={() => setMedications((current) => current.filter((item) => item.key !== medication.key))}>Remove medication</button>}
+      </fieldset>)}</div>
+      <button type="button" className="button button-secondary" onClick={() => setMedications((current) => [...current, emptyMedication()])}>Add medication</button>
+    </AsyncForm>
+  </Modal>
 }

@@ -27,7 +27,7 @@ import { VisitEditor as VisitModal, VaccineEditor as VaccineModal, PrescriptionE
 import { OwnerEditor, PetEditor } from '../components/PatientEditors'
 import { ActionDialog, DeleteRecordDialog } from '../components/RecordForm'
 import { fetchReport, printPatientHistory } from '../lib/reports'
-import Assistant from '../components/Assistant'
+import { prescriptionMedications, printPrescription } from '../lib/prescriptions'
 import { QueueDialog } from '../components/QueueEditors'
 
 function CareStatus({ record }) {
@@ -81,6 +81,9 @@ export default function PetDetail() {
         </div>
         <div className="pet-hero-actions">
           {profile.role === 'owner' && <button className="button button-secondary" disabled={printing} onClick={printHistory}><Printer size={18} weight="duotone" /> {printing ? 'Preparing...' : 'Print history'}</button>}
+          <button className="button button-secondary" onClick={() => setModal({ type: 'vaccine' })}><Syringe size={18} weight="duotone" /> Record vaccination</button>
+          <Link className="button button-secondary" to="/appointments"><CalendarPlus size={18} weight="duotone" /> Book appointment</Link>
+          <button className="button button-secondary" onClick={() => setModal({ type: 'prescription' })}><Pill size={18} weight="duotone" /> Add prescription</button>
           <button className="button button-primary" onClick={() => setModal({ type: 'visit' })}><Plus size={18} weight="bold" /> Record checkup</button>
         </div>
       </div>
@@ -144,7 +147,13 @@ export default function PetDetail() {
                       {profile.role === 'owner' && <button className="button button-secondary small-button danger-text" onClick={() => setModal({ type: 'delete', entity: 'visit', record: visit })}>Delete checkup</button>}
                     </div>
                     {visit.corrections.map((correction) => <div className="follow-up-note" key={correction.id}><strong>Correction: {correction.reason}</strong><p>{correction.correction}</p></div>)}
-                    {visit.prescriptions.map((prescription) => <div className="prescription-row" key={prescription.id}><strong>{prescription.medication_name}</strong><p>{prescription.dose} · {prescription.frequency}</p><p>{prescription.instructions}</p>{!visit.finalizedAt && <button className="text-link" onClick={() => setModal({ type: 'prescription', record: prescription })}>Edit prescription</button>}{profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', entity: 'prescription', record: prescription })}>Delete prescription</button>}</div>)}
+                    {visit.prescriptions.map((prescription) => <div className="prescription-row" key={prescription.id}>
+                      <strong>Prescription</strong>
+                      <ol className="prescription-items">{prescriptionMedications(prescription).map((medication, index) => <li key={index}><strong>{medication.medicationName}</strong><p>{[medication.dose, medication.frequency, medication.duration].filter(Boolean).join(' · ')}</p>{medication.instructions && <p>{medication.instructions}</p>}</li>)}</ol>
+                      <button className="text-link" onClick={() => printPrescription({ prescription, pet, visit, clinic: settings, profiles, owner })}>Print prescription / PDF</button>
+                      {!visit.finalizedAt && <button className="text-link" onClick={() => setModal({ type: 'prescription', record: prescription })}>Edit prescription</button>}
+                      {profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', entity: 'prescription', record: prescription })}>Delete prescription</button>}
+                    </div>)}
                     {visit.followUpDate && <div className="follow-up-note"><CalendarPlus size={16} weight="duotone" /> Follow-up due {format(parseISO(visit.followUpDate), 'd MMMM yyyy')}</div>}
                   </div>
                 </article>
@@ -196,7 +205,6 @@ export default function PetDetail() {
         </div>
 
         <aside className="record-sidebar">
-          <Assistant key={petId} patientId={petId} />
           <SectionCard title="Owner" action={<button className="text-link" onClick={() => setModal({ type: 'owner' })}>Edit owner</button>}>
             <div className="owner-card">
               <div className="avatar owner-avatar">{owner?.fullName?.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div>
@@ -216,11 +224,6 @@ export default function PetDetail() {
           </SectionCard>
           <SectionCard title="Care alerts" action={<button className="text-link" onClick={() => setModal({ type: 'alert' })}>Add alert</button>}>
             <div className="care-alert-list">{alerts.filter((alert) => alert.pet_id === pet.id).map((alert) => <div key={alert.id}><Badge tone={alert.is_active ? 'warning' : 'neutral'}>{alert.is_active ? alert.alert_type : 'Resolved'}</Badge><p>{alert.description}</p><div className="record-actions"><button className="text-link" onClick={() => setModal({ type: 'edit-alert', record: alert })}>Edit alert</button>{alert.is_active && <button className="text-link" onClick={() => setModal({ type: 'resolve-alert', record: alert })}>Resolve alert</button>}{profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', entity: 'alert', record: alert })}>Delete alert</button>}</div></div>)}</div>
-          </SectionCard>
-          <SectionCard title="Quick actions">
-            <button className="quick-action" onClick={() => setModal({ type: 'vaccine' })}><Syringe size={18} weight="duotone" /><span><strong>Record vaccination</strong><small>Select vaccine, brand and next due date</small></span></button>
-            <Link className="quick-action" to="/appointments"><CalendarPlus size={18} weight="duotone" /><span><strong>Book appointment</strong><small>Schedule the next visit</small></span></Link>
-            <button className="quick-action" onClick={() => setModal({ type: 'prescription' })}><Pill size={18} weight="duotone" /><span><strong>Add prescription</strong><small>Record medication details</small></span></button>
           </SectionCard>
         {profile.role === 'owner' && <button className="button button-secondary danger-text" onClick={() => setModal({ type: 'delete', entity: 'pet', record: pet })}>Delete patient</button>}
         </aside>

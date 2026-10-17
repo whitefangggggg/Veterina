@@ -81,6 +81,24 @@ Forms wait for database acknowledgement before closing, block repeated submissio
 
 Permanent deletion requires an owner and a recorded reason. Patient deletion removes dependent clinical rows and retrieval chunks. Patients with pre-existing stored attachments are protected from deletion until their files have been removed; this portal does not yet include attachment upload/removal controls.
 
+## Installable app (PWA)
+
+The production build includes a web app manifest, Veterina home-screen icons, and a service worker that precaches the app's static files. Installed apps open `/dashboard` in a standalone window and keep the existing staff sign-in and approval checks.
+
+Choose the **Install Veterina** button in the lower-right corner on any page. It opens the browser's installation prompt when available, or displays installation instructions. The button stays available after dismissing a prompt and is hidden inside the installed app. On iPhone/iPad, open the site in Safari, choose **Share → Add to Home Screen**, and enable **Open as Web App** when available. Installation requires HTTPS in production; localhost is supported for testing.
+
+The app shell and sign-in pages can reopen offline after the first successful service-worker installation. Clinic records, authentication requests, reports, and saves require an internet connection. The worker does not cache API responses or queue clinical writes. An offline notice asks staff to keep unsaved entries open. New versions display **Reload and update**; staff should save work in all open Veterina tabs before accepting, or choose **Later**.
+
+The install button, manifest, and a lightweight development service worker are available in `npm run dev`, including on localhost. The development worker does not intercept page navigation, app modules, or hot reload. Full offline app caching is available in production builds. To verify the production build:
+
+```sh
+npm run build
+npm run test:pwa
+npm run preview
+```
+
+The PWA browser check uses installed Chrome and port 5179. It checks offline reloads, unvisited lazy routes, install controls, cache contents, and the real service-worker update lifecycle. iOS guidance is checked with an emulated user agent; validate installation on a physical iPhone/iPad before release. Regenerate PNG icons from `public/favicon.svg` with `npm run pwa:icons` after changing the brand artwork. Netlify is configured to revalidate the service worker, manifest, and HTML; preserve those cache headers and the SPA fallback on other hosts.
+
 ## Verification
 
 ```sh

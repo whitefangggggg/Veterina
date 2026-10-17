@@ -33,6 +33,17 @@ try {
     assert.equal(new URL(page.url()).pathname, '/sign-in')
   }
   await page.goto(origin)
+  await page.getByRole('button', { name: 'Install Veterina', exact: true }).waitFor()
+  assert.equal(await page.locator('link[rel="manifest"]').count(), 1, 'Development page is missing its install manifest')
+  const devtools = await page.context().newCDPSession(page)
+  const { errors: manifestErrors } = await devtools.send('Page.getAppManifest')
+  assert.deepEqual(manifestErrors, [], 'Development manifest could not be parsed')
+  const { installabilityErrors } = await devtools.send('Page.getInstallabilityErrors')
+  assert.deepEqual(installabilityErrors.filter((error) => error.errorId !== 'in-incognito'), [], 'Development app is not installable')
+  await page.getByRole('button', { name: 'Install Veterina', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Install Veterina', exact: true }).waitFor()
+  await page.keyboard.press('Escape')
+  assert.equal(await page.getByRole('button', { name: 'Install Veterina', exact: true }).count(), 1, 'Installation entry disappeared after closing guidance')
   await page.getByRole('link', { name: 'Sign in', exact: true }).first().waitFor()
   assert.equal(await page.locator('a[href="/demo"]').count(), 0)
   await page.getByRole('link', { name: 'Sign in', exact: true }).first().click()
@@ -57,7 +68,7 @@ try {
   }
   assert.deepEqual(errors, [])
   assert.deepEqual(clinicCalls, [], 'Signed-out visitors made a clinic API request')
-  console.log('PASS protected routes, legacy links, account pages, invalid reset links, keyboard access, mobile layouts, and anonymous clinic API isolation')
+  console.log('PASS localhost PWA manifest and persistent install controls, protected routes, legacy links, account pages, invalid reset links, keyboard access, mobile layouts, and anonymous clinic API isolation')
 } finally {
   await browser?.close()
   server.kill()

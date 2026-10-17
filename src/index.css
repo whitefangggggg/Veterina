@@ -49,6 +49,13 @@ button:disabled, fieldset:disabled .button { opacity: .6; cursor: wait; transfor
 .care-alert-list > div { padding: 12px 0; border-bottom: 1px solid var(--line); }
 .prescription-row { margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
 .prescription-row .text-link { margin-right: 14px; }
+.prescription-medications { display: grid; gap: 18px; margin: 20px 0; }
+.medication-editor { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
+.medication-editor legend { padding: 0 6px; font-weight: 650; font-size: 14px; }
+.medication-editor > .text-link { margin-top: 12px; }
+.prescription-items { padding-left: 20px; }
+.prescription-items li { padding: 6px 0; overflow-wrap: anywhere; }
+.prescription-items p { white-space: pre-wrap; }
 .settings-panel { padding: 24px; }
 .mfa-setup { max-width: 440px; overflow-wrap: anywhere; }
 .mfa-setup img { display: block; margin: 20px 0; }
@@ -332,7 +339,7 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
 .pet-identity > p { margin: 4px 0 10px; color: var(--muted); font-size: 14px; }
 .pet-meta { display: flex; flex-wrap: wrap; gap: 14px; }
 .pet-meta code, .pet-meta span { display: inline-flex; align-items: center; gap: 5px; color: #65736d; font-size: 12px; }
-.pet-hero-actions { display: flex; gap: 8px; }
+.pet-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .clinical-alerts { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 13px; }
 .clinical-alert { display: flex; align-items: center; min-width: 240px; gap: 9px; padding: 10px 13px; border-radius: 10px; }
 .clinical-alert.danger { color: var(--rose); background: var(--rose-soft); }
@@ -676,8 +683,8 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
   .result-count { margin-left: 0; }
   .pet-hero { align-items: flex-start; flex-wrap: wrap; }
   .pet-identity { width: calc(100% - 85px); }
-  .pet-hero-actions { width: 100%; }
-  .pet-hero-actions .button { flex: 1; min-height: 46px; }
+  .pet-hero-actions { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+  .pet-hero-actions .button { flex: 1 1 100%; min-height: 44px; }
   .pet-summary-grid, .reminder-summary { grid-template-columns: 1fr 1fr; }
   .visit-card { grid-template-columns: 1fr; }
   .visit-date { flex-direction: row; justify-content: flex-start; gap: 4px; padding: 0 0 10px; border-right: 0; border-bottom: 1px solid #e6eae6; }
