@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { cloneElement, isValidElement, useEffect, useId } from 'react'
 import { X } from '@phosphor-icons/react'
 
 export function PageHeader({ eyebrow, title, description, actions }) {
@@ -68,11 +68,16 @@ export function Modal({ title, description, children, onClose, wide = false }) {
 }
 
 export function Field({ label, required, hint, children, span = false }) {
+  const hintId = useId()
+  const control = isValidElement(children) ? cloneElement(children, {
+    'aria-label': children.props['aria-label'] ?? label,
+    ...(hint ? { 'aria-describedby': children.props['aria-describedby'] || hintId } : {}),
+  }) : children
   return (
     <label className={`field ${span ? 'field-span' : ''}`}>
       <span>{label}{required && <b aria-hidden="true"> *</b>}</span>
-      {children}
-      {hint && <small>{hint}</small>}
+      {control}
+      {hint && <small id={hintId}>{hint}</small>}
     </label>
   )
 }

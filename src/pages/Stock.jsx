@@ -1,134 +1,131 @@
-import { useMemo, useState } from 'react'
-import { format, parseISO } from 'date-fns'
-import {
-  ArrowLineDown,
-  ArrowLineUp,
-  Cube,
-  EnvelopeSimple,
-  MapPin,
-  Package,
-  Phone,
-  Plus,
-  MagnifyingGlass,
-  Truck,
-  Warning,
-} from '@phosphor-icons/react'
+import { useState } from 'react'
+import { addDays, format, parseISO } from 'date-fns'
+import { Cube, MagnifyingGlass, Package, Plus, Truck, Warning } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
-import { Badge, Field, Modal, PageHeader, SectionCard, StatCard } from '../components/ui'
-import MutationForm from '../components/MutationForm'
-import StockCreateModal from '../components/StockCreateModal'
 import { useAuth } from '../context/AuthContext'
-import { clinicToday } from '../lib/clinicRepository'
+import { Badge, EmptyState, Modal, PageHeader, SectionCard, StatCard } from '../components/ui'
+import { AsyncForm, DeleteRecordDialog, RecordEditor } from '../components/RecordForm'
 
-function AdjustmentModal({ item, onClose }) {
-  const { adjustStock } = useClinicData()
+const supplierFields = [
+  { name: 'name', label: 'Supplier name', required: true }, { name: 'contactPerson', label: 'Contact person' },
+  { name: 'phone', label: 'Phone', type: 'tel', required: true }, { name: 'email', label: 'Email', type: 'email' },
+  { name: 'address', label: 'Address', type: 'textarea', span: true }, { name: 'notes', label: 'Ordering notes', type: 'textarea', span: true },
+]
+const activeField = { name: 'isActive', label: 'Status', type: 'select', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Archived' }] }
+
+function ItemEditor({ record, onClose }) {
+  const { suppliers, execute } = useClinicData()
+  return <RecordEditor title={record ? 'Edit inventory item' : 'New inventory item'} initial={record || { category: 'Medicine', minimumStock: 0, unit: 'unit', allowsFraction: 'false' }} onClose={onClose}
+    onSave={(values) => execute(record ? 'update_inventory_item' : 'create_inventory_item', { ...values, ...(record ? { id: record.id } : {}) })}
+    fields={[
+      { name: 'name', label: 'Item name', required: true }, { name: 'sku', label: 'SKU', disabled: true, placeholder: 'Generated on save', hint: record ? 'Assigned automatically.' : 'Assigned automatically when you save the item.' },
+      { name: 'category', label: 'Category', type: 'select', options: ['Vaccines', 'Medicine', 'Consumables', 'Other'] },
+      { name: 'unit', label: 'Unit', required: true }, { name: 'minimumStock', label: 'Minimum stock', type: 'number', min: '0', step: '0.01', required: true },
+      { name: 'supplierId', label: 'Preferred supplier', type: 'select', options: [{ value: '', label: 'No preferred supplier' }, ...suppliers.filter((supplier) => supplier.isActive || supplier.id === record?.supplierId).map((supplier) => ({ value: supplier.id, label: supplier.name }))] },
+      ...(record ? [activeField] : [
+        { name: 'allowsFraction', label: 'Allow fractional quantities', type: 'select', options: [{ value: 'false', label: 'Whole units only' }, { value: 'true', label: 'Fractional units allowed' }] },
+        { name: 'lotNumber', label: 'Initial batch / lot number' }, { name: 'expirationDate', label: 'Initial batch expiry', type: 'date' },
+      ]),
+    ]} />
+}
+
+function BatchEditor({ item, record, onClose }) {
+  const { suppliers, execute } = useClinicData()
+  return <RecordEditor title={record ? 'Edit batch' : 'Add inventory batch'} onClose={onClose} initial={record ? { supplierId: record.supplier_id, lotNumber: record.lot_number, expirationDate: record.expiration_date, unitCost: record.unit_cost, isActive: record.is_active } : { supplierId: item.supplierId }}
+    onSave={(values) => execute(record ? 'update_batch' : 'create_batch', { ...values, itemId: item.id, ...(record ? { id: record.id } : {}) })}
+    fields={[
+      { name: 'lotNumber', label: 'Batch / lot number' }, { name: 'expirationDate', label: 'Expiry date', type: 'date' },
+      { name: 'supplierId', label: 'Supplier', type: 'select', options: [{ value: '', label: 'No supplier' }, ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))] },
+      { name: 'unitCost', label: 'Unit cost', type: 'number', min: '0', step: '0.01' },
+      ...(record ? [activeField] : []),
+    ]} />
+}
+
+function StockMovementEditor({ item, onClose }) {
+  const { execute } = useClinicData()
+  const { profile } = useAuth()
   const [mode, setMode] = useState('Stock in')
-  const [quantity, setQuantity] = useState('')
-  const [reason, setReason] = useState('')
-  const [batchId,setBatchId]=useState(item.batches?.[0]?.id || '')
-  const submit = async (event) => {
-    event.preventDefault()
-    const delta = mode === 'Stock out' ? -Number(quantity) : Number(quantity)
-    await adjustStock(item.id,delta,reason || mode,batchId,event.idempotencyKey)
-    onClose()
-  }
-  return (
-    <Modal title={`Update ${item.name}`} description={`Current on-hand quantity: ${item.quantity} ${item.unit}s`} onClose={onClose}>
-      <MutationForm onSubmit={submit}>
-        <div className="segmented-control"><button type="button" className={mode === 'Stock in' ? 'active' : ''} onClick={() => setMode('Stock in')}><ArrowLineDown size={17} weight="bold" /> Stock in</button><button type="button" className={mode === 'Stock out' ? 'active' : ''} onClick={() => setMode('Stock out')}><ArrowLineUp size={17} weight="bold" /> Stock out</button></div>
-        <div className="form-grid">
-          {item.batches && <Field label="Batch" required><select required value={batchId} onChange={(e)=>setBatchId(e.target.value)}>{item.batches.map((b)=><option key={b.id} value={b.id}>{b.lot_number || 'Unlabelled batch'} · {b.quantity} on hand · {b.expiration_date || 'No expiry'}</option>)}</select></Field>}
-          <Field label={`Quantity (${item.unit}s)`} required><input autoFocus required type="number" min="0.01" step="0.01" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></Field>
-          <Field label="Reason" required><select required value={reason} onChange={(event) => setReason(event.target.value)}><option value="">Select reason</option><option>Supplier delivery</option><option>Dispensed to patient</option><option>Clinic use</option><option>Expired / damaged</option><option>Physical count correction</option></select></Field>
-        </div>
-        <div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary">Record movement</button></div>
-      </MutationForm>
-    </Modal>
-  )
+  return <Modal title={'Update ' + item.name} description={'Current on-hand quantity: ' + item.quantity + ' ' + item.unit} onClose={onClose}>
+    <div className="segmented-control">{['Stock in', 'Stock out', ...(profile.role === 'owner' ? ['Physical count'] : [])].map((value) => <button key={value} type="button" className={value === mode ? 'active' : ''} onClick={() => setMode(value)}>{value}</button>)}</div>
+    <AsyncForm key={mode} onClose={onClose} submitLabel="Record movement" onSave={(values) => mode === 'Physical count'
+      ? execute('record_count_adjustment', { id: item.id, batchId: values.batchId, observedQuantity: values.quantity, reason: values.reason })
+      : execute('record_inventory_movement', { id: item.id, batchId: values.batchId, delta: (mode === 'Stock out' ? -1 : 1) * Number(values.quantity), reason: values.reason })}>
+      <div className="form-grid">
+        <label className="field"><span>Batch *</span><select name="batchId" required defaultValue={item.batches.find((batch) => batch.is_active)?.id || ''}>{item.batches.filter((batch) => batch.is_active).map((batch) => <option key={batch.id} value={batch.id}>{batch.lot_number || 'Unnumbered batch'} · {batch.quantity} available · {batch.expiration_date || 'No expiry'}</option>)}</select></label>
+        <label className="field"><span>{mode === 'Physical count' ? 'Observed batch quantity' : 'Quantity'} *</span><input name="quantity" type="number" min={mode === 'Physical count' ? '0' : item.allowsFraction ? '0.01' : '1'} step={item.allowsFraction ? '0.01' : '1'} required /></label>
+        <label className="field field-span"><span>Reason *</span>{mode === 'Physical count' ? <input name="reason" required placeholder="Why the counted quantity differs" /> : <select name="reason" required defaultValue=""><option value="">Select reason</option>{(mode === 'Stock in' ? ['Supplier delivery', 'Returned to stock'] : ['Dispensed to patient', 'Clinic use', 'Expired / damaged']).map((reason) => <option key={reason}>{reason}</option>)}</select>}</label>
+      </div>
+    </AsyncForm>
+  </Modal>
 }
 
 export function Inventory() {
-  const {isDemo}=useAuth()
-  const [create,setCreate]=useState(false)
-  const { inventory, suppliers } = useClinicData()
+  const { inventory, suppliers, today } = useClinicData()
+  const { profile } = useAuth()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All')
-  const [adjustItem, setAdjustItem] = useState(null)
-  const lowStock = inventory.filter((item) => item.quantity <= item.minimumStock)
-  const expiryLimit=format(new Date(`${clinicToday()}T12:00:00`).setDate(new Date(`${clinicToday()}T12:00:00`).getDate()+90),'yyyy-MM-dd')
-  const expiring = inventory.filter((item) => item.nearestExpiry && item.nearestExpiry <= expiryLimit)
-  const filtered = useMemo(() => inventory.filter((item) => {
-    const normalized = query.toLowerCase()
-    return (!normalized || item.name.toLowerCase().includes(normalized) || item.sku.toLowerCase().includes(normalized))
-      && (category === 'All' || item.category === category)
-  }), [inventory, query, category])
-
-  return (
-    <div className="page">
-      <PageHeader eyebrow="Stock control" title="Inventory" description="Know what is available, expiring, or ready to reorder." actions={!isDemo && <button className="button button-primary" onClick={()=>setCreate(true)}><Package size={18} weight="duotone" /> New item</button>} />
-      <div className="stats-grid stock-stats">
-        <StatCard icon={Cube} label="Inventory items" value={inventory.length} detail="Across all categories" />
-        <StatCard icon={Warning} label="Below minimum" value={lowStock.length} detail="Reorder recommended" tone="rose" />
-        <StatCard icon={Warning} label="Expiring in 90 days" value={expiring.length} detail="Review batches" tone="amber" />
-        <StatCard icon={Truck} label="Active suppliers" value={suppliers.length} detail="Contacts on file" tone="blue" />
-      </div>
-      <div className="list-toolbar">
-        <label className="table-search"><MagnifyingGlass size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search item name or SKU..." /></label>
-        <div className="filter-pills">{['All', 'Vaccines', 'Medicine', 'Consumables'].map((value) => <button key={value} onClick={() => setCategory(value)} className={category === value ? 'active' : ''}>{value}</button>)}</div>
-      </div>
-      <div className="inventory-table section-card">
-        <div className="table-head inventory-grid"><span>Item</span><span>Category</span><span>On hand</span><span>Nearest expiry</span><span>Supplier</span><span /></div>
-        {filtered.map((item) => {
-          const supplier = suppliers.find((entry) => entry.id === item.supplierId)
-          const isLow = item.quantity <= item.minimumStock
-          const isExpiring = item.nearestExpiry && item.nearestExpiry <= expiryLimit
-          return (
-            <div className="table-row inventory-grid" key={item.id}>
-              <div className="cell-item"><strong>{item.name}</strong><code>{item.sku}</code></div>
-              <div className="cell-category"><Badge>{item.category}</Badge></div>
-              <div className="cell-qty"><span className="card-meta-label">On hand</span><strong className={isLow ? 'danger-text' : ''}>{item.quantity} {item.unit}{item.quantity !== 1 ? 's' : ''}</strong><small>Minimum {item.minimumStock}</small></div>
-              <div className="cell-expiry"><span className="card-meta-label">Nearest expiry</span><strong>{item.nearestExpiry?format(parseISO(item.nearestExpiry),'d MMM yyyy'):'No stocked expiry'}</strong>{isExpiring && <small className="warning-text">Expiring soon</small>}</div>
-              <div className="cell-supplier"><span className="card-meta-label">Supplier</span><strong>{supplier?.name}</strong><small>{supplier?.phone}</small></div>
-              <div className="cell-action"><button className="button button-secondary small-button" onClick={() => setAdjustItem(item)}>Update stock</button></div>
-            </div>
-          )
-        })}
-      </div>
-      <div className="inventory-rule-note"><Warning size={18} weight="fill" /><span><strong>Movement-based stock:</strong> quantities change only through stock-in, stock-out, or adjustment records so discrepancies can be traced.</span></div>
-      {adjustItem && <AdjustmentModal item={adjustItem} onClose={() => setAdjustItem(null)} />}
-      {create && <StockCreateModal kind="item" onClose={()=>setCreate(false)}/>}
+  const [showArchived, setShowArchived] = useState(false)
+  const [modal, setModal] = useState(null)
+  const cutoff = format(addDays(parseISO(today), 90), 'yyyy-MM-dd')
+  const active = inventory.filter((item) => item.isActive)
+  const lowStock = active.filter((item) => item.quantity <= item.minimumStock)
+  const expiring = active.filter((item) => item.nearestExpiry && item.nearestExpiry >= today && item.nearestExpiry <= cutoff)
+  const expired = active.filter((item) => item.nearestExpiry && item.nearestExpiry < today)
+  const filtered = inventory.filter((item) => (showArchived || item.isActive) && (category === 'All' || item.category === category) && [item.name, item.sku].some((value) => value.toLowerCase().includes(query.toLowerCase())))
+  const selectedItem = modal?.itemId ? inventory.find((item) => item.id === modal.itemId) : null
+  return <div className="page">
+    <PageHeader eyebrow="Stock control" title="Inventory" description="Live balances, batches and permanent movement history." actions={<button className="button button-primary" onClick={() => setModal({ type: 'item' })}><Package size={18} /> New item</button>} />
+    <div className="stats-grid stock-stats"><StatCard icon={Cube} label="Active items" value={active.length} /><StatCard icon={Warning} label="At or below minimum" value={lowStock.length} tone="rose" /><StatCard icon={Warning} label="Expiring in 90 days" value={expiring.length} detail={expired.length + ' items have expired stock'} tone="amber" /><StatCard icon={Truck} label="Active suppliers" value={suppliers.filter((supplier) => supplier.isActive).length} /></div>
+    <div className="list-toolbar"><label className="table-search"><MagnifyingGlass size={18} /><input aria-label="Search inventory" placeholder="Search item or SKU..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+      <select aria-label="Inventory category" value={category} onChange={(event) => setCategory(event.target.value)}>{['All', 'Vaccines', 'Medicine', 'Consumables', 'Other'].map((value) => <option key={value}>{value}</option>)}</select>
+      <label><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} /> Include archived</label>
     </div>
-  )
+    <div className="record-directory">{filtered.map((item) => <SectionCard key={item.id} className="inventory-record">
+      <div className="directory-card"><div><h2>{item.name}</h2><code>{item.sku}</code> <Badge>{item.category}</Badge> {!item.isActive && <Badge>Archived</Badge>}
+        <p><strong className={item.quantity <= item.minimumStock ? 'danger-text' : ''}>{item.quantity} {item.unit}</strong> · Minimum {item.minimumStock}</p>
+        <p>Nearest expiry: {item.nearestExpiry ? format(parseISO(item.nearestExpiry), 'd MMM yyyy') : 'No stocked expiry-dated batches'} {item.nearestExpiry && item.nearestExpiry < today ? <Badge tone="danger">Expired stock</Badge> : item.nearestExpiry && item.nearestExpiry <= cutoff ? <Badge tone="warning">Expiring soon</Badge> : null}</p>
+        <small>{suppliers.find((supplier) => supplier.id === item.supplierId)?.name || 'No preferred supplier'}</small></div>
+        <div className="record-actions"><button className="button button-secondary small-button" onClick={() => setModal({ type: 'item', itemId: item.id })}>Edit item</button>
+          <button className="button button-primary small-button" disabled={!item.isActive || !item.batches.some((batch) => batch.is_active)} onClick={() => setModal({ type: 'movement', itemId: item.id })}>Update stock</button>
+          <button className="button button-secondary small-button" onClick={() => setModal({ type: 'batch', itemId: item.id })}>Add batch</button>
+          {profile.role === 'owner' && !item.movements.length && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete-item', record: item })}>Delete item</button>}
+        </div>
+      </div>
+      <details className="ledger-details"><summary>Batches ({item.batches.length}) and movement history ({item.movements.length})</summary>
+        {item.batches.map((batch) => <div className="ledger-row" key={batch.id}><span><strong>{batch.lot_number || 'Unnumbered batch'}</strong> · {batch.quantity} {item.unit} · Expires {batch.expiration_date || 'not set'} {!batch.is_active && <Badge>Archived</Badge>}</span><button className="text-link" onClick={() => setModal({ type: 'batch', itemId: item.id, record: batch })}>Edit batch</button>{profile.role === 'owner' && !item.movements.some((movement) => movement.batch_id === batch.id) && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete-batch', record: batch })}>Delete batch</button>}</div>)}
+        {item.movements.map((movement) => <p className="ledger-row" key={movement.id}>{format(parseISO(movement.created_at), 'd MMM yyyy, h:mm a')} · {movement.movement_type.replaceAll('_', ' ')} · {movement.quantity_delta > 0 ? '+' : ''}{movement.quantity_delta} {item.unit} · {movement.reason}</p>)}
+        {!item.movements.length && <p>No stock movements yet. Record stock in after creating the item.</p>}
+      </details>
+    </SectionCard>)}</div>
+    {!filtered.length && <EmptyState icon={Package} title="No inventory items" description="Create an item, add its batches, then record stock in." />}
+    <p className="inventory-rule-note">Stock balances come from the movement ledger. Items with stock history can be archived; their ledger is retained.</p>
+    {modal?.type === 'item' && <ItemEditor record={selectedItem} onClose={() => setModal(null)} />}
+    {modal?.type === 'batch' && <BatchEditor item={selectedItem} record={modal.record} onClose={() => setModal(null)} />}
+    {modal?.type === 'movement' && <StockMovementEditor item={selectedItem} onClose={() => setModal(null)} />}
+    {modal?.type === 'delete-item' && <DeleteRecordDialog entity="inventory_item" record={modal.record} onClose={() => setModal(null)} />}
+    {modal?.type === 'delete-batch' && <DeleteRecordDialog entity="batch" record={modal.record} onClose={() => setModal(null)} />}
+  </div>
 }
 
 export function Suppliers() {
-  const {isDemo}=useAuth()
-  const [create,setCreate]=useState(false)
-  const { suppliers, inventory } = useClinicData()
+  const { suppliers, inventory, execute } = useClinicData()
+  const { profile } = useAuth()
   const [query, setQuery] = useState('')
-  const filtered = suppliers.filter((supplier) => supplier.name.toLowerCase().includes(query.toLowerCase()) || supplier.contactPerson.toLowerCase().includes(query.toLowerCase()))
-  return (
-    <div className="page">
-      <PageHeader eyebrow="Purchasing contacts" title="Suppliers" description="Keep ordering details available when the clinic needs them." actions={!isDemo && <button className="button button-primary" onClick={()=>setCreate(true)}><Plus size={18} weight="bold" /> Add supplier</button>} />
-      <div className="list-toolbar"><label className="table-search"><MagnifyingGlass size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search suppliers or contacts..." /></label><span className="result-count">{filtered.length} suppliers</span></div>
-      <div className="supplier-grid">
-        {filtered.map((supplier) => {
-          const suppliedItems = inventory.filter((item) => item.supplierId === supplier.id)
-          return (
-            <SectionCard key={supplier.id} className="supplier-card">
-              <div className="supplier-heading"><div className="supplier-mark"><Truck size={22} weight="duotone" /></div><div><h2>{supplier.name}</h2><span>{supplier.contactPerson}</span></div><Badge tone="success">Active</Badge></div>
-              <div className="supplier-contact">
-                <a href={`tel:${supplier.phone.replace(/\s/g, '')}`}><Phone size={17} weight="duotone" /> {supplier.phone}</a>
-                <a href={`mailto:${supplier.email}`}><EnvelopeSimple size={17} weight="duotone" /> {supplier.email}</a>
-                <span><MapPin size={17} weight="duotone" /> {supplier.address}</span>
-              </div>
-              <p className="supplier-note">{supplier.notes}</p>
-              <div className="supplier-footer"><span><strong>{suppliedItems.length}</strong> linked items</span><a className="button button-secondary small-button" href={`tel:${supplier.phone.replace(/\s/g, '')}`}><Phone size={16} weight="duotone" /> Call supplier</a></div>
-            </SectionCard>
-          )
-        })}
-      </div>
-      {create && <StockCreateModal kind="supplier" onClose={()=>setCreate(false)}/>}
-    </div>
-  )
+  const [modal, setModal] = useState(null)
+  const filtered = suppliers.filter((supplier) => [supplier.name, supplier.contactPerson].some((value) => value.toLowerCase().includes(query.toLowerCase())))
+  return <div className="page">
+    <PageHeader eyebrow="Purchasing contacts" title="Suppliers" description="Ordering contacts and linked inventory items, saved to your clinic database."
+      actions={<button className="button button-primary" onClick={() => setModal({ type: 'edit' })}><Plus size={18} /> Add supplier</button>} />
+    <div className="list-toolbar"><label className="table-search"><MagnifyingGlass size={18} /><input aria-label="Search suppliers" placeholder="Search suppliers or contacts..." value={query} onChange={(event) => setQuery(event.target.value)} /></label><span>{filtered.length} suppliers</span></div>
+    <div className="supplier-grid">{filtered.map((supplier) => <SectionCard key={supplier.id} className="supplier-card">
+      <div className="supplier-heading"><div className="supplier-mark"><Truck size={22} /></div><div><h2>{supplier.name}</h2><span>{supplier.contactPerson}</span></div><Badge tone={supplier.isActive ? 'success' : 'neutral'}>{supplier.isActive ? 'Active' : 'Archived'}</Badge></div>
+      <div className="supplier-contact"><a href={'tel:' + supplier.phone.replace(/\s/g, '')}>{supplier.phone}</a>{supplier.email && <a href={'mailto:' + supplier.email}>{supplier.email}</a>}<span>{supplier.address}</span></div>
+      <p className="supplier-note">{supplier.notes}</p>
+      <div className="supplier-footer"><span><strong>{inventory.filter((item) => item.supplierIds.includes(supplier.id)).length}</strong> linked items</span><div className="record-actions"><button className="button button-secondary small-button" onClick={() => setModal({ type: 'edit', record: supplier })}>Edit supplier</button>{profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', record: supplier })}>Delete supplier</button>}</div></div>
+    </SectionCard>)}</div>
+    {!filtered.length && <EmptyState icon={Truck} title="No matching suppliers" description="Add a supplier to keep ordering contacts on file." />}
+    {modal?.type === 'edit' && <RecordEditor title={modal.record ? 'Edit supplier' : 'Add supplier'} fields={[...supplierFields, ...(modal.record ? [activeField] : [])]} initial={modal.record} onClose={() => setModal(null)}
+      onSave={(values) => execute(modal.record ? 'update_supplier' : 'create_supplier', { ...values, ...(modal.record ? { id: modal.record.id } : {}) })} submitLabel="Save supplier" />}
+    {modal?.type === 'delete' && <DeleteRecordDialog entity="supplier" record={modal.record} onClose={() => setModal(null)} />}
+  </div>
 }

@@ -6,10 +6,9 @@ import { Field,PageHeader,SectionCard } from '../components/ui'
 import MutationForm from '../components/MutationForm'
 import Assistant from '../components/Assistant'
 export default function Knowledge(){
-  const {isDemo}=useAuth()
-  const {profile,kbDocuments=[],manageKb}=useClinicData()
+  const {profile}=useAuth()
+  const {kbDocuments=[],manageKb}=useClinicData()
   const [form,setForm]=useState({title:'',content:'',kind:'sop'}),[indexResult,setIndexResult]=useState('')
-  if(isDemo)return <div className="page"><PageHeader title="Clinic knowledge" description="Sign in to manage approved clinic documents."/></div>
   const owner=profile?.role==='owner'
   return <div className="page"><PageHeader title="Clinic knowledge" description="Only published documents are available to record recall."/><Assistant/>
     {owner&&<SectionCard title="Add a document draft"><MutationForm onSubmit={async()=>{await manageKb({...form,action:'create'});setForm({title:'',content:'',kind:'sop'})}}>

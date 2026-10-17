@@ -84,8 +84,8 @@ export default function Landing() {
             <a href="#why">Why clinics</a>
             <a href="#contact">Contact</a>
           </nav>
-          <Link to="/demo" className="landing-btn landing-btn-primary landing-header-cta">
-            Try the demo
+          <Link to="/sign-in" className="landing-btn landing-btn-primary landing-header-cta">
+            Sign in
           </Link>
         </div>
       </header>
@@ -107,12 +107,12 @@ export default function Landing() {
                 Patient care, appointments, reminders, stock, and clinic records in one calm workspace for every busy clinic day.
               </p>
               <div className="landing-hero-actions">
-                <Link to="/demo" className="landing-btn landing-btn-primary">
-                  Try the demo
+                <Link to="/create-account" className="landing-btn landing-btn-primary">
+                  Create an account
                 </Link>
-                <a href="#contact" className="landing-btn landing-btn-ghost">
-                  Talk to us
-                </a>
+                <Link to="/sign-in" className="landing-btn landing-btn-ghost">
+                  Sign in
+                </Link>
               </div>
             </div>
             <div className="landing-hero-visual" aria-hidden="true">
@@ -280,10 +280,10 @@ export default function Landing() {
           <div className="landing-cta-inner">
             <p className="landing-eyebrow">Ready when you are</p>
             <h2>Bring calmer clinic days to your team.</h2>
-            <p>Try the live demo, or reach out—we&apos;d love to hear how your clinic works.</p>
+            <p>Create your account, or reach out—we&apos;d love to hear how your clinic works.</p>
             <div className="landing-cta-actions">
-              <Link to="/demo" className="landing-btn landing-btn-primary">
-                Open the demo
+              <Link to="/create-account" className="landing-btn landing-btn-primary">
+                Create an account
               </Link>
               <div className="landing-contacts">
                 <a href="mailto:ezekielwhitefang@gmail.com">

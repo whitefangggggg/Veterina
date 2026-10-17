@@ -3,64 +3,33 @@ import { addMonths, format, isSameMonth, parseISO, startOfMonth } from 'date-fns
 import { DayPicker } from '@daypicker/react'
 import '@daypicker/react/style.css'
 import {
-  CalendarBlank,
   CalendarDots,
   CaretLeft,
   CaretRight,
-  Check,
   CheckCircle,
   Clock,
-  Funnel,
   Phone,
   Plus,
   Sparkle,
 } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
-import { Badge, Field, Modal, PageHeader } from '../components/ui'
+import { Badge, EmptyState, PageHeader } from '../components/ui'
 import PetSticker from '../components/PetSticker'
-import MutationForm from '../components/MutationForm'
-import { clinicToday } from '../lib/clinicRepository'
 import { useAuth } from '../context/AuthContext'
-
-const clinicDate = clinicToday()
-
-function AppointmentModal({ onClose, initialDate = clinicDate }) {
-  const { pets, owners, addAppointment,staff=[],profile } = useClinicData()
-  const [form, setForm] = useState({ petId:pets[0]?.id || '',date:initialDate,time:'09:00',service:'Wellness check',veterinarianId:profile?.id || '',notes:'' })
-  const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
-  const submit = async (event) => {
-    event.preventDefault()
-    await addAppointment(form,event.idempotencyKey)
-    onClose()
-  }
-  return (
-    <Modal title="New appointment" description="Schedule a clinic visit and reserve the time slot." onClose={onClose}>
-      <MutationForm onSubmit={submit}>
-        <div className="form-grid">
-          <Field label="Patient" required span><select value={form.petId} onChange={set('petId')}>{pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name} — {owners.find((owner) => owner.id === pet.ownerId)?.fullName}</option>)}</select></Field>
-          <Field label="Date" required><input required type="date" value={form.date} onChange={set('date')} /></Field>
-          <Field label="Time" required><input required type="time" value={form.time} onChange={set('time')} /></Field>
-          <Field label="Service" required><select value={form.service} onChange={set('service')}><option>Wellness check</option><option>Vaccination</option><option>Follow-up</option><option>Dental consultation</option><option>Procedure</option><option>Emergency</option></select></Field>
-          <Field label="Veterinarian" required><select required value={form.veterinarianId} onChange={set('veterinarianId')}>{staff.map((s)=><option key={s.id} value={s.id}>{s.full_name}</option>)}{!staff.length && <option value="">Demo veterinarian</option>}</select></Field>
-          <Field label="Notes" span><textarea rows="3" value={form.notes} onChange={set('notes')} /></Field>
-        </div>
-        <div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary">Create appointment</button></div>
-      </MutationForm>
-    </Modal>
-  )
-}
+import { AppointmentEditor as AppointmentModal, ReminderEditor } from '../components/OperationEditors'
+import { ActionDialog, DeleteRecordDialog, RecordEditor } from '../components/RecordForm'
 
 export function Appointments() {
-  const { appointments, getPet, getOwner,transitionAppointment } = useClinicData()
-  const {isDemo}=useAuth()
+  const { appointments, getPet, getOwner, today: clinicDate } = useClinicData()
+  const { profile } = useAuth()
   const [selectedDay, setSelectedDay] = useState(() => parseISO(clinicDate))
   const [month, setMonth] = useState(() => startOfMonth(parseISO(clinicDate)))
-  const [modal, setModal] = useState(false)
+  const [modal, setModal] = useState(null)
   const selectedDate = format(selectedDay, 'yyyy-MM-dd')
   const dayAppointments = appointments.filter((item) => item.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time))
-  const monthAppointments = appointments.filter((item) => isSameMonth(parseISO(item.date), month))
-  const appointmentDates = [...new Set(appointments.map((item) => item.date))].map(parseISO)
-  const busyDates = Object.entries(appointments.reduce((counts, item) => ({ ...counts, [item.date]: (counts[item.date] || 0) + 1 }), {}))
+  const monthAppointments = appointments.filter((item) => isSameMonth(parseISO(item.date), month) && !['Cancelled', 'No Show'].includes(item.status))
+  const appointmentDates = [...new Set(appointments.filter((item) => !['Cancelled', 'No Show'].includes(item.status)).map((item) => item.date))].map(parseISO)
+  const busyDates = Object.entries(appointments.filter((item) => !['Cancelled', 'No Show'].includes(item.status)).reduce((counts, item) => ({ ...counts, [item.date]: (counts[item.date] || 0) + 1 }), {}))
     .filter(([, count]) => count >= 2)
     .map(([date]) => parseISO(date))
 
@@ -78,7 +47,7 @@ export function Appointments() {
           <h1>Appointments</h1>
           <p>A clear view of the month, with each day given its own space.</p>
         </div>
-        <button className="button button-primary roomy-button" onClick={() => setModal(true)}><Plus size={19} weight="bold" /> New appointment</button>
+        <button className="button button-primary roomy-button" onClick={() => setModal({ type: 'appointment' })}><Plus size={19} weight="bold" /> New appointment</button>
       </div>
 
       <div className="calendar-overview">
@@ -131,85 +100,69 @@ export function Appointments() {
                     <h3>{appointment.service}</h3>
                     <p>{appointment.veterinarian}</p>
                     <Badge tone={appointment.status === 'Confirmed' ? 'success' : 'warning'}>{appointment.status}</Badge>
-                    {!isDemo && ['Confirmed','Arrived','In Progress'].includes(appointment.status) && <MutationForm onSubmit={async()=>{await transitionAppointment(appointment.id,{Confirmed:'arrived',Arrived:'in_progress','In Progress':'completed'}[appointment.status])}}><button className="button button-secondary small-button">{appointment.status==='Confirmed'?'Mark arrived':appointment.status==='Arrived'?'Start visit':'Complete visit'}</button></MutationForm>}
+                    <div className="record-actions">
+                      {['Pending', 'Confirmed'].includes(appointment.status) && <button className="button button-secondary small-button" onClick={() => setModal({ type: 'appointment', record: appointment })}>Reschedule</button>}
+                      {(appointment.status === 'Confirmed' ? ['arrived', 'cancelled', 'no_show'] : appointment.status === 'Arrived' ? ['in_progress', 'cancelled'] : appointment.status === 'In Progress' ? ['completed'] : []).map((status) => <button key={status} className="button button-secondary small-button" onClick={() => setModal({ type: 'transition', record: appointment, status })}>{status.replace('_', ' ')}</button>)}
+                      {profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', record: appointment })}>Delete appointment</button>}
+                    </div>
                   </div>
                 </article>
               )
             }) : (
-              <div className="open-day-state"><span><CalendarDots size={38} weight="duotone" /></span><h3>The day is open</h3><p>No appointments are scheduled yet.</p><button className="button button-secondary" onClick={() => setModal(true)}><Plus size={17} weight="bold" /> Add appointment</button></div>
+              <div className="open-day-state"><span><CalendarDots size={38} weight="duotone" /></span><h3>The day is open</h3><p>No appointments are scheduled yet.</p><button className="button button-secondary" onClick={() => setModal({ type: 'appointment' })}><Plus size={17} weight="bold" /> Add appointment</button></div>
             )}
           </div>
         </aside>
       </div>
-      {modal && <AppointmentModal initialDate={selectedDate} onClose={() => setModal(false)} />}
+      {modal?.type === 'appointment' && <AppointmentModal record={modal.record} initialDate={selectedDate} onClose={() => setModal(null)} />}
+      {modal?.type === 'transition' && <ActionDialog title={'Mark appointment ' + modal.status.replace('_', ' ') + '?'} action="transition_appointment" data={{ id: modal.record.id, status: modal.status }} onClose={() => setModal(null)} />}
+      {modal?.type === 'delete' && <DeleteRecordDialog entity="appointment" record={modal.record} onClose={() => setModal(null)} />}
     </div>
   )
 }
 
 export function Reminders() {
-  const { reminders, completeReminder, getPet, getOwner,addReminder,pets } = useClinicData()
-  const {isDemo}=useAuth()
-  const [custom,setCustom]=useState(false)
-  const [customForm,setCustomForm]=useState({petId:pets[0]?.id || '',title:'',dueDate:clinicDate,notes:''})
-  const [filter, setFilter] = useState('Open')
-  const [outcomeId, setOutcomeId] = useState(null)
-  const [outcome, setOutcome] = useState('')
+  const { reminders, completeReminder, getPet, getOwner } = useClinicData()
+  const { profile } = useAuth()
+  const [status, setStatus] = useState('Open')
+  const [type, setType] = useState('All')
+  const [modal, setModal] = useState(null)
   const visible = useMemo(() => reminders.filter((item) => {
-    if (filter === 'Open') return item.status !== 'Completed'
-    if (filter === 'Completed') return item.status === 'Completed'
-    return item.type === filter
-  }).sort((a, b) => a.dueDate.localeCompare(b.dueDate)), [reminders, filter])
-
-  const saveOutcome = async (event) => {
-    event.preventDefault()
-    await completeReminder(outcomeId,outcome,event.idempotencyKey)
-    setOutcomeId(null)
-    setOutcome('')
-  }
-
-  return (
-    <div className="page">
-      <PageHeader eyebrow="Daily call list" title="Reminders" description="One worklist for checkups, vaccines and follow-up calls." actions={!isDemo && <button className="button button-primary" onClick={()=>setCustom(true)}><Plus size={18} weight="bold" /> Custom reminder</button>} />
-      <div className="reminder-summary">
-        <div><span className="summary-icon overdue"><Clock size={22} weight="duotone" /></span><span><strong>{reminders.filter((item) => item.status === 'Overdue').length}</strong> overdue</span></div>
-        <div><span className="summary-icon due"><Phone size={22} weight="duotone" /></span><span><strong>{reminders.filter((item) => item.status === 'Due').length}</strong> due today</span></div>
-        <div><span className="summary-icon upcoming"><CalendarBlank size={22} weight="duotone" /></span><span><strong>{reminders.filter((item) => item.status === 'Upcoming').length}</strong> upcoming</span></div>
-        <div><span className="summary-icon complete"><CheckCircle size={22} weight="duotone" /></span><span><strong>{reminders.filter((item) => item.status === 'Completed').length}</strong> completed</span></div>
-      </div>
-      <div className="list-toolbar compact">
-        <Funnel size={17} weight="duotone" />
-        <div className="filter-pills">
-          {['Open', 'Follow-up', 'Vaccination', 'Checkup', 'Completed'].map((value) => <button key={value} onClick={() => setFilter(value)} className={filter === value ? 'active' : ''}>{value}</button>)}
-        </div>
-      </div>
-      <div className="reminder-list">
-        {visible.map((reminder) => {
-          const pet = getPet(reminder.petId)
-          const owner = getOwner(pet?.ownerId)
-          return (
-            <article className={`reminder-card ${reminder.status.toLowerCase()}`} key={reminder.id}>
-              <div className="reminder-check">{reminder.status === 'Completed' ? <CheckCircle size={22} weight="duotone" /> : <Clock size={22} weight="duotone" />}</div>
-              <div className="reminder-main">
-                <div className="reminder-title"><Badge tone={reminder.status === 'Overdue' ? 'danger' : reminder.status === 'Due' ? 'warning' : reminder.status === 'Completed' ? 'success' : 'blue'}>{reminder.status}</Badge><Badge>{reminder.type}</Badge><strong>{reminder.title}</strong></div>
-                <p>{reminder.notes}</p>
-                <div className="reminder-person"><PetSticker pet={pet} size="small" /><span><strong>{pet?.name}</strong><small>{owner?.fullName} · {owner?.phone}</small></span></div>
-              </div>
-              <div className="reminder-due"><span>Due date</span><strong>{format(parseISO(reminder.dueDate), 'd MMM yyyy')}</strong><small>{reminder.assignedTo}</small></div>
-              {reminder.status !== 'Completed' && <div className="reminder-actions"><a className="button button-secondary small-button" href={`tel:${owner?.phone?.replace(/\s/g, '')}`}><Phone size={16} weight="duotone" /> Call</a><button className="button button-primary small-button" onClick={() => setOutcomeId(reminder.id)}><Check size={16} weight="bold" /> Complete</button></div>}
-            </article>
-          )
-        })}
-      </div>
-      {outcomeId && (
-        <Modal title="Complete reminder" description="Record what happened so the clinic retains the contact history." onClose={() => setOutcomeId(null)}>
-          <MutationForm onSubmit={saveOutcome}><Field label="Call outcome" required><textarea required rows="4" value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="e.g. Owner confirmed appointment for Friday." /></Field><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setOutcomeId(null)}>Cancel</button><button className="button button-primary">Save outcome</button></div></MutationForm>
-        </Modal>
-      )}
-      {custom && <Modal title="Custom reminder" onClose={()=>setCustom(false)}><MutationForm onSubmit={async(e)=>{await addReminder(customForm,e.idempotencyKey);setCustom(false)}}>
-        <Field label="Patient"><select required value={customForm.petId} onChange={(e)=>setCustomForm({...customForm,petId:e.target.value})}>{pets.map((p)=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
-        {['title','dueDate','notes'].map((key)=><Field key={key} label={key}><input required={key!=='notes'} type={key==='dueDate'?'date':'text'} value={customForm[key]} onChange={(e)=>setCustomForm({...customForm,[key]:e.target.value})}/></Field>)}
-        <button className="button button-primary">Save reminder</button>
-      </MutationForm></Modal>}
+    const statusMatch = status === 'All' || (status === 'Open' ? !['Completed', 'Cancelled'].includes(item.status) : item.status === status)
+    return statusMatch && (type === 'All' || item.type === type)
+  }).sort((a, b) => a.dueDate.localeCompare(b.dueDate)), [reminders, status, type])
+  return <div className="page">
+    <PageHeader eyebrow="Daily call list" title="Reminders" description="Checkups, vaccines and follow-up calls with permanent contact history."
+      actions={<button className="button button-primary" onClick={() => setModal({ type: 'reminder' })}><Plus size={18} /> Custom reminder</button>} />
+    <div className="reminder-summary">{['Overdue', 'Due', 'Upcoming', 'Completed'].map((value) => <div key={value}><span className={'summary-icon ' + value.toLowerCase()}><Clock size={22} /></span><span><strong>{reminders.filter((item) => item.status === value).length}</strong> {value === 'Due' ? 'due today' : value.toLowerCase()}</span></div>)}</div>
+    <div className="list-toolbar compact">
+      <label>Status <select aria-label="Reminder status" value={status} onChange={(event) => setStatus(event.target.value)}>{['Open', 'Overdue', 'Due', 'Upcoming', 'Completed', 'Cancelled', 'All'].map((value) => <option key={value}>{value}</option>)}</select></label>
+      <label>Type <select aria-label="Reminder type" value={type} onChange={(event) => setType(event.target.value)}>{['All', 'Follow-up', 'Vaccination', 'Checkup', 'Custom', 'Medication'].map((value) => <option key={value}>{value}</option>)}</select></label>
     </div>
-  )
+    <div className="reminder-list">{visible.map((reminder) => {
+      const pet = getPet(reminder.petId)
+      const owner = getOwner(pet?.ownerId)
+      const open = !['Completed', 'Cancelled'].includes(reminder.status)
+      return <article className={'reminder-card ' + reminder.status.toLowerCase()} key={reminder.id}>
+        <div className="reminder-check">{open ? <Clock size={22} /> : <CheckCircle size={22} />}</div>
+        <div className="reminder-main">
+          <div className="reminder-title"><Badge tone={reminder.status === 'Overdue' ? 'danger' : 'blue'}>{reminder.status}</Badge><Badge>{reminder.type}</Badge><strong>{reminder.title}</strong></div>
+          <p>{reminder.notes}</p><div className="reminder-person"><PetSticker pet={pet} size="small" /><span><strong>{pet?.name}</strong><small>{owner?.fullName} · {owner?.phone}</small></span></div>
+          {reminder.outcome && <p><strong>Outcome:</strong> {reminder.outcome}</p>}
+          <details><summary>Contact history ({reminder.activity.length})</summary>{reminder.activity.map((entry) => <p key={entry.id}>{format(parseISO(entry.created_at), 'd MMM yyyy, h:mm a')} · {entry.action} · {entry.note}</p>)}</details>
+        </div>
+        <div className="reminder-due"><span>Due date</span><strong>{format(parseISO(reminder.dueDate), 'd MMM yyyy')}</strong><small>{reminder.assignedTo}</small></div>
+        <div className="record-actions">{open && <><a className="button button-secondary small-button" href={'tel:' + (owner?.normalizedPhone || owner?.phone || '')}><Phone size={16} /> Call</a><button className="button button-secondary small-button" onClick={() => setModal({ type: 'contact', record: reminder })}>Log contact</button><button className="button button-primary small-button" onClick={() => setModal({ type: 'complete', record: reminder })}>Complete</button><button className="button button-secondary small-button" onClick={() => setModal({ type: 'reminder', record: reminder })}>Edit</button><button className="text-link" onClick={() => setModal({ type: 'snooze', record: reminder })}>Snooze</button><button className="text-link" onClick={() => setModal({ type: 'cancel', record: reminder })}>Cancel reminder</button></>}{profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', record: reminder })}>Delete reminder</button>}</div>
+      </article>
+    })}</div>
+    {!visible.length && <EmptyState title="No reminders match" description="Change filters or create a custom reminder." />}
+    {modal?.type === 'reminder' && <ReminderEditor record={modal.record} onClose={() => setModal(null)} />}
+    {modal?.type === 'complete' && <RecordEditor title="Complete reminder" description="Record the contact outcome." onClose={() => setModal(null)}
+      fields={[{ name: 'outcome', label: 'Call outcome', type: 'select', required: true, options: ['Reached owner', 'No answer', 'Appointment booked', 'Owner declined', 'Other'] }, { name: 'notes', label: 'Contact notes', type: 'textarea' }]}
+      onSave={(values) => completeReminder(modal.record.id, values.outcome + (values.notes ? ': ' + values.notes : ''))} submitLabel="Save outcome" />}
+    {modal?.type === 'contact' && <ActionDialog title="Log contact attempt" description="This adds to contact history and leaves the reminder open." action="log_reminder_attempt" data={{ id: modal.record.id }} fields={[{ name: 'notes', label: 'Contact notes', type: 'textarea', required: true, span: true }]} onClose={() => setModal(null)} />}
+    {modal?.type === 'snooze' && <ActionDialog title="Snooze reminder" action="snooze_reminder" data={{ id: modal.record.id }} fields={[{ name: 'dueDate', label: 'New due date', type: 'date', required: true }]} onClose={() => setModal(null)} />}
+    {modal?.type === 'cancel' && <ActionDialog title="Cancel this reminder?" action="cancel_reminder" data={{ id: modal.record.id }} onClose={() => setModal(null)} />}
+    {modal?.type === 'delete' && <DeleteRecordDialog entity="reminder" record={modal.record} onClose={() => setModal(null)} />}
+  </div>
 }

@@ -1,40 +1,97 @@
-import { describe,it,expect,vi } from 'vitest'
-vi.mock('./supabaseClient',()=>({supabase:{rpc:vi.fn()}}))
-import { mapClinicData,mutate,unwrap } from './clinicRepository'
-import { supabase } from './supabaseClient'
-describe('Supabase repository boundary',()=>{
-  it('passes the retry key and payload unchanged to an RPC and rejects a database error',async()=>{
-    supabase.rpc.mockResolvedValueOnce({data:{id:'saved'},error:null})
-    expect(await mutate('create_encounter',{petId:'a'},'retry-key')).toEqual({id:'saved'})
-    expect(supabase.rpc).toHaveBeenCalledWith('create_encounter',{p_data:{petId:'a'},p_key:'retry-key'})
-    supabase.rpc.mockResolvedValueOnce({error:new Error('APPOINTMENT_CONFLICT')})
-    await expect(mutate('book_appointment',{},'k')).rejects.toThrow('APPOINTMENT_CONFLICT')
+import { describe, expect, it, vi } from 'vitest'
+import { clinicDate, clinicTime, clinicTimestamp, createMutationRunner, fetchClinicData, normalizeClinicData, unwrap } from './clinicRepository'
+
+describe('clinic dates and persisted record projection', () => {
+  it('uses the clinic date across midnight independently of the browser timezone', () => {
+    const now = new Date('2026-10-16T16:30:00Z')
+    expect(clinicDate(now)).toBe('2026-10-17')
+    expect(clinicTime(now)).toBe('00:30')
+    expect(clinicTimestamp('2026-10-17', '00:30')).toBe('2026-10-16T16:30:00.000Z')
   })
-  it('joins vitals to their encounter and maps clinic timezone and derived reminder dates',()=>{
-    const raw=Array.from({length:18},()=>[])
-    raw[0]=[{id:'staff',full_name:'Doctor',is_active:true}]
-    raw[2]=[{id:'owner',full_name:'Household'}]
-    raw[3]=[{id:'pet',name:'Milo',owner_id:'owner',record_number:'VET-1',baseline_weight:'4'}]
-    raw[4]=[{id:'visit',pet_id:'pet',visited_at:'2026-10-07T17:00:00Z',attending_veterinarian_id:'staff'}]
-    raw[5]=[{visit_id:'visit',weight_kg:'5.20'}]
-    raw[7]=[{id:'a',pet_id:'pet',starts_at:'2026-10-07T17:00:00Z',status:'confirmed'}]
-    raw[8]=[{id:'r',pet_id:'pet',due_at:'2026-10-07T16:00:00Z',status:'upcoming',reminder_type:'follow_up'}]
-    const result=mapClinicData(raw,'staff','2026-10-08')
-    expect(result.pets[0].latestWeight).toBe(5.2)
-    expect(result.owners[0].pets).toEqual(['pet'])
-    expect(result.appointments[0]).toMatchObject({date:'2026-10-08',time:'01:00',status:'Confirmed'})
-    expect(result.reminders[0]).toMatchObject({dueDate:'2026-10-08',status:'Due',type:'Follow-up'})
-    expect(result.visits[0].veterinarian).toBe('Doctor')
+
+  it('shows empty real datasets without manufacturing records', () => {
+    const snapshot = normalizeClinicData({})
+    for (const name of ['owners', 'pets', 'visits', 'vaccinations', 'appointments', 'inventory', 'suppliers', 'reminders']) expect(snapshot[name]).toEqual([])
   })
-  it('preserves null expiry and derives stock by batch',()=>{
-    const raw=Array.from({length:18},()=>[])
-    raw[9]=[{id:'item',quantity_on_hand:'2.5',minimum_stock:'1',nearest_expiration:null}]
-    raw[10]=[{id:'b',item_id:'item'}]
-    raw[17]=[{batch_id:'b',quantity_delta:'3'},{batch_id:'b',quantity_delta:'-0.5'}]
-    const item=mapClinicData(raw,'x').inventory[0]
-    expect(item).toMatchObject({quantity:2.5,nearestExpiry:null,batches:[{id:'b',quantity:2.5}]})
+
+  it('preserves knowledge documents from the upstream workspace without suppressing failed operations', () => {
+    const documents = [{ id: 'document', title: 'Clinic checklist', status: 'published', version: 2, content: 'Approved text' }]
+    expect(normalizeClinicData({ kb_documents: documents }).kbDocuments).toEqual(documents)
+    expect(unwrap({ data: documents, error: null })).toEqual(documents)
+    expect(() => unwrap({ data: null, error: new Error('Permission denied') })).toThrow('Permission denied')
   })
-  it('never treats a failed read as an empty successful response',()=>{
-    expect(()=>unwrap({data:[],error:new Error('permission denied')})).toThrow('permission denied')
+
+  it('derives latest weight from care chronology and excludes resolved alerts', () => {
+    const snapshot = normalizeClinicData({
+      pets: [{ id: 'pet', owner_id: 'owner', baseline_weight: '4' }],
+      owners: [{ id: 'owner', full_name: 'Owner', is_active: true }],
+      visits: [{ id: 'old', pet_id: 'pet', visited_at: '2026-10-01T00:00:00Z' }, { id: 'new', pet_id: 'pet', visited_at: '2026-10-15T00:00:00Z' }],
+      visit_vitals: [{ visit_id: 'old', weight_kg: '5' }, { visit_id: 'new', weight_kg: '6', temperature_c: null }],
+      pet_alerts: [{ pet_id: 'pet', alert_type: 'allergy', description: 'Active allergy', is_active: true }, { pet_id: 'pet', alert_type: 'allergy', description: 'Resolved allergy', is_active: false }],
+    })
+    expect(snapshot.pets[0].latestWeight).toBe(6)
+    expect(snapshot.pets[0].allergies).toEqual(['Active allergy'])
+    expect(snapshot.owners[0].pets).toEqual(['pet'])
+    expect(snapshot.visits[0].temperatureC).toBeNull()
+  })
+
+  it('keeps historical clinician names after staff profiles are renamed and orders vaccinations by care date', () => {
+    const snapshot = normalizeClinicData({
+      profiles: [{ id: 'doctor', full_name: 'Renamed clinician' }],
+      visits: [{ id: 'visit', pet_id: 'pet', visited_at: '2026-10-01', attending_veterinarian_id: 'doctor', attending_veterinarian_name: 'Original clinician' }],
+      vaccinations: [{ id: 'old', administered_at: '2026-09-01' }, { id: 'new', administered_at: '2026-10-01' }],
+    })
+    expect(snapshot.visits[0].veterinarian).toBe('Original clinician')
+    expect(snapshot.vaccinations.map((row) => row.id)).toEqual(['new', 'old'])
+  })
+
+  it('computes reminder display state from the clinic date and keeps terminal states', () => {
+    const raw = { reminder_worklist: [
+      { id: 'old', due_at: '2026-10-15T16:00:00Z', status: 'upcoming', reminder_type: 'appointment' },
+      { id: 'today', due_at: '2026-10-16T16:00:00Z', status: 'upcoming', reminder_type: 'custom' },
+      { id: 'done', due_at: '2026-10-15T16:00:00Z', status: 'completed' },
+      { id: 'cancelled', due_at: '2026-10-15T16:00:00Z', status: 'cancelled' },
+    ] }
+    const snapshot = normalizeClinicData(raw, new Date('2026-10-17T04:00:00Z'))
+    expect(snapshot.reminders.map((row) => row.status)).toEqual(['Overdue', 'Due', 'Completed', 'Cancelled'])
+    expect(snapshot.reminders[0].type).toBe('Checkup')
+  })
+
+  it('uses ledger balances and ignores depleted expiry batches', () => {
+    const snapshot = normalizeClinicData({
+      inventory_items: [{ id: 'item', minimum_stock: '2', is_active: true }],
+      inventory_batches: [{ id: 'depleted', item_id: 'item', expiration_date: '2026-01-01' }, { id: 'stocked', item_id: 'item', expiration_date: '2027-01-01' }],
+      inventory_movements: [{ item_id: 'item', batch_id: 'depleted', quantity_delta: 3, created_at: '2026-01-01' }, { item_id: 'item', batch_id: 'depleted', quantity_delta: -3, created_at: '2026-01-02' }, { item_id: 'item', batch_id: 'stocked', quantity_delta: 5, created_at: '2026-01-03' }],
+    })
+    expect(snapshot.inventory[0]).toMatchObject({ quantity: 5, nearestExpiry: '2027-01-01', minimumStock: 2 })
+  })
+})
+
+describe('database transport', () => {
+  it('reuses a retry key after a lost response and retires it after acknowledgement', async () => {
+    const rpc = vi.fn().mockResolvedValueOnce({ error: { message: 'Network failure' } }).mockResolvedValue({ data: { id: 'saved' } })
+    const run = createMutationRunner({ rpc })
+    await expect(run('create_owner', { fullName: 'Owner' })).rejects.toMatchObject({ message: 'Network failure' })
+    await run('create_owner', { fullName: 'Owner' })
+    expect(rpc.mock.calls[0][1].p_key).toBe(rpc.mock.calls[1][1].p_key)
+    await run('create_owner', { fullName: 'Owner' })
+    expect(rpc.mock.calls[2][1].p_key).not.toBe(rpc.mock.calls[1][1].p_key)
+  })
+
+  it('paginates past the API limit and respects the supplier link composite key', async () => {
+    const ordering = []
+    const client = { from: (table) => {
+      const query = { select: () => query, order: (column) => { ordering.push([table, column]); return query }, range: async (start) => ({ data: table === 'pets' && start === 0 ? Array.from({ length: 500 }, (_, id) => ({ id })) : table === 'pets' ? [{ id: 500 }] : [], error: null }) }
+      return query
+    } }
+    const result = await fetchClinicData(client)
+    expect(result.pets).toHaveLength(501)
+    expect(ordering).toContainEqual(['item_suppliers', 'item_id'])
+    expect(ordering).toContainEqual(['item_suppliers', 'supplier_id'])
+  })
+
+  it('propagates failed reads instead of substituting fixtures', async () => {
+    const query = { select: () => query, order: () => query, range: async () => ({ data: null, error: { message: 'Permission denied' } }) }
+    await expect(fetchClinicData({ from: () => query })).rejects.toMatchObject({ message: 'Permission denied' })
   })
 })

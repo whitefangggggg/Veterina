@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   BellRinging,
   CalendarDots,
@@ -10,14 +10,17 @@ import {
   MagnifyingGlass,
   Package,
   PawPrint,
+  SignOut,
+  ArrowsClockwise,
   SquaresFour,
   Stethoscope,
   Truck,
   X,
 } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
-import PetSticker from './PetSticker'
 import { useAuth } from '../context/AuthContext'
+import { authErrorMessage } from '../lib/authAccess'
+import PetSticker from './PetSticker'
 
 const workspaces = [
   { to: '/patients', label: 'Patients', detail: 'Owners and clinical records', icon: PawPrint, color: 'sage' },
@@ -73,7 +76,7 @@ function GlobalSearch({ onClose }) {
   const results = normalized
     ? pets.filter((pet) => {
         const owner = owners.find((item) => item.id === pet.ownerId)
-        return [pet.name, pet.recordNumber, pet.microchip, owner?.fullName, owner?.phone]
+        return [pet.name, pet.recordNumber, pet.microchip, owner?.fullName, owner?.phone, owner?.normalizedPhone, owner?.normalizedPhone?.replace(/^\+63/, '0')]
           .some((value) => value?.toLowerCase().includes(normalized))
       }).slice(0, 6)
     : []
@@ -123,9 +126,18 @@ function GlobalSearch({ onClose }) {
 export default function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
-  const { reminders,profile,loading,error,refresh } = useClinicData()
-  const auth = useAuth()
-  const [signOutError,setSignOutError] = useState('')
+  const { reminders, reload, refreshing } = useClinicData()
+  const { profile, user, signOut } = useAuth()
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState('')
+  const name = profile.full_name || user.email
+  const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
+  const handleSignOut = async () => {
+    setSigningOut(true)
+    setSignOutError('')
+    try { await signOut() } catch (error) { setSignOutError(authErrorMessage(error)) }
+    finally { setSigningOut(false) }
+  }
   const dueCount = reminders.filter((item) => item.status === 'Due' || item.status === 'Overdue').length
   const overlayOpen = searchOpen || workspacesOpen
 
@@ -149,10 +161,6 @@ export default function AppShell() {
     return () => document.body.classList.remove('overlay-open')
   }, [overlayOpen])
 
-  if (auth.loading) return <div className="page-loader">Checking session…</div>
-  if (!auth.isDemo && !auth.session) return <Navigate to="/login" replace />
-  if (!auth.isDemo && loading) return <div className="page-loader">Loading clinic records…</div>
-  if (!auth.isDemo && !profile) return <div className="auth-page"><section className="section-card auth-card"><h1>Clinic access required</h1><p>{error || 'Your account has no active staff profile. Contact the clinic owner.'}</p><button className="button button-secondary" onClick={()=>auth.signOut().catch((e)=>setSignOutError(e.message))}>Sign out</button>{signOutError && <p role="alert">{signOutError}</p>}</section></div>
   return (
     <div className="app-shell spacious-shell">
       <header className="workspace-header">
@@ -165,15 +173,18 @@ export default function AppShell() {
             <MagnifyingGlass size={18} /><span>Search clinic records</span><kbd>Ctrl K</kbd>
           </button>
           <div className="header-actions">
+            <button className="icon-button header-refresh" onClick={reload} disabled={refreshing} aria-label="Refresh clinic records" title="Refresh clinic records"><ArrowsClockwise size={20} /></button>
             <Link to="/reminders" className="notification-button icon-button" aria-label={`${dueCount} reminders due`}>
               <BellRinging size={21} weight="duotone" />
               {dueCount > 0 && <span>{dueCount}</span>}
             </Link>
-            <button className="profile-chip" title="Sign out" onClick={()=>auth.signOut().catch((e)=>setSignOutError(e.message))}><span className="avatar small-avatar">{auth.isDemo?'DE':profile?.full_name?.slice(0,2).toUpperCase()}</span><span><strong>{auth.isDemo?'Fictional demo':profile?.full_name}</strong><small>{auth.isDemo?'Exit demo':'Sign out'}</small></span><CaretDown size={13} /></button>
+            <div className="profile-chip" title={`${name} · ${profile.role === 'owner' ? 'Clinic owner' : 'Clinical staff'}`}><span className="avatar small-avatar">{initials}</span><span><strong>{name}</strong><small>{profile.role === 'owner' ? 'Clinic owner' : 'Clinical staff'}</small></span></div>
+            <button className="icon-button" onClick={handleSignOut} disabled={signingOut} aria-label={signingOut ? 'Signing out' : 'Sign out'} title="Sign out"><SignOut size={21} /></button>
           </div>
         </div>
       </header>
-      <main className="main-content spacious-content">{auth.isDemo && <p className="demo-banner">Fictional demo · changes are temporary · <Link to="/login">Staff sign in</Link></p>}{(error || signOutError) && <p role="alert" className="form-error">{error || signOutError} <button onClick={()=>refresh?.().catch((e)=>setSignOutError(e.message))}>Retry</button></p>}<Outlet /></main>
+      {signOutError && <p className="workspace-auth-error" role="alert">{signOutError}</p>}
+      <main className="main-content spacious-content"><Outlet /></main>
       {workspacesOpen && <WorkspaceSwitcher onClose={() => setWorkspacesOpen(false)} />}
       {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} />}
     </div>

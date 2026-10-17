@@ -1,47 +1,135 @@
-import { supabase } from './supabaseClient'
-import { classifyReminder } from '../utils/clinicRules'
-export const clinicToday = () => new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit' }).format(new Date())
-export function unwrap({ data, error }) { if (error) throw error; return data }
-export const mutate = async (action, data, key = crypto.randomUUID()) => unwrap(await supabase.rpc(action, { p_data:data,p_key:key }))
-async function rows(table) {
-  const result = []
-  for (let offset=0; ; offset+=1000) {
-    const batch=unwrap(await supabase.from(table).select('*').order('id').range(offset,offset+999))
-    result.push(...batch)
-    if(batch.length<1000) return result
+const tableNames = ['owners', 'pets', 'pet_alerts', 'visits', 'visit_vitals', 'vaccinations', 'appointments',
+  'reminder_worklist', 'reminder_activity', 'inventory_items', 'inventory_batches', 'inventory_movements',
+  'item_suppliers', 'suppliers', 'service_types', 'clinic_settings', 'profiles', 'prescriptions', 'visit_corrections', 'kb_documents']
+
+export function unwrap({ data, error }) {
+  if (error) throw error
+  return data
+}
+
+export function clinicDate(now = new Date(), timezone = 'Asia/Manila') {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+}
+
+export function clinicTime(value, timezone = 'Asia/Manila') {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value))
+}
+
+export function clinicTimestamp(date, time = '00:00', timezone = 'Asia/Manila') {
+  const guess = new Date(`${date}T${time}:00Z`)
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'longOffset' }).formatToParts(guess)
+  const offset = parts.find((part) => part.type === 'timeZoneName').value.replace('GMT', '') || '+00:00'
+  return new Date(`${date}T${time}:00${offset}`).toISOString()
+}
+
+const title = (value = '') => value.split('_').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+const number = (value) => value == null ? null : Number(value)
+
+export function normalizeClinicData(raw, now = new Date()) {
+  const get = (name) => raw[name] || []
+  const settings = get('clinic_settings')[0] || null
+  const timezone = settings?.timezone || 'Asia/Manila'
+  const today = clinicDate(now, timezone)
+  const profiles = get('profiles')
+  const staffName = (id) => profiles.find((entry) => entry.id === id)?.full_name || 'Clinic staff'
+  const visits = get('visits').map((row) => {
+    const vital = get('visit_vitals').filter((entry) => entry.visit_id === row.id).sort((a, b) => b.measured_at.localeCompare(a.measured_at))[0] || {}
+    return { ...row, petId: row.pet_id, type: row.visit_type, complaint: row.chief_complaint, diagnosis: row.diagnosis_summary,
+      visitedAt: row.visited_at, followUpDate: row.follow_up_date, veterinarianId: row.attending_veterinarian_id,
+      veterinarian: row.attending_veterinarian_name || staffName(row.attending_veterinarian_id), weightKg: number(vital.weight_kg), temperatureC: number(vital.temperature_c),
+      heartRate: number(vital.heart_rate_bpm), respiratoryRate: number(vital.respiratory_rate_rpm), bodyConditionScore: vital.body_condition_score,
+      hydration: vital.hydration, finalizedAt: row.finalized_at,
+      prescriptions: get('prescriptions').filter((entry) => entry.visit_id === row.id),
+      corrections: get('visit_corrections').filter((entry) => entry.visit_id === row.id) }
+  }).sort((a, b) => b.visitedAt.localeCompare(a.visitedAt))
+  const pets = get('pets').map((row) => {
+    const alerts = get('pet_alerts').filter((entry) => entry.pet_id === row.id && entry.is_active)
+    return { ...row, ownerId: row.owner_id, recordNumber: row.record_number, reproductiveStatus: row.reproductive_status,
+      birthDate: row.birth_date, color: row.color_markings, microchip: row.microchip_number,
+      allergies: alerts.filter((entry) => entry.alert_type === 'allergy').map((entry) => entry.description),
+      alerts: alerts.filter((entry) => entry.alert_type !== 'allergy').map((entry) => entry.description),
+      latestWeight: visits.find((entry) => entry.petId === row.id && entry.weightKg != null)?.weightKg ?? number(row.baseline_weight) }
+  })
+  const owners = get('owners').map((row) => ({ ...row, fullName: row.full_name, normalizedPhone: row.normalized_phone,
+    emergencyContact: row.emergency_contact, isActive: row.is_active, pets: pets.filter((pet) => pet.ownerId === row.id).map((pet) => pet.id) }))
+  const batches = get('inventory_batches').map((row) => ({ ...row,
+    quantity: get('inventory_movements').filter((entry) => entry.batch_id === row.id).reduce((sum, entry) => sum + Number(entry.quantity_delta), 0) }))
+  const inventory = get('inventory_items').map((row) => {
+    const itemBatches = batches.filter((batch) => batch.item_id === row.id)
+    const expiry = itemBatches.filter((batch) => batch.quantity > 0 && batch.expiration_date).map((batch) => batch.expiration_date).sort()[0] || null
+    const movements = get('inventory_movements').filter((entry) => entry.item_id === row.id).sort((a, b) => b.created_at.localeCompare(a.created_at))
+    return { ...row, minimumStock: Number(row.minimum_stock), allowsFraction: row.allows_fraction, isActive: row.is_active,
+      quantity: movements.reduce((sum, entry) => sum + Number(entry.quantity_delta), 0), nearestExpiry: expiry,
+      supplierId: get('item_suppliers').find((link) => link.item_id === row.id && link.is_preferred)?.supplier_id || get('item_suppliers').find((link) => link.item_id === row.id)?.supplier_id || null,
+      supplierIds: get('item_suppliers').filter((link) => link.item_id === row.id).map((link) => link.supplier_id), batches: itemBatches, movements }
+  })
+  const reminderTypes = { follow_up: 'Follow-up', vaccination: 'Vaccination', appointment: 'Checkup', custom: 'Custom', medication: 'Medication' }
+  const reminders = get('reminder_worklist').map((row) => {
+    const dueDate = clinicDate(new Date(row.due_at), timezone)
+    const status = ['completed', 'cancelled'].includes(row.status) ? title(row.status) : dueDate < today ? 'Overdue' : dueDate === today ? 'Due' : 'Upcoming'
+    return { ...row, petId: row.pet_id, type: reminderTypes[row.reminder_type] || title(row.reminder_type), dueDate, status,
+      assignedTo: row.assigned_to ? staffName(row.assigned_to) : 'Unassigned',
+      activity: get('reminder_activity').filter((entry) => entry.reminder_id === row.id).sort((a, b) => b.created_at.localeCompare(a.created_at)) }
+  })
+  return { owners, pets, visits, inventory, reminders, settings, profiles, today, timezone, kbDocuments: get('kb_documents'),
+    alerts: get('pet_alerts'), services: get('service_types').filter((row) => row.is_active),
+    suppliers: get('suppliers').map((row) => ({ ...row, contactPerson: row.contact_person || '', notes: row.ordering_notes, isActive: row.is_active })),
+    vaccinations: get('vaccinations').map((row) => ({ ...row, petId: row.pet_id, vaccine: row.vaccine_name, lotNumber: row.lot_number,
+      administeredAt: row.administered_at, nextDueAt: row.next_due_at, veterinarianId: row.administered_by })).sort((a, b) => b.administeredAt.localeCompare(a.administeredAt)),
+    appointments: get('appointments').map((row) => ({ ...row, petId: row.pet_id, date: clinicDate(new Date(row.starts_at), timezone),
+      time: clinicTime(row.starts_at, timezone), service: get('service_types').find((service) => service.id === row.service_type_id)?.name || 'Clinic visit',
+      veterinarianId: row.veterinarian_id, veterinarian: staffName(row.veterinarian_id), status: title(row.status),
+      durationMinutes: Math.round((new Date(row.ends_at) - new Date(row.starts_at)) / 60000) })) }
+}
+
+export async function fetchClinicData(client) {
+  const entries = await Promise.all(tableNames.map(async (name) => {
+    const rows = []
+    for (let offset = 0; ; offset += 500) {
+      let query = client.from(name).select('*').order(name === 'item_suppliers' ? 'item_id' : 'id')
+      if (name === 'item_suppliers') query = query.order('supplier_id')
+      const { data, error } = await query.range(offset, offset + 499)
+      if (error) throw error
+      rows.push(...data)
+      if (data.length < 500) break
+    }
+    return [name, rows]
+  }))
+  return Object.fromEntries(entries)
+}
+
+export function clinicErrorMessage(error) {
+  const message = error?.message || 'Unable to reach the clinic database. Please try again.'
+  const explanations = {
+    APPOINTMENT_CONFLICT: 'This veterinarian already has a booking during that time. Choose another slot.',
+    APPOINTMENT_IN_PAST: 'Choose a future appointment date and time. Past dates and times cannot be booked.',
+    INSUFFICIENT_STOCK: 'This batch does not have enough stock for that withdrawal.',
+    DUPLICATE_MICROCHIP: 'This microchip is already registered to another patient.',
+    EXPIRED_BATCH: 'This batch has expired. Choose another batch or record expired/damaged disposal.',
+    FORBIDDEN: 'Your account does not have permission for this action.',
+    RECORD_FINALIZED: 'This encounter is finalized. An owner can append a correction.',
+    IMMUTABLE_LEDGER: 'Stock history must be retained. Archive the item or record a correcting movement.',
+    BATCH_HAS_STOCK: 'Dispense or dispose of the remaining stock before archiving this batch.',
+    HAS_DEPENDENTS: 'Reassign or delete linked patients before deleting this owner.',
+    HAS_ATTACHMENTS: 'Stored attachments must be removed before this patient can be deleted.',
+    INVALID_TRANSITION: 'This record has changed status. Refresh and choose an available action.',
+    NOT_FOUND: 'This record is no longer available. Refresh the workspace.',
   }
+  for (const [code, explanation] of Object.entries(explanations)) if (message.includes(code)) return explanation
+  if (error?.code === '23505') return message.includes('microchip') ? explanations.DUPLICATE_MICROCHIP : 'This identifier is already in use.'
+  if (['23514', '23502', '22P02', '22007', '22008'].includes(error?.code)) return 'Check the required fields, dates, phone number, and numeric values before saving.'
+  return message.replace(/^VALIDATION_FAILED:\s*/, '')
 }
-const title = (value='') => value.replaceAll('_',' ').replace(/\b\w/g,(s)=>s.toUpperCase())
-const clinicDate = (value) => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value))
-export function mapClinicData(raw,userId,today=clinicToday()) {
-  const [profiles,settings,owners,pets,visits,vitals,vaccinations,appointments,reminders,inventory,batches,suppliers,services,alerts,prescriptions,corrections,kbDocuments,movements]=raw
-  const staffName=(id)=>profiles.find((s)=>s.id===id)?.full_name || 'Clinical staff'
-  return {
-    profile:profiles.find((s)=>s.id===userId),staff:profiles.filter((s)=>s.is_active),allStaff:profiles,settings:settings[0],services,
-    owners:owners.map((o)=>({...o,fullName:o.full_name,emergencyContact:o.emergency_contact,pets:pets.filter((p)=>p.owner_id===o.id).map((p)=>p.id)})),
-    pets:pets.map((p)=>{
-      const latest=visits.filter((v)=>v.pet_id===p.id && vitals.some((vt)=>vt.visit_id===v.id && vt.weight_kg!=null)).sort((a,b)=>b.visited_at.localeCompare(a.visited_at))[0]
-      return {...p,ownerId:p.owner_id,recordNumber:p.record_number,reproductiveStatus:p.reproductive_status,birthDate:p.birth_date,color:p.color_markings,microchip:p.microchip_number,photoColor:'#7aa899',
-        allergies:alerts.filter((a)=>a.pet_id===p.id && a.is_active && a.alert_type==='allergy').map((a)=>a.description),
-        alerts:alerts.filter((a)=>a.pet_id===p.id && a.is_active && a.alert_type!=='allergy').map((a)=>a.description),
-        latestWeight:Number(vitals.find((vt)=>vt.visit_id===latest?.id)?.weight_kg || p.baseline_weight) || null}
-    }),
-    visits:visits.map((v)=>{const vt=vitals.find((x)=>x.visit_id===v.id)||{};return {...v,petId:v.pet_id,type:v.visit_type,complaint:v.chief_complaint,diagnosis:v.diagnosis_summary,visitedAt:v.visited_at,
-      followUpDate:v.follow_up_date,veterinarian:staffName(v.attending_veterinarian_id),weightKg:vt.weight_kg==null?null:Number(vt.weight_kg),temperatureC:vt.temperature_c,heartRate:vt.heart_rate_bpm,respiratoryRate:vt.respiratory_rate_rpm,bodyConditionScore:vt.body_condition_score}}),
-    vaccinations:vaccinations.map((v)=>({...v,petId:v.pet_id,vaccine:v.vaccine_name,administeredAt:v.administered_at,nextDueAt:v.next_due_at,lotNumber:v.lot_number,veterinarian:staffName(v.administered_by)})),
-    appointments:appointments.map((a)=>({...a,petId:a.pet_id,date:clinicDate(a.starts_at),time:new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(a.starts_at)),
-      service:services.find((s)=>s.id===a.service_type_id)?.name || 'Visit',status:title(a.status),veterinarian:staffName(a.veterinarian_id)})),
-    reminders:reminders.map((r)=>{const dueDate=clinicDate(r.due_at);return {...r,petId:r.pet_id,dueDate,type:r.reminder_type==='follow_up'?'Follow-up':title(r.reminder_type),priority:title(r.priority),
-      status:['completed','cancelled','snoozed'].includes(r.status)?title(r.status):classifyReminder(dueDate,today),assignedTo:staffName(r.assigned_to)}}),
-    inventory:inventory.map((i)=>({...i,quantity:Number(i.quantity_on_hand),minimumStock:Number(i.minimum_stock),nearestExpiry:i.nearest_expiration,supplierId:batches.find((b)=>b.item_id===i.id)?.supplier_id,
-      batches:batches.filter((b)=>b.item_id===i.id).map((b)=>({...b,quantity:movements.filter((m)=>m.batch_id===b.id).reduce((sum,m)=>sum+Number(m.quantity_delta),0)}))})),
-    suppliers:suppliers.map((s)=>({...s,contactPerson:s.contact_person||'',notes:s.ordering_notes})),prescriptions,corrections,kbDocuments,
+
+export function createMutationRunner(client) {
+  const retryKeys = new Map()
+  return async (action, payload) => {
+    const signature = JSON.stringify([action, payload])
+    const key = retryKeys.get(signature) || crypto.randomUUID()
+    retryKeys.set(signature, key)
+    const { data, error } = await client.rpc('portal_mutation', { p_action: action, p_data: payload, p_key: key })
+    if (error) throw error
+    retryKeys.delete(signature)
+    return data
   }
-}
-export async function loadClinic(userId) {
-  const tables=['profiles','clinic_settings','owners','pets','visits','visit_vitals','vaccinations','appointments','reminders','inventory_on_hand','inventory_batches','suppliers','service_types','pet_alerts','prescriptions','visit_corrections','kb_documents','inventory_movements']
-  return mapClinicData(await Promise.all(tables.map(rows)),userId)
-}
-export async function exportReport(report,patientId) {
-  return unwrap(await supabase.rpc('export_report',{p_report:report,p_patient_id:patientId||null}))
 }

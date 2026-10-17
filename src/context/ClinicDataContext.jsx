@@ -1,55 +1,82 @@
 /* oxlint-disable react/only-export-components */
-import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { ClinicDataContext } from './ClinicContext'
-import { DemoClinicDataProvider } from './DemoClinicDataProvider'
-import { useAuth } from './AuthContext'
-import { loadClinic,mutate,unwrap } from '../lib/clinicRepository'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-const empty={owners:[],pets:[],visits:[],vaccinations:[],appointments:[],reminders:[],inventory:[],suppliers:[],staff:[],allStaff:[],services:[],prescriptions:[],corrections:[],kbDocuments:[]}
-function LiveClinicDataProvider({children}) {
-  const {session}=useAuth()
-  const userId=session?.user.id
-  const [state,setState]=useState(empty)
-  const [loading,setLoading]=useState(true)
-  const [error,setError]=useState('')
-  const generation=useRef(0)
-  const requestId=useRef(0)
-  const refresh=useCallback(async()=>{
-    if(!userId)return
-    const version=generation.current
-    const request=++requestId.current
-    const next=await loadClinic(userId)
-    if(version===generation.current&&request===requestId.current){setState(next);setError('');setLoading(false)}
-  },[userId])
-  useEffect(()=>{
-    generation.current+=1;setState(empty);setError('');setLoading(Boolean(userId))
-    if(!userId)return
-    const version=generation.current
-    const reload=()=>refresh().catch((e)=>{if(version===generation.current){setError(e.message);setLoading(false)}})
-    reload()
-    const onFocus=()=>{if(document.visibilityState==='visible')reload()}
-    window.addEventListener('focus',reload);document.addEventListener('visibilitychange',onFocus)
-    return ()=>{generation.current+=1;window.removeEventListener('focus',reload);document.removeEventListener('visibilitychange',onFocus)}
-  },[userId,refresh])
-  const write=async(action,data,key)=>{
-    const result=await mutate(action,data,key)
-    try{await refresh()}catch{setError('Saved to Supabase, but records could not be refreshed. Reload to synchronize.')}
-    return result
+import { clinicErrorMessage, createMutationRunner, fetchClinicData, normalizeClinicData } from '../lib/clinicRepository'
+import { useAuth } from './AuthContext'
+import { ClinicDataContext } from './ClinicContext'
+
+export function ClinicDataProvider({ children }) {
+  const { user, refreshAccess, signOut } = useAuth()
+  const [raw, setRaw] = useState(null)
+  const [error, setError] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  const [clock, setClock] = useState(() => new Date())
+  const request = useRef(0)
+  const mounted = useRef(false)
+  const mutation = useMemo(() => createMutationRunner(supabase), [])
+
+  const reload = useCallback(async () => {
+    const current = ++request.current
+    setRefreshing(true)
+    try {
+      const result = await fetchClinicData(supabase)
+      if (!mounted.current || current !== request.current) return
+      if (!result.profiles.some((profile) => profile.id === user.id && profile.is_active)) {
+        await refreshAccess()
+        throw new Error('FORBIDDEN')
+      }
+      setRaw(result)
+      setError('')
+    } catch (error) {
+      if (mounted.current && current === request.current) setError(clinicErrorMessage(error))
+    } finally {
+      if (mounted.current && current === request.current) setRefreshing(false)
+    }
+  }, [user.id, refreshAccess])
+
+  useEffect(() => {
+    mounted.current = true
+    const generation = request.current
+    queueMicrotask(() => { if (mounted.current && generation === request.current) void reload() })
+    const tick = setInterval(() => setClock(new Date()), 30000)
+    const onFocus = () => { setClock(new Date()); void reload() }
+    window.addEventListener('focus', onFocus)
+    return () => { mounted.current = false; request.current += 1; clearInterval(tick); window.removeEventListener('focus', onFocus) }
+  }, [reload])
+
+  const execute = async (action, payload) => {
+    try {
+      const result = await mutation(action, payload)
+      await reload()
+      return result
+    } catch (error) { throw new Error(clinicErrorMessage(error), { cause: error }) }
   }
-  const value={...state,loading,error,refresh,isDemo:false,
-    getOwner:(id)=>state.owners.find((o)=>o.id===id),getPet:(id)=>state.pets.find((p)=>p.id===id),
-    addOwner:(d,k)=>write('create_owner',d,k),addPet:(d,k)=>write('create_pet',d,k),addVisit:(d,k)=>write('create_encounter',d,k),
-    addVaccination:(d,k)=>write('create_vaccination',d,k),addAppointment:(d,k)=>write('book_appointment',d,k),completeReminder:(id,outcome,k)=>write('complete_reminder',{id,outcome},k),
-    adjustStock:(id,delta,reason,batchId,k)=>write('record_inventory_movement',{id,delta,reason,batchId},k),
-    addSupplier:(d,k)=>write('create_supplier',d,k),addInventoryItem:(d,k)=>write('create_inventory_item',d,k),addPrescription:(d,k)=>write('create_prescription',d,k),
-    addReminder:(d,k)=>write('create_custom_reminder',d,k),saveSettings:(d,k)=>write('save_settings',d,k),finalizeEncounter:(id,k)=>write('finalize_encounter',{id},k),
-    correctEncounter:(d,k)=>write('correct_encounter',d,k),transitionAppointment:(id,status,k)=>write('transition_appointment',{id,status},k),
-    manageKb:async(d)=>{const r=unwrap(await supabase.rpc('manage_kb',{p_data:d}));await refresh();return r},
-  }
-  return <ClinicDataContext.Provider value={value}>{children}</ClinicDataContext.Provider>
+  const data = useMemo(() => normalizeClinicData(raw || {}, clock), [raw, clock])
+  const value = { ...data, execute, reload, refreshing,
+    manageKb: async (payload) => {
+      const { data: result, error } = await supabase.rpc('manage_kb', { p_data: payload })
+      if (error) throw new Error(clinicErrorMessage(error), { cause: error })
+      await reload()
+      return result
+    },
+    addOwner: (payload) => execute('create_owner', payload),
+    addPet: (payload) => execute('create_pet', payload),
+    addVisit: (payload) => execute('create_encounter', payload),
+    addVaccination: (payload) => execute('create_vaccination', payload),
+    addAppointment: (payload) => execute('book_appointment', payload),
+    completeReminder: (id, outcome) => execute('complete_reminder', { id, outcome }),
+    getOwner: (id) => data.owners.find((owner) => owner.id === id),
+    getPet: (id) => data.pets.find((pet) => pet.id === id) }
+
+  if (!raw) return <div className="page-loader" role="status">{error ? <><p role="alert">{error}</p><button className="button button-primary" disabled={refreshing} onClick={reload}>Retry loading records</button><button className="button button-secondary" onClick={() => void signOut().catch((error) => setError(error.message))}>Sign out</button></> : <><span aria-hidden="true" /><p>Loading clinic records...</p></>}</div>
+  return <ClinicDataContext.Provider value={value}>
+    {error && <div className="database-error" role="alert"><span>Saved records could not be refreshed. {error}</span><button className="button button-secondary small-button" disabled={refreshing} onClick={reload}>Retry refresh</button></div>}
+    {children}
+  </ClinicDataContext.Provider>
 }
-export function ClinicDataProvider({children}) {
-  const {isDemo}=useAuth()
-  return isDemo?<DemoClinicDataProvider>{children}</DemoClinicDataProvider>:<LiveClinicDataProvider>{children}</LiveClinicDataProvider>
+
+export function useClinicData() {
+  const context = useContext(ClinicDataContext)
+  if (!context) throw new Error('useClinicData must be used inside ClinicDataProvider')
+  return context
 }
-export function useClinicData(){const context=useContext(ClinicDataContext);if(!context)throw new Error('useClinicData must be used inside ClinicDataProvider');return context}
