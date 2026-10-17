@@ -84,7 +84,7 @@ export default function Landing() {
             <a href="#why">Why clinics</a>
             <a href="#contact">Contact</a>
           </nav>
-          <Link to="/dashboard" className="landing-btn landing-btn-primary landing-header-cta">
+          <Link to="/demo" className="landing-btn landing-btn-primary landing-header-cta">
             Try the demo
           </Link>
         </div>
@@ -107,7 +107,7 @@ export default function Landing() {
                 Patient care, appointments, reminders, stock, and clinic records in one calm workspace for every busy clinic day.
               </p>
               <div className="landing-hero-actions">
-                <Link to="/dashboard" className="landing-btn landing-btn-primary">
+                <Link to="/demo" className="landing-btn landing-btn-primary">
                   Try the demo
                 </Link>
                 <a href="#contact" className="landing-btn landing-btn-ghost">
@@ -282,7 +282,7 @@ export default function Landing() {
             <h2>Bring calmer clinic days to your team.</h2>
             <p>Try the live demo, or reach out—we&apos;d love to hear how your clinic works.</p>
             <div className="landing-cta-actions">
-              <Link to="/dashboard" className="landing-btn landing-btn-primary">
+              <Link to="/demo" className="landing-btn landing-btn-primary">
                 Open the demo
               </Link>
               <div className="landing-contacts">

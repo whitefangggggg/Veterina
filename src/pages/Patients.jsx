@@ -4,6 +4,7 @@ import { CaretRight, MagnifyingGlass, PawPrint, Plus, UserPlus, UsersThree, Warn
 import { useClinicData } from '../context/ClinicDataContext'
 import { Badge, EmptyState, Field, Modal, PageHeader } from '../components/ui'
 import PetSticker from '../components/PetSticker'
+import MutationForm from '../components/MutationForm'
 
 const emptyOwner = { fullName: '', phone: '', email: '', address: '', emergencyContact: '' }
 const emptyPet = { name: '', ownerId: '', species: 'Dog', breed: '', sex: 'Male', reproductiveStatus: 'Intact', birthDate: '', color: '', microchip: '', allergies: '', latestWeight: '' }
@@ -13,15 +14,15 @@ function AddOwnerModal({ onClose }) {
   const [form, setForm] = useState(emptyOwner)
   const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
-    addOwner(form)
+    await addOwner(form,event.idempotencyKey)
     onClose()
   }
 
   return (
     <Modal title="Add pet owner" description="Create the household record first, then add their pets." onClose={onClose}>
-      <form onSubmit={submit}>
+      <MutationForm onSubmit={submit}>
         <div className="form-grid">
           <Field label="Full name" required span><input required value={form.fullName} onChange={set('fullName')} placeholder="e.g. Maria Santos" /></Field>
           <Field label="Mobile number" required><input required value={form.phone} onChange={set('phone')} placeholder="09XX XXX XXXX" /></Field>
@@ -30,7 +31,7 @@ function AddOwnerModal({ onClose }) {
           <Field label="Emergency contact" span><input value={form.emergencyContact} onChange={set('emergencyContact')} placeholder="Name · mobile number" /></Field>
         </div>
         <div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary">Save owner</button></div>
-      </form>
+      </MutationForm>
     </Modal>
   )
 }
@@ -40,15 +41,15 @@ function AddPetModal({ onClose }) {
   const [form, setForm] = useState(() => ({ ...emptyPet, ownerId: owners[0]?.id || '' }))
   const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
-    addPet(form)
+    await addPet(form,event.idempotencyKey)
     onClose()
   }
 
   return (
     <Modal title="Register a new patient" description="Add identity and baseline health information." onClose={onClose} wide>
-      <form onSubmit={submit}>
+      <MutationForm onSubmit={submit}>
         <div className="form-grid three-columns">
           <Field label="Pet name" required><input required value={form.name} onChange={set('name')} /></Field>
           <Field label="Owner" required><select required value={form.ownerId} onChange={set('ownerId')}>{owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.fullName}</option>)}</select></Field>
@@ -63,7 +64,7 @@ function AddPetModal({ onClose }) {
           <Field label="Known allergies" span><input value={form.allergies} onChange={set('allergies')} placeholder="Leave blank if none known" /></Field>
         </div>
         <div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary">Register patient</button></div>
-      </form>
+      </MutationForm>
     </Modal>
   )
 }

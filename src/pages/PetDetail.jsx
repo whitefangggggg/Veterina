@@ -22,6 +22,12 @@ import {
 import { useClinicData } from '../context/ClinicDataContext'
 import { Badge, Field, Modal, SectionCard } from '../components/ui'
 import PetSticker from '../components/PetSticker'
+import MutationForm from '../components/MutationForm'
+import Assistant from '../components/Assistant'
+import { useAuth } from '../context/AuthContext'
+import { clinicToday } from '../lib/clinicRepository'
+import { printHistory } from '../lib/printHistory'
+import ClinicalActionModal from '../components/ClinicalActionModal'
 
 const emptyVisit = {
   type: 'Wellness check',
@@ -42,22 +48,22 @@ const emptyVisit = {
 }
 
 function VisitModal({ pet, onClose }) {
-  const { addVisit } = useClinicData()
-  const [form, setForm] = useState(() => ({ ...emptyVisit, weightKg: pet.latestWeight || '' }))
+  const { addVisit,staff=[],profile } = useClinicData()
+  const [form, setForm] = useState(() => ({ ...emptyVisit, weightKg: pet.latestWeight || '',veterinarianId:profile?.id || '' }))
   const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
-    addVisit({ ...form, petId: pet.id })
+    await addVisit({ ...form, petId: pet.id,veterinarianId:form.veterinarianId || profile?.id },event.idempotencyKey)
     onClose()
   }
 
   return (
     <Modal title={`Record checkup for ${pet.name}`} description="This entry will be appended to the permanent clinical timeline." onClose={onClose} wide>
-      <form onSubmit={submit}>
+      <MutationForm onSubmit={submit}>
         <h3 className="form-section-title">Visit details</h3>
         <div className="form-grid three-columns">
           <Field label="Visit type" required><select value={form.type} onChange={set('type')}><option>Wellness check</option><option>Sick visit</option><option>Follow-up</option><option>Emergency</option><option>Procedure</option></select></Field>
-          <Field label="Attending veterinarian" required><input required value={form.veterinarian} onChange={set('veterinarian')} /></Field>
+          <Field label="Attending veterinarian" required><select required value={form.veterinarianId || profile?.id || ''} onChange={set('veterinarianId')}>{staff.map((s)=><option key={s.id} value={s.id}>{s.full_name}</option>)}{!staff.length && <option value="">Demo veterinarian</option>}</select></Field>
           <Field label="Follow-up date"><input type="date" value={form.followUpDate} onChange={set('followUpDate')} /></Field>
           <Field label="Chief complaint" required span><textarea required rows="2" value={form.complaint} onChange={set('complaint')} /></Field>
         </div>
@@ -79,40 +85,42 @@ function VisitModal({ pet, onClose }) {
           <Field label="Diagnosis" span><input value={form.diagnosis} onChange={set('diagnosis')} /></Field>
         </div>
         <div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary">Save clinical entry</button></div>
-      </form>
+      </MutationForm>
     </Modal>
   )
 }
 
 function VaccineModal({ pet, onClose }) {
-  const { addVaccination } = useClinicData()
-  const [form, setForm] = useState({ vaccine: 'Anti-rabies', administeredAt: '2026-07-29', nextDueAt: '2027-07-29', lotNumber: '', dose: '1 mL', veterinarian: 'Dr. Andrea Villanueva' })
+  const { addVaccination,staff=[],profile } = useClinicData()
+  const [form, setForm] = useState({ vaccine:'Anti-rabies',administeredAt:clinicToday(),nextDueAt:'',lotNumber:'',dose:'',veterinarianId:profile?.id || '' })
   const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
-    addVaccination({ ...form, petId: pet.id })
+    await addVaccination({ ...form, petId: pet.id },event.idempotencyKey)
     onClose()
   }
   return (
     <Modal title={`Record vaccination for ${pet.name}`} description="The next due date will automatically create a reminder." onClose={onClose}>
-      <form onSubmit={submit}>
+      <MutationForm onSubmit={submit}>
         <div className="form-grid">
           <Field label="Vaccine" required span><input required value={form.vaccine} onChange={set('vaccine')} /></Field>
           <Field label="Date administered" required><input required type="date" value={form.administeredAt} onChange={set('administeredAt')} /></Field>
           <Field label="Next due date" required><input required type="date" value={form.nextDueAt} onChange={set('nextDueAt')} /></Field>
           <Field label="Batch / lot number" required><input required value={form.lotNumber} onChange={set('lotNumber')} /></Field>
           <Field label="Dose"><input value={form.dose} onChange={set('dose')} /></Field>
-          <Field label="Veterinarian" required span><input required value={form.veterinarian} onChange={set('veterinarian')} /></Field>
+          <Field label="Veterinarian" required span><select required value={form.veterinarianId} onChange={set('veterinarianId')}>{staff.map((s)=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></Field>
         </div>
         <div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary">Save vaccination</button></div>
-      </form>
+      </MutationForm>
     </Modal>
   )
 }
 
 export default function PetDetail() {
+  const { isDemo } = useAuth()
   const { petId } = useParams()
-  const { getPet, getOwner, visits, vaccinations, reminders } = useClinicData()
+  const { getPet,getOwner,visits,vaccinations,reminders,profile,staff=[],prescriptions=[],corrections=[],finalizeEncounter }=useClinicData()
+  const [correctionVisit,setCorrectionVisit]=useState(null)
   const [modal, setModal] = useState(null)
   const [tab, setTab] = useState('history')
   const pet = getPet(petId)
@@ -135,7 +143,7 @@ export default function PetDetail() {
           <div className="pet-meta"><code>{pet.recordNumber}</code>{pet.microchip && <span><ShieldCheck size={15} weight="duotone" /> {pet.microchip}</span>}</div>
         </div>
         <div className="pet-hero-actions">
-          <button className="button button-secondary" onClick={() => window.print()}><Printer size={18} weight="duotone" /> Print history</button>
+          {isDemo?<button className="button button-secondary" onClick={()=>window.print()}><Printer size={18}/> Print demo</button>:profile?.role==='owner'&&<MutationForm onSubmit={async()=>printHistory(petId,staff)}><button className="button button-secondary"><Printer size={18}/> Print history</button></MutationForm>}
           <button className="button button-primary" onClick={() => setModal('visit')}><Plus size={18} weight="bold" /> Record checkup</button>
         </div>
       </div>
@@ -165,7 +173,7 @@ export default function PetDetail() {
           {tab === 'history' && (
             <div className="clinical-timeline">
               {petVisits.map((visit) => (
-                <article className="visit-card section-card" key={visit.id}>
+                <article className="visit-card section-card" key={visit.id} id={visit.id}>
                   <div className="visit-date">
                     <span>{format(parseISO(visit.visitedAt), 'MMM')}</span>
                     <strong>{format(parseISO(visit.visitedAt), 'dd')}</strong>
@@ -187,6 +195,10 @@ export default function PetDetail() {
                       <div><strong>P · Plan</strong><p>{visit.plan || '—'}</p></div>
                     </div>
                     {visit.followUpDate && <div className="follow-up-note"><CalendarPlus size={16} weight="duotone" /> Follow-up due {format(parseISO(visit.followUpDate), 'd MMMM yyyy')}</div>}
+                    {prescriptions.filter((pr)=>pr.visit_id===visit.id).map((pr)=><p key={pr.id}><strong>{pr.medication_name}</strong> · {pr.dose} · {pr.frequency} · {pr.instructions}</p>)}
+                    {corrections.filter((c)=>c.visit_id===visit.id).map((c)=><p key={c.id}><strong>Correction: {c.reason}</strong> · {c.correction}</p>)}
+                    {!isDemo && (visit.finalized_at?<p>Finalized · original entry is locked.</p>:<MutationForm onSubmit={async(e)=>finalizeEncounter(visit.id,e.idempotencyKey)}><button className="button button-secondary small-button">Finalize entry</button></MutationForm>)}
+                    {!isDemo && profile?.role==='owner'&&<button className="button button-secondary small-button" onClick={()=>{setCorrectionVisit(visit.id);setModal('correction')}}>Append correction</button>}
                   </div>
                 </article>
               ))}
@@ -198,11 +210,11 @@ export default function PetDetail() {
             <SectionCard title="Vaccination history" description="Administered doses, batches and next due dates" action={<button className="button button-primary small-button" onClick={() => setModal('vaccine')}><Plus size={16} weight="bold" /> Add vaccine</button>}>
               <div className="vaccine-list">
                 {petVaccinations.map((vaccine) => (
-                  <div className="vaccine-row" key={vaccine.id}>
+                  <div className="vaccine-row" key={vaccine.id} id={vaccine.id}>
                     <div className="vaccine-icon"><Syringe size={20} weight="duotone" /></div>
                     <div><strong>{vaccine.vaccine}</strong><span>Given {format(parseISO(vaccine.administeredAt), 'd MMM yyyy')} · {vaccine.dose}</span></div>
                     <div><span>Lot number</span><strong>{vaccine.lotNumber}</strong></div>
-                    <div><span>Next due</span><strong>{format(parseISO(vaccine.nextDueAt), 'd MMM yyyy')}</strong></div>
+                    <div><span>Next due</span><strong>{vaccine.nextDueAt?format(parseISO(vaccine.nextDueAt),'d MMM yyyy'):'Not recorded'}</strong></div>
                     <Badge tone="success">Recorded</Badge>
                   </div>
                 ))}
@@ -232,6 +244,7 @@ export default function PetDetail() {
         </div>
 
         <aside className="record-sidebar">
+          {!isDemo && <Assistant patientId={petId} />}
           <SectionCard title="Owner">
             <div className="owner-card">
               <div className="avatar owner-avatar">{owner?.fullName?.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div>
@@ -251,12 +264,13 @@ export default function PetDetail() {
           <SectionCard title="Quick actions">
             <button className="quick-action" onClick={() => setModal('vaccine')}><Syringe size={18} weight="duotone" /><span><strong>Record vaccination</strong><small>Add batch and next due date</small></span></button>
             <Link className="quick-action" to="/appointments"><CalendarPlus size={18} weight="duotone" /><span><strong>Book appointment</strong><small>Schedule the next visit</small></span></Link>
-            <button className="quick-action"><Pill size={18} weight="duotone" /><span><strong>Add prescription</strong><small>Record medication details</small></span></button>
+            {!isDemo && <button className="quick-action" onClick={()=>setModal('prescription')}><Pill size={18} weight="duotone" /><span><strong>Add prescription</strong><small>Record medication details</small></span></button>}
           </SectionCard>
         </aside>
       </div>
       {modal === 'visit' && <VisitModal pet={pet} onClose={() => setModal(null)} />}
       {modal === 'vaccine' && <VaccineModal pet={pet} onClose={() => setModal(null)} />}
+      {['prescription','correction'].includes(modal)&&<ClinicalActionModal kind={modal} petId={petId} visitId={correctionVisit} onClose={()=>setModal(null)}/>}
     </div>
   )
 }

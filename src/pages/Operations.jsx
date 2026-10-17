@@ -18,37 +18,41 @@ import {
 import { useClinicData } from '../context/ClinicDataContext'
 import { Badge, Field, Modal, PageHeader } from '../components/ui'
 import PetSticker from '../components/PetSticker'
+import MutationForm from '../components/MutationForm'
+import { clinicToday } from '../lib/clinicRepository'
+import { useAuth } from '../context/AuthContext'
 
-const clinicDate = '2026-07-29'
+const clinicDate = clinicToday()
 
 function AppointmentModal({ onClose, initialDate = clinicDate }) {
-  const { pets, owners, addAppointment } = useClinicData()
-  const [form, setForm] = useState({ petId: pets[0]?.id || '', date: initialDate, time: '09:00', service: 'Wellness check', veterinarian: 'Dr. Andrea Villanueva', notes: '' })
+  const { pets, owners, addAppointment,staff=[],profile } = useClinicData()
+  const [form, setForm] = useState({ petId:pets[0]?.id || '',date:initialDate,time:'09:00',service:'Wellness check',veterinarianId:profile?.id || '',notes:'' })
   const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
-    addAppointment(form)
+    await addAppointment(form,event.idempotencyKey)
     onClose()
   }
   return (
     <Modal title="New appointment" description="Schedule a clinic visit and reserve the time slot." onClose={onClose}>
-      <form onSubmit={submit}>
+      <MutationForm onSubmit={submit}>
         <div className="form-grid">
           <Field label="Patient" required span><select value={form.petId} onChange={set('petId')}>{pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name} — {owners.find((owner) => owner.id === pet.ownerId)?.fullName}</option>)}</select></Field>
           <Field label="Date" required><input required type="date" value={form.date} onChange={set('date')} /></Field>
           <Field label="Time" required><input required type="time" value={form.time} onChange={set('time')} /></Field>
           <Field label="Service" required><select value={form.service} onChange={set('service')}><option>Wellness check</option><option>Vaccination</option><option>Follow-up</option><option>Dental consultation</option><option>Procedure</option><option>Emergency</option></select></Field>
-          <Field label="Veterinarian" required><input required value={form.veterinarian} onChange={set('veterinarian')} /></Field>
+          <Field label="Veterinarian" required><select required value={form.veterinarianId} onChange={set('veterinarianId')}>{staff.map((s)=><option key={s.id} value={s.id}>{s.full_name}</option>)}{!staff.length && <option value="">Demo veterinarian</option>}</select></Field>
           <Field label="Notes" span><textarea rows="3" value={form.notes} onChange={set('notes')} /></Field>
         </div>
         <div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary">Create appointment</button></div>
-      </form>
+      </MutationForm>
     </Modal>
   )
 }
 
 export function Appointments() {
-  const { appointments, getPet, getOwner } = useClinicData()
+  const { appointments, getPet, getOwner,transitionAppointment } = useClinicData()
+  const {isDemo}=useAuth()
   const [selectedDay, setSelectedDay] = useState(() => parseISO(clinicDate))
   const [month, setMonth] = useState(() => startOfMonth(parseISO(clinicDate)))
   const [modal, setModal] = useState(false)
@@ -127,6 +131,7 @@ export function Appointments() {
                     <h3>{appointment.service}</h3>
                     <p>{appointment.veterinarian}</p>
                     <Badge tone={appointment.status === 'Confirmed' ? 'success' : 'warning'}>{appointment.status}</Badge>
+                    {!isDemo && ['Confirmed','Arrived','In Progress'].includes(appointment.status) && <MutationForm onSubmit={async()=>{await transitionAppointment(appointment.id,{Confirmed:'arrived',Arrived:'in_progress','In Progress':'completed'}[appointment.status])}}><button className="button button-secondary small-button">{appointment.status==='Confirmed'?'Mark arrived':appointment.status==='Arrived'?'Start visit':'Complete visit'}</button></MutationForm>}
                   </div>
                 </article>
               )
@@ -142,7 +147,10 @@ export function Appointments() {
 }
 
 export function Reminders() {
-  const { reminders, completeReminder, getPet, getOwner } = useClinicData()
+  const { reminders, completeReminder, getPet, getOwner,addReminder,pets } = useClinicData()
+  const {isDemo}=useAuth()
+  const [custom,setCustom]=useState(false)
+  const [customForm,setCustomForm]=useState({petId:pets[0]?.id || '',title:'',dueDate:clinicDate,notes:''})
   const [filter, setFilter] = useState('Open')
   const [outcomeId, setOutcomeId] = useState(null)
   const [outcome, setOutcome] = useState('')
@@ -152,16 +160,16 @@ export function Reminders() {
     return item.type === filter
   }).sort((a, b) => a.dueDate.localeCompare(b.dueDate)), [reminders, filter])
 
-  const saveOutcome = (event) => {
+  const saveOutcome = async (event) => {
     event.preventDefault()
-    completeReminder(outcomeId, outcome)
+    await completeReminder(outcomeId,outcome,event.idempotencyKey)
     setOutcomeId(null)
     setOutcome('')
   }
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Daily call list" title="Reminders" description="One worklist for checkups, vaccines and follow-up calls." actions={<button className="button button-primary"><Plus size={18} weight="bold" /> Custom reminder</button>} />
+      <PageHeader eyebrow="Daily call list" title="Reminders" description="One worklist for checkups, vaccines and follow-up calls." actions={!isDemo && <button className="button button-primary" onClick={()=>setCustom(true)}><Plus size={18} weight="bold" /> Custom reminder</button>} />
       <div className="reminder-summary">
         <div><span className="summary-icon overdue"><Clock size={22} weight="duotone" /></span><span><strong>{reminders.filter((item) => item.status === 'Overdue').length}</strong> overdue</span></div>
         <div><span className="summary-icon due"><Phone size={22} weight="duotone" /></span><span><strong>{reminders.filter((item) => item.status === 'Due').length}</strong> due today</span></div>
@@ -194,9 +202,14 @@ export function Reminders() {
       </div>
       {outcomeId && (
         <Modal title="Complete reminder" description="Record what happened so the clinic retains the contact history." onClose={() => setOutcomeId(null)}>
-          <form onSubmit={saveOutcome}><Field label="Call outcome" required><textarea required rows="4" value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="e.g. Owner confirmed appointment for Friday." /></Field><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setOutcomeId(null)}>Cancel</button><button className="button button-primary">Save outcome</button></div></form>
+          <MutationForm onSubmit={saveOutcome}><Field label="Call outcome" required><textarea required rows="4" value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="e.g. Owner confirmed appointment for Friday." /></Field><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setOutcomeId(null)}>Cancel</button><button className="button button-primary">Save outcome</button></div></MutationForm>
         </Modal>
       )}
+      {custom && <Modal title="Custom reminder" onClose={()=>setCustom(false)}><MutationForm onSubmit={async(e)=>{await addReminder(customForm,e.idempotencyKey);setCustom(false)}}>
+        <Field label="Patient"><select required value={customForm.petId} onChange={(e)=>setCustomForm({...customForm,petId:e.target.value})}>{pets.map((p)=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+        {['title','dueDate','notes'].map((key)=><Field key={key} label={key}><input required={key!=='notes'} type={key==='dueDate'?'date':'text'} value={customForm[key]} onChange={(e)=>setCustomForm({...customForm,[key]:e.target.value})}/></Field>)}
+        <button className="button button-primary">Save reminder</button>
+      </MutationForm></Modal>}
     </div>
   )
 }

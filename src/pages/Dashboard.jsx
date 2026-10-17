@@ -15,8 +15,10 @@ import {
 import { useClinicData } from '../context/ClinicDataContext'
 import PetSticker from '../components/PetSticker'
 import { Badge } from '../components/ui'
+import { clinicToday } from '../lib/clinicRepository'
+import { useAuth } from '../context/AuthContext'
 
-const today = '2026-07-29'
+const today = clinicToday()
 
 const spaces = [
   { to: '/patients', title: 'Patient records', description: 'Owners, pets, checkups and complete clinical histories.', icon: PawPrint, color: 'sage' },
@@ -28,7 +30,8 @@ const spaces = [
 ]
 
 export default function Dashboard() {
-  const { appointments, reminders, inventory, getPet, getOwner } = useClinicData()
+  const { appointments, reminders, inventory, getPet, getOwner,profile } = useClinicData()
+  const {isDemo}=useAuth()
   const todayAppointments = appointments.filter((item) => item.date === today).sort((a, b) => a.time.localeCompare(b.time))
   const dueReminders = reminders.filter((item) => item.status === 'Due' || item.status === 'Overdue')
   const lowStock = inventory.filter((item) => item.quantity <= item.minimumStock)
@@ -37,8 +40,8 @@ export default function Dashboard() {
     <div className="home-page">
       <section className="home-hero">
         <div className="home-greeting">
-          <span className="hero-kicker"><Sparkle size={15} weight="fill" /> Wednesday, 29 July</span>
-          <h1>Good morning,<br /><span>Dr. Andrea.</span></h1>
+          <span className="hero-kicker"><Sparkle size={15} weight="fill" /> {new Intl.DateTimeFormat('en-PH',{timeZone:'Asia/Manila',weekday:'long',day:'numeric',month:'long'}).format(new Date())}</span>
+          <h1>Welcome,<br /><span>{isDemo?'Demo staff':profile?.full_name}.</span></h1>
           <p>Patient care, scheduling, and clinic operations — ready when you are.</p>
           <div className="hero-actions">
             <Link className="button button-primary roomy-button" to="/patients"><MagnifyingGlass size={19} weight="bold" /> Find a patient</Link>
