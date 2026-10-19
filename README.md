@@ -1,5 +1,12 @@
 # Veterina
 
+For complete regression checks and isolated database setup, see [TESTING.md](TESTING.md).
+Run `npm run test:all` for an aggregate report, including real local persistence checks.
+
+The dashboard includes a daily action board and stock watch. Patient records include
+a unified care timeline with links to each original record. See
+[Daily workflow improvements](DAILY-WORKFLOW-PLAN.md) for the implemented behavior.
+
 Staff-only veterinary clinic management for a single clinic in the Philippines. Supabase Auth and Postgres back the portal. Clinic pages load real database rows; there is no fixture fallback. Empty tables show empty states. The backend requirements are in [PRD.md](PRD.md); the frontend requirements are preserved in [PRD.frontend.md](PRD.frontend.md).
 
 ## Run locally

@@ -1831,3 +1831,36 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
 .service-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
 .bcs-replace { display: flex; align-items: center; gap: 8px; }
 .field .bcs-replace input { width: 18px; height: 18px; min-height: 18px; flex: none; padding: 0; }
+:target { scroll-margin-top: 100px; }
+
+/* Daily workflow panels share the existing clinic workspace styling. */
+.daily-work-section { width: min(1280px, 100%); margin: 0 auto; padding: 36px 36px 0; }
+.daily-work-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.daily-work-grid .section-card { min-width: 0; }
+.daily-work-list, .care-event-list { list-style: none; margin: 0; padding: 0; }
+.daily-work-list, .care-event-list { padding: 0 24px; }
+.daily-work-grid .section-card > .text-link { display: inline-block; margin: 0 24px 20px; }
+.patient-timeline > .list-toolbar { margin: 0 24px 8px; }
+.patient-timeline > button { margin: 16px 24px 24px; }
+.daily-work-list li { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.daily-work-list li:last-child { border-bottom: 0; }
+.daily-work-list li > div { display: grid; gap: 5px; min-width: 0; }
+.daily-work-list li > div:last-child { justify-items: start; }
+.daily-work-list li > a { flex-shrink: 0; }
+.daily-work-list small, .daily-work-list span:not(.badge) { color: var(--muted); font-size: 12px; }
+.daily-work-list a, .daily-work-list strong, .daily-work-list small, .daily-work-list span { overflow-wrap: anywhere; }
+.daily-patient-link { font-weight: 700; color: var(--ink); }
+.daily-patient-link:hover { color: var(--brand); text-decoration: underline; }
+.daily-empty { padding: 12px 24px; color: var(--muted); font-size: 13px; }
+.care-event { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.care-event time { font-size: 12px; color: var(--muted); padding-top: 4px; }
+.care-event time small { display: block; margin-top: 5px; }
+.care-event h3 { margin: 9px 0 6px; font-size: 16px; overflow-wrap: anywhere; }
+.care-event p { margin: 0 0 10px; color: var(--muted); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.care-event-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 760px) {
+  .daily-work-section { padding: 28px max(16px, var(--safe-left)) 0 max(16px, var(--safe-right)); }
+  .daily-work-grid { grid-template-columns: minmax(0, 1fr); }
+  .daily-work-list li { flex-wrap: wrap; }
+  .care-event { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}

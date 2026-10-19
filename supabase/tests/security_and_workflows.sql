@@ -1,4 +1,4 @@
--- Run as the database owner on Development. All fixtures are rolled back.
+-- Run as the database owner on the isolated test stack. All fixtures roll back.
 begin;
 do $$ declare u uuid; s uuid; i uuid; x uuid; begin
   u:=gen_random_uuid(); s:=gen_random_uuid(); i:=gen_random_uuid(); x:=gen_random_uuid();
@@ -14,21 +14,22 @@ do $$ begin
 end $$;
 set local role authenticated;
 select set_config('request.jwt.claim.sub',current_setting('test.staff'),true);
-do $$ declare o uuid; p uuid; q uuid; v uuid; vac uuid; key uuid; data jsonb; item uuid; batch uuid; result jsonb; begin
+do $$ declare o uuid; p uuid; q uuid; v uuid; vac uuid; key uuid; data jsonb; item uuid; vaccine_item uuid; batch uuid; result jsonb; begin
   o:=(public.create_owner('{"fullName":"Test Household","phone":"09170000000","address":"Fixture"}',gen_random_uuid())->>'id')::uuid;
-  p:=(public.create_pet(jsonb_build_object('ownerId',o,'name','Patient A','species','Dog','sex','Male','reproductiveStatus','Intact'),gen_random_uuid())->>'id')::uuid;
-  q:=(public.create_pet(jsonb_build_object('ownerId',o,'name','Patient B','species','Dog','sex','Female','reproductiveStatus','Intact'),gen_random_uuid())->>'id')::uuid;
-  key:=gen_random_uuid();data:=jsonb_build_object('petId',p,'type','Wellness check','complaint','itching','subjective','skin itching','weightKg','5','followUpDate','2027-01-01');
+  p:=(public.create_pet(jsonb_build_object('ownerId',o,'name','Patient A','species','Dog','breed','Mixed','sex','Male','reproductiveStatus','Intact'),gen_random_uuid())->>'id')::uuid;
+  q:=(public.create_pet(jsonb_build_object('ownerId',o,'name','Patient B','species','Dog','breed','Mixed','sex','Female','reproductiveStatus','Intact'),gen_random_uuid())->>'id')::uuid;
+  key:=gen_random_uuid();data:=jsonb_build_object('petId',p,'type','Wellness check','complaint','itching','subjective','skin itching','weightKg','5','followUpDate',current_date+1);
   result:=public.create_encounter(data,key);v:=(result->>'id')::uuid;
   if public.create_encounter(data,key)<>result then raise exception 'FAIL: idempotent response';end if;
   begin perform public.create_encounter(data || '{"complaint":"different payload"}'::jsonb,key);raise exception 'FAIL: changed payload replay';exception when raise_exception then if sqlerrm not like '%retry payload changed%' then raise;end if;end;
   if (select count(*) from public.visits where pet_id=p)<>1 or (select count(*) from public.visit_vitals where visit_id=v)<>1 or (select count(*) from public.reminders where visit_id=v)<>1 then raise exception 'FAIL: atomic encounter';end if;
-  key:=gen_random_uuid();data:=jsonb_build_object('petId',p,'vaccine','Rabies','lotNumber','TEST-LOT','administeredAt','2026-01-01','nextDueAt','2027-01-01');
+  vaccine_item:=(public.portal_mutation('create_inventory_item',jsonb_build_object('name','Fixture Rabies','brand','Fixture Brand','category','Vaccines','unit','dose','minimumStock',0,'allowsFraction','false'),gen_random_uuid())->>'id')::uuid;
+  key:=gen_random_uuid();data:=jsonb_build_object('petId',p,'inventoryItemId',vaccine_item,'lotNumber','TEST-LOT','administeredAt',current_date,'nextDueAt',current_date+30);
   vac:=(public.create_vaccination(data,key)->>'id')::uuid;perform public.create_vaccination(data,key);
   if (select count(*) from public.reminders where vaccination_id=vac)<>1 then raise exception 'FAIL: duplicate vaccine reminder';end if;
-  perform public.book_appointment(jsonb_build_object('petId',p,'date','2027-02-01','time','09:00','service','Wellness check','veterinarianId',current_setting('test.staff')),gen_random_uuid());
+  perform public.book_appointment(jsonb_build_object('petId',p,'date',current_date+10,'time','09:00','service','Wellness check','veterinarianId',current_setting('test.staff')),gen_random_uuid());
   begin
-    perform public.book_appointment(jsonb_build_object('petId',q,'date','2027-02-01','time','09:15','service','Wellness check','veterinarianId',current_setting('test.staff')),gen_random_uuid());
+    perform public.book_appointment(jsonb_build_object('petId',q,'date',current_date+10,'time','09:15','service','Wellness check','veterinarianId',current_setting('test.staff')),gen_random_uuid());
     raise exception 'FAIL: overlapping booking allowed';
   exception when raise_exception then if sqlerrm not like '%APPOINTMENT_CONFLICT%' then raise;end if;end;
   item:=(public.create_inventory_item(jsonb_build_object('sku',gen_random_uuid()::text,'name','Test Stock','category','Medicine','unit','unit','lotNumber','TEST'),gen_random_uuid())->>'id')::uuid;

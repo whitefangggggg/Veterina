@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
@@ -29,6 +29,8 @@ import { ActionDialog, DeleteRecordDialog } from '../components/RecordForm'
 import { fetchReport, printPatientHistory } from '../lib/reports'
 import { prescriptionMedications, printPrescription } from '../lib/prescriptions'
 import { QueueDialog } from '../components/QueueEditors'
+import PatientTimeline from '../components/PatientTimeline'
+import { useHashTarget } from '../lib/useHashTarget'
 
 function CareStatus({ record }) {
   const tone = { Waiting: 'warning', 'In progress': 'blue', Completed: 'success', Cancelled: 'danger' }[record.careStatus] || 'neutral'
@@ -40,11 +42,18 @@ function CareStatus({ record }) {
 
 export default function PetDetail() {
   const { petId } = useParams()
+  useHashTarget()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
   const { getPet, getOwner, visits, vaccinations, reminders, alerts, profiles, settings, queueEntries } = useClinicData()
   const [modal, setModal] = useState(null)
-  const [tab, setTab] = useState('history')
+  const tab = ['history', 'timeline', 'vaccines', 'growth', 'services'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'history'
+  const setTab = (value) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', value)
+    setSearchParams(next)
+  }
   const [printing, setPrinting] = useState(false)
   const [printError, setPrintError] = useState('')
   const [careReceipt, setCareReceipt] = useState(null)
@@ -82,7 +91,7 @@ export default function PetDetail() {
         <div className="pet-hero-actions">
           {profile.role === 'owner' && <button className="button button-secondary" disabled={printing} onClick={printHistory}><Printer size={18} weight="duotone" /> {printing ? 'Preparing...' : 'Print history'}</button>}
           <button className="button button-secondary" onClick={() => setModal({ type: 'vaccine' })}><Syringe size={18} weight="duotone" /> Record vaccination</button>
-          <Link className="button button-secondary" to="/appointments"><CalendarPlus size={18} weight="duotone" /> Book appointment</Link>
+          <Link className="button button-secondary" to={`/appointments?new=1&petId=${encodeURIComponent(pet.id)}`}><CalendarPlus size={18} weight="duotone" /> Book appointment</Link>
           <button className="button button-secondary" onClick={() => setModal({ type: 'prescription' })}><Pill size={18} weight="duotone" /> Add prescription</button>
           <button className="button button-primary" onClick={() => setModal({ type: 'visit' })}><Plus size={18} weight="bold" /> Record checkup</button>
         </div>
@@ -108,10 +117,12 @@ export default function PetDetail() {
         <div className="record-main">
           <div className="tabs" role="tablist">
             <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>Clinical history</button>
+            <button className={tab === 'timeline' ? 'active' : ''} onClick={() => setTab('timeline')}>Care timeline</button>
             <button className={tab === 'vaccines' ? 'active' : ''} onClick={() => setTab('vaccines')}>Vaccinations</button>
             <button className={tab === 'growth' ? 'active' : ''} onClick={() => setTab('growth')}>Weight & vitals</button>
             <button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Service history</button>
           </div>
+          {tab === 'timeline' && <PatientTimeline key={petId} patientId={petId} />}
 
           {tab === 'history' && (
             <div className="clinical-timeline">
@@ -147,7 +158,7 @@ export default function PetDetail() {
                       {profile.role === 'owner' && <button className="button button-secondary small-button danger-text" onClick={() => setModal({ type: 'delete', entity: 'visit', record: visit })}>Delete checkup</button>}
                     </div>
                     {visit.corrections.map((correction) => <div className="follow-up-note" key={correction.id}><strong>Correction: {correction.reason}</strong><p>{correction.correction}</p></div>)}
-                    {visit.prescriptions.map((prescription) => <div className="prescription-row" key={prescription.id}>
+                    {visit.prescriptions.map((prescription) => <div className="prescription-row" key={prescription.id} id={`prescription-${prescription.id}`}>
                       <strong>Prescription</strong>
                       <ol className="prescription-items">{prescriptionMedications(prescription).map((medication, index) => <li key={index}><strong>{medication.medicationName}</strong><p>{[medication.dose, medication.frequency, medication.duration].filter(Boolean).join(' · ')}</p>{medication.instructions && <p>{medication.instructions}</p>}</li>)}</ol>
                       <button className="text-link" onClick={() => printPrescription({ prescription, pet, visit, clinic: settings, profiles, owner })}>Print prescription / PDF</button>
@@ -166,7 +177,7 @@ export default function PetDetail() {
             <SectionCard title="Vaccination history" description="Vaccine records, brands, care status and next due dates" action={<button className="button button-primary small-button" onClick={() => setModal({ type: 'vaccine' })}><Plus size={16} weight="bold" /> Add vaccine</button>}>
               <div className="vaccine-list">
                 {petVaccinations.map((vaccine) => (
-                  <div className="vaccine-row" key={vaccine.id}>
+                  <div className="vaccine-row" key={vaccine.id} id={`vaccination-${vaccine.id}`}>
                     <div className="vaccine-icon"><Syringe size={20} weight="duotone" /></div>
                     <div><strong>{vaccine.vaccine}</strong><span>{['Recorded', 'Completed'].includes(vaccine.careStatus) ? 'Given' : 'Recorded date'} {format(parseISO(vaccine.administeredAt), 'd MMM yyyy')} · {vaccine.dose}</span><CareStatus record={vaccine} /></div>
                     <div><span>Brand</span><strong>{vaccine.brand || 'Not recorded'}</strong>{vaccine.lotNumber && <small>Historical lot: {vaccine.lotNumber}</small>}</div>

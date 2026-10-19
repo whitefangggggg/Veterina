@@ -1,21 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Clock, Plus, SignIn } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
 import { Badge, EmptyState, PageHeader } from '../components/ui'
 import PetSticker from '../components/PetSticker'
 import { QueueDialog } from '../components/QueueEditors'
 import { visibleQueueEntries } from '../utils/clinicRules'
+import { isClinicDate } from '../lib/dailyWorkflow'
+import { useHashTarget } from '../lib/useHashTarget'
 
 const statuses = { waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' }
 
 export default function Queue() {
+  useHashTarget()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { queueEntries, getPet, getOwner, today, timezone, reload, allServices } = useClinicData()
   const [service, setService] = useState('All')
-  const [status, setStatus] = useState('Active')
-  const [historyDate, setHistoryDate] = useState('')
+  const status = ['Active', 'All', ...Object.keys(statuses)].includes(searchParams.get('status')) ? searchParams.get('status') : 'Active'
+  const setStatus = (value) => { const next = new URLSearchParams(searchParams); next.set('status', value); setSearchParams(next) }
+  const setHistoryDate = (value) => { const next = new URLSearchParams(searchParams); next.set('date', value); setSearchParams(next) }
   const [modal, setModal] = useState(null)
-  const date = historyDate || today
+  const date = isClinicDate(searchParams.get('date')) ? searchParams.get('date') : today
   useEffect(() => {
     const timer = setInterval(() => { void reload() }, 30000)
     return () => clearInterval(timer)
@@ -38,7 +43,7 @@ export default function Queue() {
       const pet = getPet(entry.petId)
       const owner = getOwner(pet?.ownerId)
       const active = ['waiting', 'in_progress'].includes(entry.status)
-      return <article className="queue-card" key={entry.id}>
+      return <article className="queue-card" key={entry.id} id={`queue-${entry.id}`}>
         <div className="queue-patient"><span className="queue-ticket" aria-label={`Queue number ${entry.queueNumber}, ${entry.queueDate}`}><strong>{entry.queueNumber}</strong><small>{entry.queueDate}</small></span><PetSticker pet={pet} size="small" /><div><Link className="queue-patient-link" to={`/patients/${entry.petId}`} aria-label={`View patient details for ${pet?.name || 'patient'} (${entry.queueNumber})`}><strong>{pet?.name || 'Patient'}</strong></Link><small>{owner?.fullName} · {pet?.recordNumber}</small></div></div>
         <div className="queue-care"><strong>{entry.service}</strong><span>{entry.veterinarian}</span>{entry.notes && <p>{entry.notes}</p>}</div>
         <div className="queue-arrival"><time dateTime={entry.arrivedAt}>{new Intl.DateTimeFormat('en-PH', { timeZone: timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(entry.arrivedAt))}</time><span>{entry.source === 'appointment' ? 'Booked appointment' : entry.source === 'patient_record' ? entry.category === 'vaccination' ? 'Patient vaccination' : 'Patient checkup' : 'Walk-in'}</span></div>
