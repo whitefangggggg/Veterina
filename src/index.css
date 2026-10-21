@@ -357,7 +357,98 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
 .tabs button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 620; cursor: pointer; }
 .tabs button.active { color: var(--brand); background: var(--brand-soft); }
 .clinical-timeline { display: flex; flex-direction: column; gap: 12px; }
-.visit-card { display: grid; grid-template-columns: 60px 1fr; padding: 18px; }
+.clinical-history-filters { padding: 12px 14px; margin-bottom: 14px; }
+.clinical-history-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.clinical-history-search { display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 0; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
+.clinical-history-search:focus-within { outline: 2px solid var(--brand); outline-offset: 1px; }
+.clinical-history-search input { flex: 1; height: 38px; padding: 0; border: 0; background: transparent; outline: 0; color: var(--ink); font-size: 13px; }
+.clinical-history-search svg { flex-shrink: 0; }
+.clinical-history-view-toggle { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; }
+.clinical-history-view-toggle button, .clinical-history-advanced-toggle { display: inline-flex; justify-content: center; align-items: center; gap: 5px; min-height: 32px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+.clinical-history-view-toggle button[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand-dark); font-weight: 650; }
+.clinical-history-advanced-toggle { min-height: 40px; }
+.clinical-history-advanced-toggle[aria-expanded="true"] { background: var(--brand-soft); color: var(--brand-dark); }
+.clinical-history-advanced-toggle > span { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: var(--brand-dark); background: var(--brand-soft); font-size: 11px; }
+.clinical-history-filter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.clinical-history-filters input, .clinical-history-filters select { width: 100%; min-width: 0; }
+.clinical-history-filter-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 9px; color: var(--muted); font-size: 12px; }
+.clinical-history-date-hint { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
+.clinical-history-calendar { padding: 16px; margin-bottom: 16px; }
+.clinical-history-calendar > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.clinical-history-calendar h2 { margin: 0; color: var(--ink); font-size: 18px; }
+.clinical-history-calendar > header > div { display: flex; align-items: center; gap: 6px; }
+.clinical-history-calendar > header .text-link { margin-right: 6px; font-size: 12px; }
+.clinical-history-calendar > footer { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding-top: 12px; color: var(--muted); font-size: 12px; }
+.clinical-history-calendar > footer > span { display: inline-flex; align-items: center; gap: 6px; }
+.clinical-history-calendar footer i { width: 5px; height: 5px; border-radius: 50%; background: var(--brand); }
+.record-calendar-scroll { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; scrollbar-width: thin; }
+.record-calendar-scroll:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.record-month-calendar { width: 100%; min-width: 770px; --rdp-accent-color: var(--brand); }
+.record-month-calendar .rdp-months, .record-month-calendar .rdp-month, .record-month-calendar .rdp-month_grid { width: 100%; max-width: none; }
+.record-month-calendar .rdp-month_caption, .record-month-calendar .rdp-nav { display: none; }
+.record-month-calendar .rdp-month_grid { table-layout: fixed; border-collapse: collapse; }
+.record-month-calendar .rdp-weekday { height: 30px; padding: 5px 8px; border-right: 1px solid var(--line); color: var(--muted); background: #f7f9f8; text-align: left; font-size: 11px; font-weight: 600; }
+.record-month-calendar .rdp-day { height: 116px; padding: 0; border: 1px solid var(--line); vertical-align: top; }
+.record-month-calendar .rdp-day_button { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; width: 100%; height: 100%; min-height: 116px; margin: 0; padding: 5px; border: 2px solid transparent; border-radius: 0; background: white; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.record-month-calendar .rdp-day_button:hover { background: #f5f9f7; }
+.record-month-calendar .rdp-selected .rdp-day_button { border-color: #8bb9ac; background: #f3f8f5; }
+.record-month-calendar .rdp-day_button:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--brand); outline-offset: -2px; }
+.record-calendar-day-number { display: inline-flex; align-items: center; justify-content: center; align-self: flex-start; min-width: 21px; height: 21px; margin-bottom: 5px; border-radius: 50%; font-size: 12px; font-weight: 600; }
+.record-month-calendar .rdp-today .record-calendar-day-number { color: white; background: var(--brand); }
+.record-month-calendar .rdp-outside .rdp-day_button { background: #fafbfa; }
+.record-month-calendar .rdp-outside .record-calendar-day-number { color: #9aa69f; }
+.record-calendar-day-events { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.record-calendar-event { display: flex; align-items: center; gap: 4px; min-width: 0; height: 20px; padding: 2px 4px; border-radius: 3px; background: color-mix(in srgb, var(--calendar-event-color) 23%, white); color: #30433c; overflow: hidden; white-space: nowrap; }
+.record-calendar-event-time { flex-shrink: 0; font-size: 9px; }
+.record-calendar-event > strong { flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 10px; font-weight: 650; }
+.record-calendar-event-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+.record-calendar-more { padding: 0 4px; color: var(--brand-dark); font-size: 10px; font-weight: 600; }
+.record-calendar-scroll-hint { display: none; margin: 8px 0 0; color: var(--muted); font-size: 11px; }
+@media (max-width: 1100px) { .record-calendar-scroll-hint { display: block; } }
+.clinical-history-day-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 18px 0 12px; }
+.clinical-history-day-heading h2 { margin: 0; color: var(--ink); font-size: 15px; }
+.clinical-history-day-heading > span { color: var(--muted); font-size: 12px; }
+.patient-record-browser { padding-bottom: 16px; }
+.patient-record-browser > .clinical-history-filters, .patient-record-browser > .clinical-history-calendar { margin: 0 20px 14px; }
+.patient-record-browser > .clinical-history-day-heading { margin: 18px 20px 12px; }
+.patient-record-browser .record-browser-more { margin: 16px 24px 8px; }
+.patient-record-browser .directory-card { overflow-wrap: anywhere; }
+.calendar-day-preview { display: grid; gap: 16px; min-width: 0; }
+.calendar-preview-record { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--preview-color, #ffffff) 16%, white); overflow-wrap: anywhere; }
+.calendar-preview-record > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.calendar-preview-record h3 { margin: 0; color: var(--ink); font-size: 17px; }
+.calendar-preview-record h4 { margin: 0 0 8px; color: var(--brand-dark); font-size: 13px; }
+.calendar-preview-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin: 0 0 18px; }
+.calendar-preview-fields > div { min-width: 0; }
+.calendar-preview-fields dt { color: var(--muted); font-size: 11px; }
+.calendar-preview-fields dd { margin: 4px 0 0; color: var(--ink); font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.calendar-preview-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.calendar-preview-section p, .calendar-preview-record > p { margin: 5px 0; color: var(--ink); font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.calendar-preview-section small { color: var(--muted); font-size: 11px; }
+.calendar-preview-source { display: inline-block; margin-top: 14px; }
+.calendar-preview-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.calendar-preview-actions:empty { display: none; }
+.calendar-preview-record .soap-grid p { white-space: pre-wrap; }
+@media (max-width: 480px) {
+  .calendar-preview-record { padding: 12px; }
+  .calendar-preview-fields { grid-template-columns: minmax(0, 1fr); }
+  .calendar-preview-record .soap-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.clinical-history-filter-summary button { margin-left: auto; }
+.clinical-history-filter-summary button:disabled { opacity: .5; cursor: default; }
+@media (max-width: 760px) { .clinical-history-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) {
+  .clinical-history-filter-grid { grid-template-columns: minmax(0, 1fr); }
+  .clinical-history-view-toggle button > svg, .clinical-history-advanced-toggle > svg:first-child { display: none; }
+  .clinical-history-view-toggle button { padding-inline: 6px; }
+  .clinical-history-advanced-toggle { padding-inline: 5px; gap: 3px; }
+}
+.visit-card { display: grid; grid-template-columns: 60px 1fr; padding: 18px; background: color-mix(in srgb, var(--visit-card-color, #ffffff) 16%, white); }
+.visit-color-controls { position: relative; z-index: 2; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
+.visit-color-controls input[type="color"] { width: 36px; height: 32px; min-height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; background: white; }
+.visit-color-controls input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.visit-color-controls button:disabled { opacity: .55; cursor: default; }
+.visit-color-error { position: relative; z-index: 2; }
 .visit-card:has(.visit-edit-trigger) { position: relative; }
 .visit-edit-trigger { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .visit-edit-trigger::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }

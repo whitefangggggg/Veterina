@@ -7,6 +7,11 @@ The dashboard includes a daily action board and stock watch. Patient records inc
 a unified care timeline with links to each original record. See
 [Daily workflow improvements](DAILY-WORKFLOW-PLAN.md) for the implemented behavior.
 
+Patient registration and editing include an optional Environment field (Indoor,
+Outdoor, or Indoor & outdoor), displayed in Patient details. Apply the
+`20261020143919_patient_environment.sql` migration before deploying this frontend.
+Existing patients show "Not recorded" until an environment is selected.
+
 Staff-only veterinary clinic management for a single clinic in the Philippines. Supabase Auth and Postgres back the portal. Clinic pages load real database rows; there is no fixture fallback. Empty tables show empty states. The backend requirements are in [PRD.md](PRD.md); the frontend requirements are preserved in [PRD.frontend.md](PRD.frontend.md).
 
 ## Run locally

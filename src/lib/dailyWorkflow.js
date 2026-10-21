@@ -20,10 +20,10 @@ export function dateInClinic(value, timezone) {
 
 export function buildPatientTimeline(data, patientId) {
   const events = []
-  const add = (kind, id, at, title, status, detail, href) => {
+  const add = (kind, id, at, title, status, detail, href, visitType) => {
     const date = at ? dateInClinic(at, data.timezone || 'Asia/Manila') : ''
     if (!date) return
-    events.push({ id: `${kind}-${id}`, kind, at, date, title, status, detail: detail || '', href })
+    events.push({ id: `${kind}-${id}`, sourceId: id, visitType, kind, at, date, title, status, detail: detail || '', href })
   }
   for (const appointment of data.appointments || []) {
     if (appointment.petId === patientId) add('Appointment', appointment.id, appointment.starts_at || appointment.date, appointment.service, appointment.status, appointment.veterinarian, appointmentSource(appointment))
@@ -37,13 +37,13 @@ export function buildPatientTimeline(data, patientId) {
   }
   for (const visit of data.visits || []) {
     if (visit.petId !== patientId) continue
-    add('Checkup', visit.id, visit.visitedAt, visit.type, visit.finalizedAt ? 'Finalized' : visit.careStatus || 'Recorded', visit.diagnosis || visit.complaint, patientSource(patientId, 'history', visit.id))
+    add('Checkup', visit.id, visit.visitedAt, visit.type, visit.finalizedAt ? 'Finalized' : visit.careStatus || 'Recorded', visit.diagnosis || visit.complaint, patientSource(patientId, 'history', visit.id), visit.type)
     for (const prescription of visit.prescriptions || []) {
       const medicationNames = prescriptionMedications(prescription).map((medication) => medication.medicationName).filter(Boolean).join(', ')
-      add('Prescription', prescription.id, prescription.prescribed_at || visit.visitedAt, 'Prescription recorded', visit.finalizedAt ? 'Finalized' : 'Recorded', [medicationNames, prescription.prescribed_by_name || visit.veterinarian].filter(Boolean).join(' · '), patientSource(patientId, 'history', `prescription-${prescription.id}`))
+      add('Prescription', prescription.id, prescription.prescribed_at || visit.visitedAt, 'Prescription recorded', visit.finalizedAt ? 'Finalized' : 'Recorded', [medicationNames, prescription.prescribed_by_name || visit.veterinarian].filter(Boolean).join(' · '), patientSource(patientId, 'history', `prescription-${prescription.id}`), visit.type)
     }
     for (const correction of visit.corrections || []) {
-      add('Correction', correction.id, correction.created_at, 'Clinical correction appended', 'Recorded', correction.reason, patientSource(patientId, 'history', visit.id))
+      add('Correction', correction.id, correction.created_at, 'Clinical correction appended', 'Recorded', correction.reason, patientSource(patientId, 'history', visit.id), visit.type)
     }
   }
   for (const vaccine of data.vaccinations || []) {

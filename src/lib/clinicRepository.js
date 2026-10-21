@@ -48,7 +48,7 @@ export function normalizeClinicData(raw, now = new Date()) {
   const visits = get('visits').map((row) => {
     const vital = get('visit_vitals').filter((entry) => entry.visit_id === row.id).sort((a, b) => b.measured_at.localeCompare(a.measured_at))[0] || {}
     return { ...row, ...careMetadata('visit_id', row.id), petId: row.pet_id, type: row.visit_type, complaint: row.chief_complaint, diagnosis: row.diagnosis_summary,
-      visitedAt: row.visited_at, followUpDate: row.follow_up_date, veterinarianId: row.attending_veterinarian_id,
+      visitedAt: row.visited_at, cardColor: /^#[0-9a-f]{6}$/i.test(row.card_color) ? row.card_color.toLowerCase() : null, followUpDate: row.follow_up_date, veterinarianId: row.attending_veterinarian_id,
       veterinarian: row.attending_veterinarian_name || staffName(row.attending_veterinarian_id), weightKg: number(vital.weight_kg), temperatureC: number(vital.temperature_c),
       heartRate: number(vital.heart_rate_bpm), respiratoryRate: number(vital.respiratory_rate_rpm), bodyConditionScore: vital.body_condition_score, bodyConditionScale: vital.body_condition_scale || 9,
       hydration: vital.hydration, finalizedAt: row.finalized_at,
@@ -58,7 +58,7 @@ export function normalizeClinicData(raw, now = new Date()) {
   const pets = get('pets').map((row) => {
     const alerts = get('pet_alerts').filter((entry) => entry.pet_id === row.id && entry.is_active)
     return { ...row, ownerId: row.owner_id, recordNumber: row.record_number, reproductiveStatus: row.reproductive_status,
-      birthDate: row.birth_date, birthDateEstimated: row.birth_date_estimated || false, diet: row.diet || '', color: row.color_markings, microchip: row.microchip_number,
+      birthDate: row.birth_date, birthDateEstimated: row.birth_date_estimated || false, diet: row.diet || '', environment: row.environment || '', color: row.color_markings, microchip: row.microchip_number,
       allergies: alerts.filter((entry) => entry.alert_type === 'allergy').map((entry) => entry.description),
       alerts: alerts.filter((entry) => entry.alert_type !== 'allergy').map((entry) => entry.description),
       latestWeight: visits.find((entry) => entry.petId === row.id && entry.weightKg != null)?.weightKg ?? number(row.baseline_weight) }
@@ -119,6 +119,7 @@ export function clinicErrorMessage(error) {
     CHECKUP_ALREADY_QUEUED: 'This patient already has a checkup record or draft in the queue. Open the existing checkup to continue.',
     CHECKUP_IN_QUEUE: 'Complete or cancel this checkup’s queue entry before finalizing its clinical record.',
     DRAFT_CONFLICT: 'A newer draft was saved by another staff member. Close and reopen this form to load it before saving.',
+    RECORD_CHANGED: 'These notes were edited by another staff member. Close and reopen this form to load the latest notes before saving.',
     QUEUE_DUPLICATE: 'This patient already has an active queue entry for this service. Refresh the queue to view it.',
     CARE_RECORD_REQUIRED: 'Save the checkup or vaccination record from the queue to complete this visit.',
     APPOINTMENT_CONFLICT: 'This veterinarian already has a booking during that time. Choose another slot.',

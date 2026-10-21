@@ -53,6 +53,7 @@ export function PetEditor({ record, onClose }) {
       </> },
       { name: 'latestWeight', label: 'Baseline weight (kg)', type: 'number', min: '0.01', step: '0.01' },
       { name: 'color', label: 'Color / markings' },
+      { name: 'environment', label: 'Environment', type: 'select', options: [{ value: '', label: 'Not recorded' }, 'Indoor', 'Outdoor', 'Indoor & outdoor'] },
       { name: 'diet', label: 'Diet / feeding notes', type: 'textarea', span: true },
       { name: 'microchip', label: 'Microchip number', pattern: '[0-9]{15}', hint: '15 digits, or leave blank.' },
       ...(record ? [{ name: 'status', label: 'Patient status', type: 'select', options: ['Active', 'Inactive', 'Deceased'] }] : [{ name: 'allergies', label: 'Known allergies', span: true }]),
