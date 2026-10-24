@@ -4,6 +4,7 @@ import { chromium, expect } from '@playwright/test'
 import { spawn } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { mockAccessToken } from './helpers/mock-auth.mjs'
 
 const origin = 'http://127.0.0.1:5178'
 const env = Object.fromEntries(readFileSync('.env.local', 'utf8').replace(/^\uFEFF/, '').trim().split(/\r?\n/).map((line) => {
@@ -48,7 +49,7 @@ try {
   assert.ok(ready, 'Vite did not start')
   browser = await chromium.launch({ channel: 'chrome', headless: true })
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
-  const session = { access_token: `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ sub: userId, role: 'authenticated', exp: 2000000000 })).toString('base64url')}.test`, refresh_token: 'browser-test', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user: { id: userId, aud: 'authenticated', role: 'authenticated', email: 'queue@example.org', app_metadata: {}, user_metadata: {} } }
+  const session = { access_token: mockAccessToken(userId), refresh_token: 'browser-test', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user: { id: userId, aud: 'authenticated', role: 'authenticated', email: 'queue@example.org', app_metadata: {}, user_metadata: {} } }
   await context.addInitScript(({ key, session }) => localStorage.setItem(key, JSON.stringify(session)), { key: `sb-${api.hostname.split('.')[0]}-auth-token`, session })
   await context.route(`${api.origin}/**`, async (route) => {
     const request = route.request()

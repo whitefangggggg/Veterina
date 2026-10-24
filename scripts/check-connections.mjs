@@ -3,6 +3,7 @@ import { expect as baseExpect } from '@playwright/test'
 import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { browserServer, frontendEnvironment } from './helpers/browser.mjs'
+import { mockAccessToken } from './helpers/mock-auth.mjs'
 
 const api = new URL(frontendEnvironment().VITE_SUPABASE_URL)
 const userId = '10000000-0000-4000-8000-000000000001'
@@ -36,7 +37,7 @@ let page
 const failedRequests = []
 try {
   const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' })
-  const session = { access_token: `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ sub: userId, role: 'authenticated', exp: 2000000000 })).toString('base64url')}.test`, refresh_token: 'browser-test', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user: { id: userId, aud: 'authenticated', role: 'authenticated', email: 'connections@example.org', app_metadata: {}, user_metadata: {} } }
+  const session = { access_token: mockAccessToken(userId), refresh_token: 'browser-test', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user: { id: userId, aud: 'authenticated', role: 'authenticated', email: 'connections@example.org', app_metadata: {}, user_metadata: {} } }
   await context.addInitScript(({ key, session }) => {
     if (!sessionStorage.getItem('signed-out')) localStorage.setItem(key, JSON.stringify(session))
   }, { key: `sb-${api.hostname.split('.')[0]}-auth-token`, session })
