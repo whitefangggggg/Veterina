@@ -14,6 +14,15 @@ function MaintenanceEditor({ entry, pet, onClose }) {
     fields={[{ name: 'serviceNotes', label: 'Work performed / service notes', type: 'textarea', required: true, span: true }]} />
 }
 
+export function ServiceNotesEditor({ entry, onClose }) {
+  const { execute } = useClinicData()
+  const [original] = useState(() => ({ originalNotes: entry.notes || '', originalServiceNotes: entry.serviceNotes || '' }))
+  return <RecordEditor title={`Edit ${entry.service} notes`} description={`${entry.queueNumber} · ${entry.queueDate}. Update the notes while preserving the recorded service status and dates.`}
+    initial={{ notes: original.originalNotes, serviceNotes: original.originalServiceNotes }} onClose={onClose} submitLabel="Save service notes"
+    onSave={(values) => execute('update_service_notes', { id: entry.id, ...values, ...original })}
+    fields={[{ name: 'notes', label: 'Arrival notes', type: 'textarea', maxLength: 10000, span: true }, { name: 'serviceNotes', label: 'Work performed / service notes', type: 'textarea', maxLength: 10000, required: entry.status === 'completed', span: true }]} />
+}
+
 export function QueueDialog({ modal, onClose }) {
   const { pets, owners, profiles, appointments, queueEntries, visits, vaccinations, today, execute, getPet, services } = useClinicData()
   const { user } = useAuth()

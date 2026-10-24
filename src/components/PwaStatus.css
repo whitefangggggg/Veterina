@@ -1,0 +1,37 @@
+.pwa-status {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 80;
+  display: grid;
+  gap: 10px;
+  width: auto;
+  max-width: 400px;
+  margin-left: auto;
+  pointer-events: none;
+}
+.pwa-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+}
+.pwa-notice > svg { flex: none; margin-top: 2px; color: var(--brand); }
+.pwa-notice > div { min-width: 0; }
+.pwa-notice strong { display: block; font-size: 14px; }
+.pwa-notice p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.pwa-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.pwa-actions .button { min-height: 44px; padding: 9px 14px; font-size: 13px; }
+.pwa-install-button { justify-self: end; min-height: 44px; pointer-events: auto; }
+.pwa-install-instructions { margin: 0; color: var(--ink); line-height: 1.65; }
+.pwa-offline { border-color: #e2ce99; background: #fffbef; }
+.pwa-offline > svg { color: #8c651b; }
+.pwa-action-error { color: #923b3b; font-size: 13px; }
+@media print { .pwa-status { display: none; } }

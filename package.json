@@ -11,7 +11,14 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "test:browser": "node scripts/check-frontend.mjs",
+    "test:connections": "node scripts/check-connections.mjs",
+    "test:database": "node scripts/check-database.mjs",
+    "test:all": "node scripts/check-all.mjs",
+    "test:schema": "node scripts/snapshot-test-schema.mjs",
+    "test:pwa": "node scripts/check-pwa.mjs",
+    "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "test:queue": "node scripts/check-queue.mjs",
+    "test:prescriptions": "node scripts/check-prescriptions.mjs",
     "test:api": "node scripts/check-supabase.mjs"
   },
   "dependencies": {
@@ -33,6 +40,7 @@
     "oxlint": "^1.71.0",
     "tailwindcss": "^4.3.3",
     "vite": "^8.1.1",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^4.1.11"
   },
   "overrides": {

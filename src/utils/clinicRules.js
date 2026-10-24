@@ -1,3 +1,17 @@
+import { intervalToDuration, isValid, parseISO } from 'date-fns'
+
+export function formatPatientAge(birthDate, today) {
+  if (!birthDate || !today) return ''
+  const start = parseISO(birthDate)
+  const end = parseISO(today)
+  if (!isValid(start) || !isValid(end) || start > end) return ''
+  const duration = intervalToDuration({ start, end })
+  const totalMonths = (duration.years || 0) * 12 + (duration.months || 0)
+  const years = Math.floor(totalMonths / 12)
+  const months = totalMonths % 12
+  return `${years} ${years === 1 ? 'year' : 'years'}, ${months} ${months === 1 ? 'month' : 'months'}`
+}
+
 export function vaccinationStatus(nextDueAt, today) {
   if (!nextDueAt) return 'No next dose scheduled'
   return nextDueAt < today ? 'Overdue' : nextDueAt === today ? 'Due today' : 'Up to date'

@@ -5,13 +5,13 @@ import { useAuth } from '../context/AuthContext'
 import { appointmentMinimum, validateAppointmentStart } from '../lib/appointmentScheduling'
 import AppointmentTimePicker from './AppointmentTimePicker'
 
-export function AppointmentEditor({ record, initialDate, onClose }) {
+export function AppointmentEditor({ record, initialDate, initialPetId, onClose }) {
   const { pets, owners, profiles, services, timezone, execute } = useClinicData()
   const { user } = useAuth()
   const [clock, setClock] = useState(() => new Date())
   const minimum = appointmentMinimum(timezone, clock)
   const [selectedDate, setSelectedDate] = useState(() => record?.date || (initialDate && initialDate >= minimum.date ? initialDate : minimum.date))
-  const [initial] = useState(() => record || { date: selectedDate,
+  const [initial] = useState(() => record || { date: selectedDate, petId: initialPetId || '',
     time: selectedDate === minimum.date && minimum.time > '09:00' ? minimum.time : '09:00',
     veterinarianId: user.id, service: services[0]?.name })
   const refreshClock = () => setClock(new Date())
@@ -26,6 +26,9 @@ export function AppointmentEditor({ record, initialDate, onClose }) {
   return <RecordEditor title={record ? 'Reschedule appointment' : 'New appointment'} description="Choose a future date and time for this appointment."
     initial={initial} onClose={onClose}
     onSave={(values) => {
+      if (!pets.some((pet) => pet.id === values.petId && (pet.status === 'Active' || pet.id === record?.petId))) {
+        throw new Error('Select an active patient before booking an appointment.')
+      }
       const error = validateAppointmentStart(values.date, values.time, timezone)
       if (error) throw new Error(error)
       return execute(record ? 'reschedule_appointment' : 'book_appointment', { ...values, ...(record ? { id: record.id } : {}) })

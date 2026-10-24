@@ -105,9 +105,9 @@ export function Field({ label, required, hint, children, span = false }) {
   )
 }
 
-export function SectionCard({ title, description, action, children, className = '' }) {
+export function SectionCard({ title, description, action, children, className = '', id }) {
   return (
-    <section className={`section-card ${className}`}>
+    <section id={id} className={`section-card ${className}`}>
       {(title || action) && (
         <header className="section-header">
           <div>{title && <h2>{title}</h2>}{description && <p>{description}</p>}</div>

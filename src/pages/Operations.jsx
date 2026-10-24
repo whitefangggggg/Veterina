@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { addMonths, format, isSameMonth, parseISO, startOfMonth } from 'date-fns'
 import { DayPicker } from '@daypicker/react'
 import '@daypicker/react/style.css'
@@ -19,14 +20,32 @@ import { useAuth } from '../context/AuthContext'
 import { AppointmentEditor as AppointmentModal, ReminderEditor } from '../components/OperationEditors'
 import { ActionDialog, DeleteRecordDialog, RecordEditor } from '../components/RecordForm'
 import { QueueDialog } from '../components/QueueEditors'
+import { isClinicDate } from '../lib/dailyWorkflow'
+import { useHashTarget } from '../lib/useHashTarget'
 
 export function Appointments() {
-  const { appointments, queueEntries, getPet, getOwner, today: clinicDate } = useClinicData()
+  useHashTarget()
+  const { appointments, queueEntries, pets, getPet, getOwner, today: clinicDate } = useClinicData()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedPetId = searchParams.get('petId')
+  const newRequested = searchParams.get('new') === '1'
+  const invalidPatient = requestedPetId !== null && !pets.some((pet) => pet.id === requestedPetId && pet.status === 'Active')
+  const closeAppointment = () => {
+    setModal(null)
+    if (searchParams.has('new') || searchParams.has('petId')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('new')
+      next.delete('petId')
+      setSearchParams(next, { replace: true })
+    }
+  }
   const { profile } = useAuth()
-  const [selectedDay, setSelectedDay] = useState(() => parseISO(clinicDate))
-  const [month, setMonth] = useState(() => startOfMonth(parseISO(clinicDate)))
+  const selectedDate = isClinicDate(searchParams.get('date')) ? searchParams.get('date') : clinicDate
+  const selectedDay = parseISO(selectedDate)
+  const setSelectedDay = (day) => { const next = new URLSearchParams(searchParams); next.set('date', format(day, 'yyyy-MM-dd')); setSearchParams(next) }
+  const [month, setMonth] = useState(() => startOfMonth(parseISO(selectedDate)))
+  useEffect(() => { setMonth(startOfMonth(parseISO(selectedDate))) }, [selectedDate])
   const [modal, setModal] = useState(null)
-  const selectedDate = format(selectedDay, 'yyyy-MM-dd')
   const dayAppointments = appointments.filter((item) => item.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time))
   const monthAppointments = appointments.filter((item) => isSameMonth(parseISO(item.date), month) && !['Cancelled', 'No Show'].includes(item.status))
   const appointmentDates = [...new Set(appointments.filter((item) => !['Cancelled', 'No Show'].includes(item.status)).map((item) => item.date))].map(parseISO)
@@ -48,8 +67,9 @@ export function Appointments() {
           <h1>Appointments</h1>
           <p>A clear view of the month, with each day given its own space.</p>
         </div>
-        <button className="button button-primary roomy-button" onClick={() => setModal({ type: 'appointment' })}><Plus size={19} weight="bold" /> New appointment</button>
+        <button className="button button-primary roomy-button" onClick={() => { closeAppointment(); setModal({ type: 'appointment' }) }}><Plus size={19} weight="bold" /> New appointment</button>
       </div>
+      {invalidPatient && <p className="auth-message auth-error" role="alert">This patient is unavailable or inactive. Open a patient record or choose New appointment to select an active patient.</p>}
 
       <div className="calendar-overview">
         <div><strong>{monthAppointments.length}</strong><span>visits this month</span></div>
@@ -94,11 +114,11 @@ export function Appointments() {
               const owner = getOwner(pet?.ownerId)
               const queueEntry = queueEntries.find((entry) => entry.appointmentId === appointment.id)
               return (
-                <article className="flow-appointment-card" key={appointment.id}>
+                <article className="flow-appointment-card" key={appointment.id} id={`appointment-${appointment.id}`}>
                   <time>{format(parseISO(`${selectedDate}T${appointment.time}`), 'h:mm a')}</time>
                   <span className="agenda-line" />
                   <div className="agenda-card-body">
-                    <div><PetSticker pet={pet} size="small" /><span><strong>{pet?.name}</strong><small>{pet?.breed} · {owner?.fullName}</small></span></div>
+                    <div><PetSticker pet={pet} size="small" /><span><Link className="text-link" to={`/patients/${appointment.petId}`}>{pet?.name || 'View patient'}</Link><small>{pet?.breed} · {owner?.fullName}</small></span></div>
                     <h3>{appointment.service}</h3>
                     <p>{appointment.veterinarian}</p>
                     <Badge tone={appointment.status === 'Confirmed' ? 'success' : 'warning'}>{appointment.status}</Badge>
@@ -121,7 +141,7 @@ export function Appointments() {
           </div>
         </aside>
       </div>
-      {modal?.type === 'appointment' && <AppointmentModal record={modal.record} initialDate={selectedDate} onClose={() => setModal(null)} />}
+      {(modal?.type === 'appointment' || (newRequested && !invalidPatient && !modal)) && <AppointmentModal key={modal?.record?.id || requestedPetId || 'new'} record={modal?.record} initialDate={selectedDate} initialPetId={requestedPetId} onClose={closeAppointment} />}
       {modal?.type === 'queue' && <QueueDialog modal={modal.dialog} onClose={() => setModal(null)} />}
       {modal?.type === 'transition' && <ActionDialog title={'Mark appointment ' + modal.status.replace('_', ' ') + '?'} action="transition_appointment" data={{ id: modal.record.id, status: modal.status }} onClose={() => setModal(null)} />}
       {modal?.type === 'delete' && <DeleteRecordDialog entity="appointment" record={modal.record} onClose={() => setModal(null)} />}
@@ -130,9 +150,12 @@ export function Appointments() {
 }
 
 export function Reminders() {
+  useHashTarget()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { reminders, completeReminder, getPet, getOwner } = useClinicData()
   const { profile } = useAuth()
-  const [status, setStatus] = useState('Open')
+  const status = ['Open', 'Overdue', 'Due', 'Upcoming', 'Completed', 'Cancelled', 'All'].includes(searchParams.get('status')) ? searchParams.get('status') : 'Open'
+  const setStatus = (value) => { const next = new URLSearchParams(searchParams); next.set('status', value); setSearchParams(next) }
   const [type, setType] = useState('All')
   const [modal, setModal] = useState(null)
   const visible = useMemo(() => reminders.filter((item) => {
@@ -151,11 +174,11 @@ export function Reminders() {
       const pet = getPet(reminder.petId)
       const owner = getOwner(pet?.ownerId)
       const open = !['Completed', 'Cancelled'].includes(reminder.status)
-      return <article className={'reminder-card ' + reminder.status.toLowerCase()} key={reminder.id}>
+      return <article className={'reminder-card ' + reminder.status.toLowerCase()} key={reminder.id} id={`reminder-${reminder.id}`}>
         <div className="reminder-check">{open ? <Clock size={22} /> : <CheckCircle size={22} />}</div>
         <div className="reminder-main">
           <div className="reminder-title"><Badge tone={reminder.status === 'Overdue' ? 'danger' : 'blue'}>{reminder.status}</Badge><Badge>{reminder.type}</Badge><strong>{reminder.title}</strong></div>
-          <p>{reminder.notes}</p><div className="reminder-person"><PetSticker pet={pet} size="small" /><span><strong>{pet?.name}</strong><small>{owner?.fullName} · {owner?.phone}</small></span></div>
+          <p>{reminder.notes}</p><div className="reminder-person"><PetSticker pet={pet} size="small" /><span><Link className="text-link" to={`/patients/${reminder.petId}`}>{pet?.name || 'View patient'}</Link><small>{owner?.fullName} · {owner?.phone}</small></span></div>
           {reminder.outcome && <p><strong>Outcome:</strong> {reminder.outcome}</p>}
           <details><summary>Contact history ({reminder.activity.length})</summary>{reminder.activity.map((entry) => <p key={entry.id}>{format(parseISO(entry.created_at), 'd MMM yyyy, h:mm a')} · {entry.action} · {entry.note}</p>)}</details>
         </div>

@@ -19,7 +19,7 @@ do $$
 declare
   owner_id uuid; pet_id uuid; second_pet uuid; visit_id uuid; vaccine_id uuid; reminder_id uuid; appointment_id uuid;
   supplier_id uuid; item_id uuid; batch_id uuid; rx_id uuid; alert_id uuid; second_item_id uuid; generated_sku text;
-  key_id uuid:=gen_random_uuid(); data jsonb; result jsonb; export_document jsonb; before_count integer; rejected boolean; invalid_quantity text; past_start timestamptz; saved_start timestamptz;
+  key_id uuid:=gen_random_uuid(); data jsonb; rx_data jsonb; result jsonb; export_document jsonb; before_count integer; rejected boolean; invalid_quantity text; past_start timestamptz; saved_start timestamptz;
   care_date date:=(now() at time zone 'Asia/Manila')::date;
 begin
   if current_user<>'authenticated' then raise exception 'TEST: user role not applied'; end if;
@@ -53,6 +53,31 @@ begin
   perform public.portal_mutation('update_encounter',data||jsonb_build_object('id',visit_id,'complaint','Edited checkup','weightKg','3'),gen_random_uuid());
   if (select weight_kg from public.visit_vitals v where v.visit_id=visit_id)<>3 then raise exception 'TEST: vitals edit'; end if;
   rx_id:=(public.portal_mutation('create_prescription',jsonb_build_object('visitId',visit_id,'medicationName','Recorded medication','dose','Recorded dose','frequency','Recorded frequency'),gen_random_uuid())->>'id')::uuid;
+  if (select medications from public.prescriptions where id=rx_id) is not null then raise exception 'TEST: legacy prescription changed'; end if;
+  rx_data:=jsonb_build_object('visitId',visit_id,'medications',jsonb_build_array(
+    jsonb_build_object('medicationName','First medication','dose','First dose','frequency','First frequency','duration','7 days','instructions','First notes'),
+    jsonb_build_object('medicationName','Second medication','dose','Second dose','frequency','Second frequency','duration','3 days','instructions','Second notes')));
+  key_id:=gen_random_uuid(); result:=public.portal_mutation('create_prescription',rx_data,key_id); rx_id:=(result->>'id')::uuid;
+  if public.portal_mutation('create_prescription',rx_data,key_id)<>result then raise exception 'TEST: prescription replay mismatch'; end if;
+  if (select medications from public.prescriptions where id=rx_id)<>rx_data->'medications' then raise exception 'TEST: medication list not saved'; end if;
+  if (select medication_name from public.prescriptions where id=rx_id)<>'First medication' then raise exception 'TEST: first medication compatibility'; end if;
+  rejected:=false;
+  begin perform public.portal_mutation('create_prescription',jsonb_set(rx_data,'{medications,1,dose}','""'::jsonb),gen_random_uuid());
+  exception when others then if sqlerrm like 'VALIDATION_FAILED%' then rejected:=true; else raise; end if; end;
+  if not rejected or (select count(*) from public.prescriptions p where p.visit_id=visit_id)<>2 then raise exception 'TEST: partial prescription saved'; end if;
+  rejected:=false;
+  begin perform public.portal_mutation('create_prescription',jsonb_set(rx_data,'{medications}','[]'::jsonb),gen_random_uuid());
+  exception when others then if sqlerrm like 'VALIDATION_FAILED%' then rejected:=true; else raise; end if; end;
+  if not rejected then raise exception 'TEST: empty prescription accepted'; end if;
+  rejected:=false;
+  begin perform public.portal_mutation('create_prescription',jsonb_set(rx_data,'{medications}','{}'::jsonb),gen_random_uuid());
+  exception when others then if sqlerrm like 'VALIDATION_FAILED%' then rejected:=true; else raise; end if; end;
+  if not rejected then raise exception 'TEST: non-array prescription accepted'; end if;
+  rx_data:=jsonb_build_object('id',rx_id,'medications',jsonb_build_array(rx_data#>'{medications,1}'));
+  perform public.portal_mutation('update_prescription',rx_data,gen_random_uuid());
+  if (select jsonb_array_length(medications) from public.prescriptions where id=rx_id)<>1
+    or (select medication_name from public.prescriptions where id=rx_id)<>'Second medication'
+    or (select duration from public.prescriptions where id=rx_id)<>'3 days' then raise exception 'TEST: prescription edit/remove failed'; end if;
   perform public.portal_mutation('finalize_encounter',jsonb_build_object('id',visit_id),gen_random_uuid());
   rejected:=false;
   begin perform public.portal_mutation('update_encounter',data||jsonb_build_object('id',visit_id),gen_random_uuid()); exception when others then if sqlerrm like 'RECORD_FINALIZED%' then rejected:=true; else raise; end if; end;
@@ -60,6 +85,9 @@ begin
   rejected:=false;
   begin perform public.portal_mutation('update_prescription',jsonb_build_object('id',rx_id,'medicationName','Changed','dose','Changed','frequency','Changed'),gen_random_uuid()); exception when others then if sqlerrm like 'RECORD_FINALIZED%' then rejected:=true; else raise; end if; end;
   if not rejected then raise exception 'TEST: finalized prescription editable'; end if;
+  rejected:=false;
+  begin perform public.portal_mutation('update_prescription',rx_data,gen_random_uuid()); exception when others then if sqlerrm like 'RECORD_FINALIZED%' then rejected:=true; else raise; end if; end;
+  if not rejected then raise exception 'TEST: finalized medication list editable'; end if;
   perform public.portal_mutation('correct_encounter',jsonb_build_object('id',visit_id,'reason','Rollback correction','correction','Corrected historical entry'),gen_random_uuid());
   if not exists(select 1 from public.visit_corrections c where c.visit_id=visit_id and c.before_data#>>'{visit,id}'=visit_id::text and c.after_data->>'appended_correction'='Corrected historical entry') then raise exception 'TEST: correction snapshots missing'; end if;
 

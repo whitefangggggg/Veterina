@@ -52,7 +52,7 @@ export function ClinicDataProvider({ children }) {
     } catch (error) {
       // Refresh concurrent saves while the open editor retains its own inputs.
       // Closing and reopening then loads the draft or checkup that was saved.
-      if (['DRAFT_CONFLICT', 'CHECKUP_ALREADY_QUEUED', 'VACCINATION_ALREADY_QUEUED'].some((code) => error.message?.includes(code))) await reload()
+      if (['DRAFT_CONFLICT', 'RECORD_CHANGED', 'CHECKUP_ALREADY_QUEUED', 'VACCINATION_ALREADY_QUEUED'].some((code) => error.message?.includes(code))) await reload()
       throw new Error(clinicErrorMessage(error), { cause: error })
     }
   }

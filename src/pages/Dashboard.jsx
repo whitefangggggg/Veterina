@@ -16,6 +16,7 @@ import { useClinicData } from '../context/ClinicDataContext'
 import PetSticker from '../components/PetSticker'
 import { Badge } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
+import DailyWorklist from '../components/DailyWorklist'
 
 const spaces = [
   { to: '/queue', title: 'In-site queue', description: 'Walk-ins, check-ins, checkups and vaccinations.', icon: FirstAidKit, color: 'amber' },
@@ -32,7 +33,8 @@ export default function Dashboard() {
   const { profile } = useAuth()
   const todayAppointments = appointments.filter((item) => item.date === today && !['Cancelled', 'No Show'].includes(item.status)).sort((a, b) => a.time.localeCompare(b.time))
   const dueReminders = reminders.filter((item) => item.status === 'Due' || item.status === 'Overdue')
-  const lowStock = inventory.filter((item) => item.quantity <= item.minimumStock)
+  const lowStock = inventory.filter((item) => item.isActive && item.quantity <= item.minimumStock)
+  const nextAppointments = todayAppointments.filter((item) => item.status !== 'Completed')
 
   return (
     <div className="home-page">
@@ -43,7 +45,7 @@ export default function Dashboard() {
           <p>Patient care, scheduling, and clinic operations — ready when you are.</p>
           <div className="hero-actions">
             <Link className="button button-primary roomy-button" to="/patients"><MagnifyingGlass size={19} weight="bold" /> Find a patient</Link>
-            <Link className="button button-glass roomy-button" to="/appointments"><Plus size={19} weight="bold" /> New appointment</Link>
+            <Link className="button button-glass roomy-button" to="/appointments?new=1"><Plus size={19} weight="bold" /> New appointment</Link>
           </div>
         </div>
         <div className="today-glance">
@@ -55,7 +57,7 @@ export default function Dashboard() {
           </div>
           <div className="next-patients">
             <span className="glance-label">Next patients</span>
-            {todayAppointments.slice(0, 3).map((appointment) => {
+            {nextAppointments.slice(0, 3).map((appointment) => {
               const pet = getPet(appointment.petId)
               const owner = getOwner(pet?.ownerId)
               return (
@@ -71,6 +73,7 @@ export default function Dashboard() {
         </div>
       </section>
 
+      <DailyWorklist />
       <section className="spaces-section">
         <div className="spaces-heading">
           <div><span className="eyebrow">Your clinic</span><h2>Choose a workspace</h2><p>Open a focused area and keep the rest of the day out of the way.</p></div>

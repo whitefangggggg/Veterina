@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
@@ -22,13 +22,25 @@ import {
 import { useClinicData } from '../context/ClinicDataContext'
 import { Badge, SectionCard } from '../components/ui'
 import PetSticker from '../components/PetSticker'
+import VisitCard from '../components/VisitCard'
+import ClinicalHistoryFilters from '../components/ClinicalHistoryFilters'
+import ClinicalHistoryCalendar from '../components/ClinicalHistoryCalendar'
+import PatientRecordBrowser from '../components/PatientRecordBrowser'
+import CalendarDayPreview from '../components/CalendarDayPreview'
+import CalendarRecordDetails from '../components/CalendarRecordDetails'
 import { useAuth } from '../context/AuthContext'
 import { VisitEditor as VisitModal, VaccineEditor as VaccineModal, PrescriptionEditor } from '../components/ClinicalEditors'
 import { OwnerEditor, PetEditor } from '../components/PatientEditors'
 import { ActionDialog, DeleteRecordDialog } from '../components/RecordForm'
 import { fetchReport, printPatientHistory } from '../lib/reports'
-import Assistant from '../components/Assistant'
+import { prescriptionMedications, printPrescription } from '../lib/prescriptions'
 import { QueueDialog } from '../components/QueueEditors'
+import PatientTimeline from '../components/PatientTimeline'
+import { useHashTarget } from '../lib/useHashTarget'
+import { formatPatientAge } from '../utils/clinicRules'
+import { clinicalHistoryParams, filterClinicalHistory } from '../lib/clinicalHistory'
+import { dateInClinic, isClinicDate } from '../lib/dailyWorkflow'
+import { recordHistoryFields, serviceHistoryRecords, vaccinationHistoryRecords } from '../lib/patientRecordHistory'
 
 function CareStatus({ record }) {
   const tone = { Waiting: 'warning', 'In progress': 'blue', Completed: 'success', Cancelled: 'danger' }[record.careStatus] || 'neutral'
@@ -40,11 +52,18 @@ function CareStatus({ record }) {
 
 export default function PetDetail() {
   const { petId } = useParams()
+  const targetId = useHashTarget()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { getPet, getOwner, visits, vaccinations, reminders, alerts, profiles, settings, queueEntries } = useClinicData()
+  const { getPet, getOwner, visits, vaccinations, reminders, alerts, profiles, settings, queueEntries, today, timezone } = useClinicData()
   const [modal, setModal] = useState(null)
-  const [tab, setTab] = useState('history')
+  const tab = ['history', 'timeline', 'vaccines', 'growth', 'services'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'history'
+  const setTab = (value) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', value)
+    setSearchParams(next)
+  }
   const [printing, setPrinting] = useState(false)
   const [printError, setPrintError] = useState('')
   const [careReceipt, setCareReceipt] = useState(null)
@@ -60,10 +79,56 @@ export default function PetDetail() {
     catch (error) { setPrintError(error.message) } finally { setPrinting(false) }
   }
   const pet = getPet(petId)
+  const patientAge = formatPatientAge(pet?.birthDate, today)
   const owner = getOwner(pet?.ownerId)
   const petVisits = useMemo(() => visits.filter((item) => item.petId === petId).sort((a, b) => b.visitedAt.localeCompare(a.visitedAt)), [visits, petId])
+  const historyFilters = Object.fromEntries(Object.entries(clinicalHistoryParams).map(([field, param]) => [field, searchParams.get(param) || '']))
+  const filteredVisits = filterClinicalHistory(petVisits, historyFilters, timezone)
+  const historyView = !targetId && searchParams.get('historyView') === 'calendar' ? 'calendar' : 'cards'
+  const latestHistoryDate = dateInClinic(filteredVisits[0]?.visitedAt, timezone) || today
+  const requestedHistoryDay = searchParams.get('historyDay')
+  const requestedHistoryMonth = searchParams.get('historyMonth')
+  const historyMonth = isClinicDate(`${requestedHistoryMonth}-01`) ? requestedHistoryMonth
+    : (isClinicDate(requestedHistoryDay) ? requestedHistoryDay : latestHistoryDate).slice(0, 7)
+  const historyDay = isClinicDate(requestedHistoryDay) && requestedHistoryDay.startsWith(historyMonth) ? requestedHistoryDay
+    : filteredVisits.map((visit) => dateInClinic(visit.visitedAt, timezone)).find((date) => date.startsWith(historyMonth)) || `${historyMonth}-01`
+  const visibleVisits = historyView === 'calendar' ? filteredVisits.filter((visit) => dateInClinic(visit.visitedAt, timezone) === historyDay) : filteredVisits
+  const previewVisits = modal?.type === 'calendar-preview' ? filteredVisits.filter((visit) => dateInClinic(visit.visitedAt, timezone) === modal.day) : []
+  const changeHistoryView = (view) => {
+    const next = new URLSearchParams(searchParams)
+    if (view === 'calendar') next.set('historyView', view)
+    else next.delete('historyView')
+    setSearchParams(next, { replace: true, preventScrollReset: true })
+  }
+  const changeHistoryMonth = (month) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('historyMonth', month)
+    next.delete('historyDay')
+    setSearchParams(next, { replace: true, preventScrollReset: true })
+  }
+  const changeHistoryDay = (day) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('historyDay', day)
+    next.set('historyMonth', day.slice(0, 7))
+    setSearchParams(next, { replace: true, preventScrollReset: true })
+  }
+  const changeHistoryFilter = (field, value) => {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set(clinicalHistoryParams[field], value)
+    else next.delete(clinicalHistoryParams[field])
+    setSearchParams(next, { replace: true, preventScrollReset: true })
+  }
+  const clearHistoryFilters = () => {
+    const next = new URLSearchParams(searchParams)
+    Object.values(clinicalHistoryParams).forEach((param) => next.delete(param))
+    setSearchParams(next, { replace: true, preventScrollReset: true })
+  }
   const petVaccinations = vaccinations.filter((item) => item.petId === petId)
   const maintenance = queueEntries.filter((entry) => entry.petId === petId && entry.category === 'maintenance').sort((a, b) => b.arrivedAt.localeCompare(a.arrivedAt))
+  const vaccineRecords = vaccinationHistoryRecords(petVaccinations, profiles, timezone)
+  const vaccineFields = recordHistoryFields(vaccineRecords, [['vaccine', 'Vaccine', 'All vaccines'], ['brand', 'Brand', 'All brands'], ['status', 'Care status', 'All care statuses'], ['due', 'Next dose status', 'All next dose statuses'], ['veterinarian', 'Veterinarian', 'All veterinarians']])
+  const serviceRecords = serviceHistoryRecords(maintenance, timezone)
+  const serviceFields = recordHistoryFields(serviceRecords, [['service', 'Service', 'All services'], ['status', 'Service status', 'All service statuses'], ['veterinarian', 'Veterinarian', 'All veterinarians'], ['notes', 'Service notes', 'All records']])
   const petReminders = reminders.filter((item) => item.petId === petId && !['Completed', 'Cancelled'].includes(item.status))
   const weightData = [...petVisits].reverse().map((visit) => ({ visitId: visit.id, date: format(parseISO(visit.visitedAt), 'MMM yy'), weight: visit.weightKg, bcs: visit.bodyConditionScore }))
 
@@ -81,6 +146,9 @@ export default function PetDetail() {
         </div>
         <div className="pet-hero-actions">
           {profile.role === 'owner' && <button className="button button-secondary" disabled={printing} onClick={printHistory}><Printer size={18} weight="duotone" /> {printing ? 'Preparing...' : 'Print history'}</button>}
+          <button className="button button-secondary" onClick={() => setModal({ type: 'vaccine' })}><Syringe size={18} weight="duotone" /> Record vaccination</button>
+          <Link className="button button-secondary" to={`/appointments?new=1&petId=${encodeURIComponent(pet.id)}`}><CalendarPlus size={18} weight="duotone" /> Book appointment</Link>
+          <button className="button button-secondary" onClick={() => setModal({ type: 'prescription' })}><Pill size={18} weight="duotone" /> Add prescription</button>
           <button className="button button-primary" onClick={() => setModal({ type: 'visit' })}><Plus size={18} weight="bold" /> Record checkup</button>
         </div>
       </div>
@@ -105,23 +173,25 @@ export default function PetDetail() {
         <div className="record-main">
           <div className="tabs" role="tablist">
             <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>Clinical history</button>
+            <button className={tab === 'timeline' ? 'active' : ''} onClick={() => setTab('timeline')}>Care timeline</button>
             <button className={tab === 'vaccines' ? 'active' : ''} onClick={() => setTab('vaccines')}>Vaccinations</button>
             <button className={tab === 'growth' ? 'active' : ''} onClick={() => setTab('growth')}>Weight & vitals</button>
             <button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Service history</button>
           </div>
+          {tab === 'timeline' && <PatientTimeline key={petId} patientId={petId} />}
 
           {tab === 'history' && (
+            <>
+            <ClinicalHistoryFilters visits={petVisits} filters={historyFilters} onChange={changeHistoryFilter} onClear={clearHistoryFilters} count={filteredVisits.length} timezone={timezone} view={historyView} onViewChange={changeHistoryView} />
+            {historyView === 'calendar' && <>
+              <ClinicalHistoryCalendar visits={filteredVisits} month={historyMonth} day={historyDay} today={today} timezone={timezone} onMonthChange={changeHistoryMonth} onDayChange={changeHistoryDay} onDayPreview={(day) => setModal({ type: 'calendar-preview', day })} />
+              <div className="clinical-history-day-heading"><h2>{format(parseISO(historyDay), 'd MMMM yyyy')}</h2><span>{visibleVisits.length} checkup{visibleVisits.length === 1 ? '' : 's'}</span></div>
+            </>}
             <div className="clinical-timeline">
-              {petVisits.map((visit) => {
+              {visibleVisits.map((visit) => {
                 const activeQueue = ['Waiting', 'In progress'].includes(visit.careStatus) ? visit.careQueue : null
                 return (
-                <article className="visit-card section-card" key={visit.id} id={visit.id}>
-                  <div className="visit-date">
-                    <span>{format(parseISO(visit.visitedAt), 'MMM')}</span>
-                    <strong>{format(parseISO(visit.visitedAt), 'dd')}</strong>
-                    <small>{format(parseISO(visit.visitedAt), 'yyyy')}</small>
-                  </div>
-                  <div className="visit-content">
+                <VisitCard key={visit.id} visit={visit}>
                     <div className="visit-heading"><div><Badge tone="blue">{visit.type}</Badge><CareStatus record={visit} /><h2>{visit.finalizedAt ? visit.diagnosis || visit.complaint : <button type="button" className="visit-edit-trigger" aria-label={`Edit ${visit.type} checkup from ${format(parseISO(visit.visitedAt), 'd MMM yyyy, h:mm a')}`} onClick={() => openCheckup(visit)}>{visit.diagnosis || visit.complaint}</button>}</h2><p>{visit.complaint}</p></div><span>{visit.veterinarian}</span></div>
                     <div className="vitals-strip">
                       <span><Scales size={15} weight="duotone" /> {visit.weightKg} kg</span>
@@ -144,20 +214,30 @@ export default function PetDetail() {
                       {profile.role === 'owner' && <button className="button button-secondary small-button danger-text" onClick={() => setModal({ type: 'delete', entity: 'visit', record: visit })}>Delete checkup</button>}
                     </div>
                     {visit.corrections.map((correction) => <div className="follow-up-note" key={correction.id}><strong>Correction: {correction.reason}</strong><p>{correction.correction}</p></div>)}
-                    {visit.prescriptions.map((prescription) => <div className="prescription-row" key={prescription.id}><strong>{prescription.medication_name}</strong><p>{prescription.dose} · {prescription.frequency}</p><p>{prescription.instructions}</p>{!visit.finalizedAt && <button className="text-link" onClick={() => setModal({ type: 'prescription', record: prescription })}>Edit prescription</button>}{profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', entity: 'prescription', record: prescription })}>Delete prescription</button>}</div>)}
+                    {visit.prescriptions.map((prescription) => <div className="prescription-row" key={prescription.id} id={`prescription-${prescription.id}`}>
+                      <strong>Prescription</strong>
+                      <ol className="prescription-items">{prescriptionMedications(prescription).map((medication, index) => <li key={index}><strong>{medication.medicationName}</strong><p>{[medication.dose, medication.frequency, medication.duration].filter(Boolean).join(' · ')}</p>{medication.instructions && <p>{medication.instructions}</p>}</li>)}</ol>
+                      <button className="text-link" onClick={() => printPrescription({ prescription, pet, visit, clinic: settings, profiles, owner })}>Print prescription / PDF</button>
+                      {!visit.finalizedAt && <button className="text-link" onClick={() => setModal({ type: 'prescription', record: prescription })}>Edit prescription</button>}
+                      {profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', entity: 'prescription', record: prescription })}>Delete prescription</button>}
+                    </div>)}
                     {visit.followUpDate && <div className="follow-up-note"><CalendarPlus size={16} weight="duotone" /> Follow-up due {format(parseISO(visit.followUpDate), 'd MMMM yyyy')}</div>}
-                  </div>
-                </article>
+                </VisitCard>
               )})}
               {!petVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No clinical visits yet</h3><p>Record the first checkup to begin this pet’s history.</p></div>}
+              {petVisits.length > 0 && !filteredVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No matching checkups</h3><p>Try another clinical detail or clear the filters to see all checkups.</p><button type="button" className="button button-secondary" onClick={clearHistoryFilters}>Show all checkups</button></div>}
+              {historyView === 'calendar' && filteredVisits.length > 0 && !visibleVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No checkups on this day</h3><p>Select a marked day to see its clinical details.</p></div>}
             </div>
+            </>
           )}
 
           {tab === 'vaccines' && (
             <SectionCard title="Vaccination history" description="Vaccine records, brands, care status and next due dates" action={<button className="button button-primary small-button" onClick={() => setModal({ type: 'vaccine' })}><Plus size={16} weight="bold" /> Add vaccine</button>}>
+              <PatientRecordBrowser records={vaccineRecords} scope="vaccine" label="Vaccinations" itemName="vaccination" itemPlural="vaccinations" fields={vaccineFields} dateLabel="Vaccination date" placeholder="Search vaccine, brand, dose or lot…" emptyTitle="No vaccinations recorded" emptyDescription="Saved vaccination records will appear here." previewKind="vaccination">
+              {(visible) =>
               <div className="vaccine-list">
-                {petVaccinations.map((vaccine) => (
-                  <div className="vaccine-row" key={vaccine.id}>
+                {visible.map((vaccine) => (
+                  <div className="vaccine-row" key={vaccine.id} id={`vaccination-${vaccine.id}`}>
                     <div className="vaccine-icon"><Syringe size={20} weight="duotone" /></div>
                     <div><strong>{vaccine.vaccine}</strong><span>{['Recorded', 'Completed'].includes(vaccine.careStatus) ? 'Given' : 'Recorded date'} {format(parseISO(vaccine.administeredAt), 'd MMM yyyy')} · {vaccine.dose}</span><CareStatus record={vaccine} /></div>
                     <div><span>Brand</span><strong>{vaccine.brand || 'Not recorded'}</strong>{vaccine.lotNumber && <small>Historical lot: {vaccine.lotNumber}</small>}</div>
@@ -165,14 +245,15 @@ export default function PetDetail() {
                     <div className="record-actions">{['Waiting', 'In progress'].includes(vaccine.careStatus) ? <Link className="button button-secondary small-button" to="/queue">Open queued vaccination</Link> : <button className="button button-secondary small-button" onClick={() => setModal({ type: 'vaccine', record: vaccine })}>Edit vaccine</button>}{profile.role === 'owner' && <button className="button button-secondary small-button danger-text" onClick={() => setModal({ type: 'delete', entity: 'vaccination', record: vaccine })}>Delete vaccine</button>}</div>
                   </div>
                 ))}
-                {!petVaccinations.length && <div className="empty-inline"><Syringe size={30} weight="duotone" /><h3>No vaccinations recorded</h3></div>}
-              </div>
+              </div>}
+              </PatientRecordBrowser>
             </SectionCard>
           )}
 
           {tab === 'services' && <SectionCard title="Maintenance service history" description="Grooming and other maintenance services recorded at the clinic.">
-            {maintenance.map((entry) => <article className="directory-card" key={entry.id}><div><h3>{entry.service}</h3><p>{entry.queueNumber} · {entry.queueDate} · {entry.veterinarian}</p><Badge>{entry.status.replaceAll('_', ' ')}</Badge>{entry.serviceNotes && <p className="service-notes">{entry.serviceNotes}</p>}</div>{['waiting', 'in_progress'].includes(entry.status) && <Link className="text-link" to="/queue">Open queue</Link>}</article>)}
-            {!maintenance.length && <p className="empty-inline">No maintenance services recorded.</p>}
+            <PatientRecordBrowser records={serviceRecords} scope="service" label="Service history" itemName="service" itemPlural="services" fields={serviceFields} dateLabel="Service date" placeholder="Search service, notes or queue number…" emptyTitle="No maintenance services recorded" emptyDescription="Saved grooming and maintenance services will appear here." previewKind="service">
+            {(visible) => visible.map((entry) => <article className="directory-card" key={entry.id}><div><h3>{entry.service}</h3><p>{entry.queueNumber} · {entry.queueDate} · {entry.veterinarian}</p><Badge>{entry.status.replaceAll('_', ' ')}</Badge>{entry.serviceNotes && <p className="service-notes">{entry.serviceNotes}</p>}</div>{['waiting', 'in_progress'].includes(entry.status) && <Link className="text-link" to="/queue">Open queue</Link>}</article>)}
+            </PatientRecordBrowser>
           </SectionCard>}
 
           {tab === 'growth' && (
@@ -196,8 +277,17 @@ export default function PetDetail() {
         </div>
 
         <aside className="record-sidebar">
-          <Assistant key={petId} patientId={petId} />
-          <SectionCard title="Owner" action={<button className="text-link" onClick={() => setModal({ type: 'owner' })}>Edit owner</button>}>
+          <SectionCard title="Patient details" action={<button className="text-link" onClick={() => setModal({ type: 'pet' })}>Edit patient</button>}>
+            <dl className="detail-list">
+              <div><dt>Born</dt><dd>{pet.birthDate ? `${format(parseISO(pet.birthDate), 'd MMM yyyy')}${pet.birthDateEstimated ? ' (estimated)' : ''}` : 'Unknown'}{patientAge && <> · <span>{patientAge}</span></>}</dd></div>
+              <div><dt>Color</dt><dd>{pet.color || '—'}</dd></div>
+              <div><dt>Sex</dt><dd>{pet.sex}</dd></div>
+              <div><dt>Status</dt><dd>{pet.reproductiveStatus}</dd></div>
+              <div><dt>Environment</dt><dd>{pet.environment || 'Not recorded'}</dd></div>
+              <div><dt>Diet</dt><dd className="service-notes">{pet.diet || 'Not recorded'}</dd></div>
+            </dl>
+          </SectionCard>
+           <SectionCard title="Owner" action={<button className="text-link" onClick={() => setModal({ type: 'owner' })}>Edit owner</button>}>
             <div className="owner-card">
               <div className="avatar owner-avatar">{owner?.fullName?.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div>
               <div><strong>{owner?.fullName}</strong><span>Primary contact</span></div>
@@ -205,26 +295,13 @@ export default function PetDetail() {
             <a href={`tel:${owner?.phone?.replace(/\s/g, '')}`}><Phone size={16} weight="duotone" /> {owner?.phone}</a>
             <span><MapPin size={16} weight="duotone" /> {owner?.address}</span>
           </SectionCard>
-          <SectionCard title="Patient details" action={<button className="text-link" onClick={() => setModal({ type: 'pet' })}>Edit patient</button>}>
-            <dl className="detail-list">
-              <div><dt>Born</dt><dd>{pet.birthDate ? `${format(parseISO(pet.birthDate), 'd MMM yyyy')}${pet.birthDateEstimated ? ' (estimated)' : ''}` : 'Unknown'}</dd></div>
-              <div><dt>Color</dt><dd>{pet.color || '—'}</dd></div>
-              <div><dt>Sex</dt><dd>{pet.sex}</dd></div>
-              <div><dt>Status</dt><dd>{pet.reproductiveStatus}</dd></div>
-              <div><dt>Diet</dt><dd className="service-notes">{pet.diet || 'Not recorded'}</dd></div>
-            </dl>
-          </SectionCard>
           <SectionCard title="Care alerts" action={<button className="text-link" onClick={() => setModal({ type: 'alert' })}>Add alert</button>}>
             <div className="care-alert-list">{alerts.filter((alert) => alert.pet_id === pet.id).map((alert) => <div key={alert.id}><Badge tone={alert.is_active ? 'warning' : 'neutral'}>{alert.is_active ? alert.alert_type : 'Resolved'}</Badge><p>{alert.description}</p><div className="record-actions"><button className="text-link" onClick={() => setModal({ type: 'edit-alert', record: alert })}>Edit alert</button>{alert.is_active && <button className="text-link" onClick={() => setModal({ type: 'resolve-alert', record: alert })}>Resolve alert</button>}{profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', entity: 'alert', record: alert })}>Delete alert</button>}</div></div>)}</div>
-          </SectionCard>
-          <SectionCard title="Quick actions">
-            <button className="quick-action" onClick={() => setModal({ type: 'vaccine' })}><Syringe size={18} weight="duotone" /><span><strong>Record vaccination</strong><small>Select vaccine, brand and next due date</small></span></button>
-            <Link className="quick-action" to="/appointments"><CalendarPlus size={18} weight="duotone" /><span><strong>Book appointment</strong><small>Schedule the next visit</small></span></Link>
-            <button className="quick-action" onClick={() => setModal({ type: 'prescription' })}><Pill size={18} weight="duotone" /><span><strong>Add prescription</strong><small>Record medication details</small></span></button>
           </SectionCard>
         {profile.role === 'owner' && <button className="button button-secondary danger-text" onClick={() => setModal({ type: 'delete', entity: 'pet', record: pet })}>Delete patient</button>}
         </aside>
       </div>
+      {modal?.type === 'calendar-preview' && <CalendarDayPreview label="Clinical history" day={modal.day} count={previewVisits.length} itemName="checkup" itemPlural="checkups" timezone={timezone} onClose={() => setModal(null)}><CalendarRecordDetails records={previewVisits} kind="checkup" /></CalendarDayPreview>}
       {modal?.type === 'visit' && <VisitModal pet={pet} record={modal.record} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Checkup' }) }} onClose={() => setModal(null)} />}
       {modal?.type === 'queue-care' && <QueueDialog modal={{ type: 'care', entry: modal.entry }} onClose={() => setModal(null)} />}
       {modal?.type === 'vaccine' && <VaccineModal pet={pet} record={modal.record} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Vaccination' }) }} onClose={() => setModal(null)} />}
