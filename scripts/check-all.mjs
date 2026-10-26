@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 
 // Keep browser suites sequential: prescriptions and PWA both own port 5179.
-const suites = ['test', 'lint', 'build', 'test:browser', 'test:connections', 'test:queue', 'test:prescriptions', 'test:pwa', 'test:api', 'test:database']
+const suites = ['test', 'lint', 'build', 'test:browser', 'test:connections', 'test:queue', 'test:checkup-completion', 'test:clinical-history', 'test:appointments', 'test:prescriptions', 'test:inventory', 'test:registration', 'test:clinic-access', 'test:pwa', 'test:api', 'test:database']
 // Invoke installed Node entrypoints without an extra npm/shell process for each
 // suite, keeping process ownership and exit codes predictable on Windows.
 const commands = {
@@ -12,7 +12,13 @@ const commands = {
   'test:browser': ['scripts/check-frontend.mjs'],
   'test:connections': ['scripts/check-connections.mjs'],
   'test:queue': ['scripts/check-queue.mjs'],
+  'test:clinical-history': ['scripts/check-clinical-history.mjs'],
+  'test:appointments': ['scripts/check-appointments.mjs'],
   'test:prescriptions': ['scripts/check-prescriptions.mjs'],
+  'test:inventory': ['scripts/check-inventory.mjs'],
+  'test:registration': ['scripts/check-registration.mjs'],
+  'test:clinic-access': ['scripts/check-clinic-access.mjs'],
+  'test:checkup-completion': ['scripts/check-checkup-completion.mjs'],
   'test:pwa': ['scripts/check-pwa.mjs'],
   'test:api': ['scripts/check-supabase.mjs'],
   'test:database': ['scripts/check-database.mjs'],

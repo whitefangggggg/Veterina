@@ -3,6 +3,7 @@ import { ClipboardText, ClockCountdown, FileText, PawPrint, ShieldCheck, Syringe
 import { PageHeader, SectionCard } from '../components/ui'
 import { AsyncForm } from '../components/RecordForm'
 import StaffAdmin from '../components/StaffAdmin'
+import ClinicJoinCode from '../components/ClinicJoinCode'
 import ServiceSettings from '../components/ServiceSettings'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
@@ -78,7 +79,7 @@ export function Settings() {
   return <div className="page">
     <PageHeader eyebrow="Owner access" title="Clinic settings" description="Persisted clinic identity, professional details, privacy settings and staff access." />
     <div className="tabs"><button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'staff' ? 'active' : ''} onClick={() => setTab('staff')}>Staff accounts</button><button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Services</button></div>
-    {tab === 'services' ? <ServiceSettings /> : tab === 'staff' ? <SectionCard className="settings-panel"><StaffAdmin /></SectionCard> : <SectionCard title="Clinic profile">
+    {tab === 'services' ? <ServiceSettings /> : tab === 'staff' ? <SectionCard className="settings-panel"><StaffAdmin /></SectionCard> : <><ClinicJoinCode /><SectionCard title="Clinic profile">
       <div className="settings-panel">
       {saved && <p className="auth-message" role="status">Clinic settings saved.</p>}
       <AsyncForm submitLabel="Save settings" onSave={async (values) => { setSaved(false); await execute('save_settings', { ...values, aiEnabled: values.aiEnabled === 'on' }); await refreshAccess(); setSaved(true) }}>
@@ -99,6 +100,6 @@ export function Settings() {
         </div>
       </AsyncForm>
       </div>
-    </SectionCard>}
+    </SectionCard></>}
   </div>
 }

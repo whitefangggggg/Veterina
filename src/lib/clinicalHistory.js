@@ -26,7 +26,7 @@ export function filterClinicalHistory(visits, filters = {}, timezone = 'Asia/Man
 
     const text = normalize([
       visit.type, visit.complaint, visit.diagnosis, visit.subjective, visit.objective,
-      visit.assessment, visit.plan, visit.veterinarian, visit.careStatus || 'Recorded',
+      visit.assessment, visit.plan, visit.clinicalNotes, visit.veterinarian, visit.careStatus || 'Recorded',
       visit.finalizedAt ? 'Finalized' : '', date, visit.followUpDate, visit.hydration,
       visit.careQueue?.queueNumber,
       visit.weightKg != null ? `${visit.weightKg} kg` : '',
@@ -36,7 +36,7 @@ export function filterClinicalHistory(visits, filters = {}, timezone = 'Asia/Man
       visit.bodyConditionScore != null ? `BCS ${visit.bodyConditionScore}/${visit.bodyConditionScale || 9}` : '',
       ...(visit.corrections || []).flatMap((item) => [item.reason, item.correction]),
       ...(visit.prescriptions || []).flatMap((item) => prescriptionMedications(item)
-        .flatMap((medication) => [medication.medicationName, medication.dose, medication.frequency, medication.duration, medication.instructions])),
+        .flatMap((medication) => [medication.medicationName, medication.dose, medication.route, medication.frequency, medication.duration, medication.instructions])),
     ].filter((value) => value != null).join(' '))
     return terms.every((term) => text.includes(term))
   })

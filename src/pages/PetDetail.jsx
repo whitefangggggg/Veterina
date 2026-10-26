@@ -32,10 +32,13 @@ import { useAuth } from '../context/AuthContext'
 import { VisitEditor as VisitModal, VaccineEditor as VaccineModal, PrescriptionEditor } from '../components/ClinicalEditors'
 import { OwnerEditor, PetEditor } from '../components/PatientEditors'
 import { ActionDialog, DeleteRecordDialog } from '../components/RecordForm'
+import { AppointmentEditor } from '../components/OperationEditors'
+import PrescriptionActions from '../components/PrescriptionActions'
 import { fetchReport, printPatientHistory } from '../lib/reports'
-import { prescriptionMedications, printPrescription } from '../lib/prescriptions'
+import { prescriptionMedications } from '../lib/prescriptions'
 import { QueueDialog } from '../components/QueueEditors'
 import PatientTimeline from '../components/PatientTimeline'
+import PatientSchedule from '../components/PatientSchedule'
 import { useHashTarget } from '../lib/useHashTarget'
 import { formatPatientAge } from '../utils/clinicRules'
 import { clinicalHistoryParams, filterClinicalHistory } from '../lib/clinicalHistory'
@@ -171,6 +174,9 @@ export default function PetDetail() {
 
       <div className="record-layout">
         <div className="record-main">
+          <PatientSchedule patientId={petId} appointmentId={searchParams.get('appointmentId')}
+            onEditAppointment={(record) => setModal({ type: 'appointment', record })} onEditFollowUp={openCheckup}
+            onArrive={(dialog) => setModal({ type: 'schedule-arrival', dialog })} />
           <div className="tabs" role="tablist">
             <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>Clinical history</button>
             <button className={tab === 'timeline' ? 'active' : ''} onClick={() => setTab('timeline')}>Care timeline</button>
@@ -205,6 +211,7 @@ export default function PetDetail() {
                       <div><strong>O · Objective</strong><p>{visit.objective || '—'}</p></div>
                       <div><strong>A · Assessment</strong><p>{visit.assessment || '—'}</p></div>
                       <div><strong>P · Plan</strong><p>{visit.plan || '—'}</p></div>
+                      {visit.clinicalNotes && <div className="field-span"><strong>Clinical notes</strong><p className="service-notes">{visit.clinicalNotes}</p></div>}
                     </div>
                     <div className="record-actions">
                       {!visit.finalizedAt && <button className="button button-secondary small-button" onClick={() => openCheckup(visit)}>Edit checkup</button>}
@@ -216,8 +223,8 @@ export default function PetDetail() {
                     {visit.corrections.map((correction) => <div className="follow-up-note" key={correction.id}><strong>Correction: {correction.reason}</strong><p>{correction.correction}</p></div>)}
                     {visit.prescriptions.map((prescription) => <div className="prescription-row" key={prescription.id} id={`prescription-${prescription.id}`}>
                       <strong>Prescription</strong>
-                      <ol className="prescription-items">{prescriptionMedications(prescription).map((medication, index) => <li key={index}><strong>{medication.medicationName}</strong><p>{[medication.dose, medication.frequency, medication.duration].filter(Boolean).join(' · ')}</p>{medication.instructions && <p>{medication.instructions}</p>}</li>)}</ol>
-                      <button className="text-link" onClick={() => printPrescription({ prescription, pet, visit, clinic: settings, profiles, owner })}>Print prescription / PDF</button>
+                      <ol className="prescription-items">{prescriptionMedications(prescription).map((medication, index) => <li key={medication.medicationId || index}><strong>{medication.medicationName}</strong><p>{[medication.dose, `Route: ${medication.route || 'Not recorded'}`, medication.frequency, medication.duration].filter(Boolean).join(' · ')}</p>{medication.instructions && <p>{medication.instructions}</p>}{medication.inventoryItemId && <p><Link className="text-link" to={`/inventory#inventory-${medication.inventoryItemId}`}>Dispensed {medication.dispenseQuantity} {medication.dispenseUnit || 'units'} from inventory</Link></p>}</li>)}</ol>
+                      <PrescriptionActions context={{ prescription, pet, visit, clinic: settings, profiles, owner }} />
                       {!visit.finalizedAt && <button className="text-link" onClick={() => setModal({ type: 'prescription', record: prescription })}>Edit prescription</button>}
                       {profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', entity: 'prescription', record: prescription })}>Delete prescription</button>}
                     </div>)}
@@ -279,7 +286,7 @@ export default function PetDetail() {
         <aside className="record-sidebar">
           <SectionCard title="Patient details" action={<button className="text-link" onClick={() => setModal({ type: 'pet' })}>Edit patient</button>}>
             <dl className="detail-list">
-              <div><dt>Born</dt><dd>{pet.birthDate ? `${format(parseISO(pet.birthDate), 'd MMM yyyy')}${pet.birthDateEstimated ? ' (estimated)' : ''}` : 'Unknown'}{patientAge && <> · <span>{patientAge}</span></>}</dd></div>
+              <div><dt>Born</dt><dd>{pet.birthDate ? `${format(parseISO(pet.birthDate), 'd MMM yyyy')}${pet.birthDateEstimated ? ' (est.)' : ''}` : 'Unknown'}{patientAge && <> · <span>{patientAge}</span></>}</dd></div>
               <div><dt>Color</dt><dd>{pet.color || '—'}</dd></div>
               <div><dt>Sex</dt><dd>{pet.sex}</dd></div>
               <div><dt>Status</dt><dd>{pet.reproductiveStatus}</dd></div>
@@ -304,6 +311,8 @@ export default function PetDetail() {
       {modal?.type === 'calendar-preview' && <CalendarDayPreview label="Clinical history" day={modal.day} count={previewVisits.length} itemName="checkup" itemPlural="checkups" timezone={timezone} onClose={() => setModal(null)}><CalendarRecordDetails records={previewVisits} kind="checkup" /></CalendarDayPreview>}
       {modal?.type === 'visit' && <VisitModal pet={pet} record={modal.record} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Checkup' }) }} onClose={() => setModal(null)} />}
       {modal?.type === 'queue-care' && <QueueDialog modal={{ type: 'care', entry: modal.entry }} onClose={() => setModal(null)} />}
+      {modal?.type === 'appointment' && <AppointmentEditor record={modal.record} onClose={() => setModal(null)} />}
+      {modal?.type === 'schedule-arrival' && <QueueDialog modal={modal.dialog} onSaved={(saved) => setCareReceipt({ ...saved, petId: pet.id, label: 'Follow-up checkup' })} onClose={() => setModal(null)} />}
       {modal?.type === 'vaccine' && <VaccineModal pet={pet} record={modal.record} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Vaccination' }) }} onClose={() => setModal(null)} />}
       {modal?.type === 'owner' && <OwnerEditor record={owner} onClose={() => setModal(null)} />}
       {modal?.type === 'pet' && <PetEditor record={pet} onClose={() => setModal(null)} />}

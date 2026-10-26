@@ -27,6 +27,9 @@ export function authErrorMessage(error) {
   switch (error?.code) {
     case 'invalid_credentials': return 'The email or password is incorrect. Please try again.'
     case 'email_not_confirmed': return 'Please confirm your email before signing in.'
+    case 'email_address_not_authorized': return 'Email delivery is not available for this address yet. Please contact the app administrator.'
+    case 'email_address_invalid': return 'Please enter a valid email address.'
+    case 'email_provider_disabled': return 'Email sign-in is currently unavailable. Please contact the app administrator.'
     case 'user_already_exists': return 'An account with this email already exists. Please sign in.'
     case 'over_request_rate_limit':
     case 'over_email_send_rate_limit': return 'Too many attempts. Please wait a few minutes and try again.'

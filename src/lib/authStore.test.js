@@ -19,6 +19,7 @@ function mockClient(initial = null) {
   const eq = vi.fn(() => ({ maybeSingle }))
   const select = vi.fn(() => ({ eq }))
   const client = {
+    rpc: vi.fn(async () => ({ data: { valid: true, clinicName: 'Test clinic' }, error: null })),
     from: vi.fn(() => ({ select })),
     auth: {
       onAuthStateChange: vi.fn((callback) => {
@@ -29,6 +30,7 @@ function mockClient(initial = null) {
       getSession: vi.fn(async () => ({ data: { session: current }, error: null })),
       signInWithPassword: vi.fn(async () => ({ data: { session: current }, error: null })),
       signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
+      resend: vi.fn(async () => ({ data: {}, error: null })),
       resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
       initialize: vi.fn(async () => ({ error: null })),
       getUser: vi.fn(async () => ({ data: { user: current?.user ?? null }, error: null })),
@@ -181,15 +183,23 @@ describe('auth session lifecycle', () => {
 })
 
 describe('auth actions', () => {
-  it('registers display metadata only and handles confirmation-required responses', async () => {
+  it('validates the clinic code and submits only pending staff application metadata', async () => {
     const mock = mockClient()
     const store = createAuthStore(mock.client)
-    await expect(store.signUp({ fullName: ' Test Staff ', email: ' staff@example.org ', password: 'password123', emailRedirectTo: 'https://clinic.example/sign-in' })).resolves.toEqual({ session: null })
+    await expect(store.signUp({ fullName: ' Test Staff ', email: ' staff@example.org ', password: 'password123', veterinaCode: 'VET-1234567890ABCDEF1234', emailRedirectTo: 'https://clinic.example/sign-in' })).resolves.toEqual({ session: null })
     expect(mock.client.auth.signUp).toHaveBeenCalledWith({
       email: 'staff@example.org', password: 'password123',
-      options: { data: { full_name: 'Test Staff', application: 'veterina' }, emailRedirectTo: 'https://clinic.example/sign-in' },
+      options: { data: { full_name: 'Test Staff', application: 'veterina', veterina_code: 'VET-1234567890ABCDEF1234' }, emailRedirectTo: 'https://clinic.example/sign-in' },
     })
     expect(mock.client.from).not.toHaveBeenCalled()
+  })
+  it('rejects invalid or rotated codes before creating an Auth account', async () => {
+    const mock = mockClient()
+    const store = createAuthStore(mock.client)
+    await expect(store.signUp({ fullName: 'Staff', email: 'staff@example.org', password: 'password123', veterinaCode: 'invalid' })).rejects.toThrow('Veterina Code')
+    mock.client.rpc.mockResolvedValue({ data: { valid: false }, error: null })
+    await expect(store.signUp({ fullName: 'Staff', email: 'staff@example.org', password: 'password123', veterinaCode: 'VET-1234567890ABCDEF1234' })).rejects.toThrow('invalid or has changed')
+    expect(mock.client.auth.signUp).not.toHaveBeenCalled()
   })
 
   it('propagates invalid credentials and signs out locally without leaving access behind', async () => {
@@ -208,6 +218,27 @@ describe('auth actions', () => {
     expect(mock.client.auth.signOut).toHaveBeenLastCalledWith({ scope: 'local' })
     expect(store.getSnapshot()).toMatchObject({ access: 'signed-out', session: null, user: null, profile: null })
     stop()
+  })
+})
+
+describe('confirmation email resend', () => {
+  it('requests a signup link for the trimmed email with the sign-in redirect and never creates another account', async () => {
+    const mock = mockClient()
+    const store = createAuthStore(mock.client)
+    await store.resendConfirmation({ email: ' staff@example.org ', emailRedirectTo: 'https://clinic.example.org/sign-in?next=%2Fpatients' })
+    expect(mock.client.auth.resend).toHaveBeenCalledWith({ type: 'signup', email: 'staff@example.org', options: { emailRedirectTo: 'https://clinic.example.org/sign-in?next=%2Fpatients' } })
+    expect(mock.client.auth.signUp).not.toHaveBeenCalled()
+    expect(mock.client.from).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing addresses and propagates provider and rate limit errors', async () => {
+    const mock = mockClient()
+    const store = createAuthStore(mock.client)
+    await expect(store.resendConfirmation({ email: '  ' })).rejects.toThrow('Enter your email address')
+    expect(mock.client.auth.resend).not.toHaveBeenCalled()
+    const error = { code: 'over_email_send_rate_limit' }
+    mock.client.auth.resend.mockResolvedValueOnce({ error })
+    await expect(store.resendConfirmation({ email: 'staff@example.org' })).rejects.toEqual(error)
   })
 })
 

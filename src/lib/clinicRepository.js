@@ -47,8 +47,10 @@ export function normalizeClinicData(raw, now = new Date()) {
   }
   const visits = get('visits').map((row) => {
     const vital = get('visit_vitals').filter((entry) => entry.visit_id === row.id).sort((a, b) => b.measured_at.localeCompare(a.measured_at))[0] || {}
-    return { ...row, ...careMetadata('visit_id', row.id), petId: row.pet_id, type: row.visit_type, complaint: row.chief_complaint, diagnosis: row.diagnosis_summary,
-      visitedAt: row.visited_at, cardColor: /^#[0-9a-f]{6}$/i.test(row.card_color) ? row.card_color.toLowerCase() : null, followUpDate: row.follow_up_date, veterinarianId: row.attending_veterinarian_id,
+    return { ...row, ...careMetadata('visit_id', row.id), petId: row.pet_id, type: row.visit_type, complaint: row.chief_complaint, diagnosis: row.diagnosis_summary, clinicalNotes: row.clinical_notes || '',
+      visitedAt: row.visited_at, cardColor: /^#[0-9a-f]{6}$/i.test(row.card_color) ? row.card_color.toLowerCase() : null, followUpDate: row.follow_up_date,
+      followUpScheduledDate: row.follow_up_scheduled_date, followUpArrivedAt: row.follow_up_arrived_at, followUpVisitId: row.follow_up_visit_id, followUpQueueId: row.follow_up_queue_id,
+      veterinarianId: row.attending_veterinarian_id,
       veterinarian: row.attending_veterinarian_name || staffName(row.attending_veterinarian_id), weightKg: number(vital.weight_kg), temperatureC: number(vital.temperature_c),
       heartRate: number(vital.heart_rate_bpm), respiratoryRate: number(vital.respiratory_rate_rpm), bodyConditionScore: vital.body_condition_score, bodyConditionScale: vital.body_condition_scale || 9,
       hydration: vital.hydration, finalizedAt: row.finalized_at,
@@ -115,6 +117,8 @@ export async function fetchClinicData(client) {
 export function clinicErrorMessage(error) {
   const message = error?.message || 'Unable to reach the clinic database. Please try again.'
   const explanations = {
+    FOLLOWUP_NOT_TODAY: 'This follow-up is not scheduled for today. Reschedule it before recording arrival.',
+    FOLLOWUP_ALREADY_ARRIVED: 'This follow-up has already arrived. Open its new clinical record or queue entry.',
     VACCINATION_ALREADY_QUEUED: 'This patient already has a vaccination record or draft in the queue. Open the existing vaccination to continue.',
     CHECKUP_ALREADY_QUEUED: 'This patient already has a checkup record or draft in the queue. Open the existing checkup to continue.',
     CHECKUP_IN_QUEUE: 'Complete or cancel this checkup’s queue entry before finalizing its clinical record.',
@@ -125,6 +129,8 @@ export function clinicErrorMessage(error) {
     APPOINTMENT_CONFLICT: 'This veterinarian already has a booking during that time. Choose another slot.',
     APPOINTMENT_IN_PAST: 'Choose a future appointment date and time. Past dates and times cannot be booked.',
     INSUFFICIENT_STOCK: 'This batch does not have enough stock for that withdrawal.',
+    DISPENSING_LOCKED: 'This prescription has dispensing history. Keep its dispensed medications, batches and quantities unchanged. Use Inventory for stock corrections; prescriptions with dispensing history cannot be deleted.',
+    INVENTORY_UNAVAILABLE: 'This inventory item or batch is no longer active or available. Refresh inventory and choose another batch.',
     DUPLICATE_MICROCHIP: 'This microchip is already registered to another patient.',
     EXPIRED_BATCH: 'This batch has expired. Choose another batch or record expired/damaged disposal.',
     FORBIDDEN: 'Your account does not have permission for this action.',

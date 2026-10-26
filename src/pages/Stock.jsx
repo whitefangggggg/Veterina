@@ -27,6 +27,7 @@ function ItemEditor({ record, onClose }) {
       { name: 'brand', label: 'Brand', required: category === 'Vaccines', hint: 'Used as the brand when this vaccine is selected for a patient.' },
       { name: 'unit', label: 'Unit', required: true }, { name: 'minimumStock', label: 'Minimum stock', type: 'number', min: '0', step: '0.01', required: true },
       { name: 'supplierId', label: 'Preferred supplier', type: 'select', options: [{ value: '', label: 'No preferred supplier' }, ...suppliers.filter((supplier) => supplier.isActive || supplier.id === record?.supplierId).map((supplier) => ({ value: supplier.id, label: supplier.name }))] },
+      { name: 'notes', label: 'Notes', type: 'textarea', span: true, placeholder: 'Storage instructions, handling reminders or other item details' },
       ...(record ? [activeField] : [
         { name: 'allowsFraction', label: 'Allow fractional quantities', type: 'select', options: [{ value: 'false', label: 'Whole units only' }, { value: 'true', label: 'Fractional units allowed' }] },
         { name: 'lotNumber', label: 'Initial batch / lot number' }, { name: 'expirationDate', label: 'Initial batch expiry', type: 'date' },
@@ -103,6 +104,7 @@ export function Inventory() {
     <div className="record-directory">{filtered.map((item) => <SectionCard key={item.id} id={`inventory-${item.id}`} className="inventory-record">
       <div className="directory-card"><div><h2>{item.name}</h2><code>{item.sku}</code> <Badge>{item.category}</Badge> {!item.isActive && <Badge>Archived</Badge>}
         {item.brand && <p>Brand: {item.brand}</p>}
+        {item.notes && <p className="inventory-item-notes"><strong>Notes:</strong> {item.notes}</p>}
         <p><strong className={item.quantity <= item.minimumStock ? 'danger-text' : ''}>{item.quantity} {item.unit}</strong> · Minimum {item.minimumStock}</p>
         <p>Nearest expiry: {item.nearestExpiry ? format(parseISO(item.nearestExpiry), 'd MMM yyyy') : 'No stocked expiry-dated batches'} {item.nearestExpiry && item.nearestExpiry < today ? <Badge tone="danger">Expired stock</Badge> : item.nearestExpiry && item.nearestExpiry <= cutoff ? <Badge tone="warning">Expiring soon</Badge> : null}</p>
         <small>{item.supplierIds.length ? item.supplierIds.map((id) => {

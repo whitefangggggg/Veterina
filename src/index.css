@@ -18,6 +18,18 @@
 .auth-show-password input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); }
 .auth-hint { margin: -12px 0 0; color: var(--muted); font-size: 12px; }
 .auth-form .auth-submit { width: 100%; min-height: 46px; }
+.registration-code-field { display: grid; gap: 10px; padding: 16px; border: 1px solid #dce8df; border-radius: 14px; background: #f4f8f5; }
+.registration-code-field .button { width: 100%; min-height: 42px; }
+.registration-code-field small, .registration-clinic-name { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.registration-clinic-name strong { color: var(--brand); }
+.clinic-qr-video { display: block; width: 100%; max-height: 320px; object-fit: cover; border-radius: 14px; background: #ecf1ed; margin-bottom: 16px; }
+.clinic-code-card { margin-bottom: 20px; }
+.clinic-code-content { display: grid; grid-template-columns: minmax(0,1fr) 240px; align-items: center; gap: 24px; padding: 0 24px 24px; }
+.clinic-code-content p { max-width: 60ch; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.clinic-registration-code { display: block; width: fit-content; max-width: 100%; margin-top: 10px; padding: 14px 18px; border: 1px dashed #a8c7b5; border-radius: 12px; background: #f4f8f5; color: var(--brand); font-size: 17px; font-weight: 650; overflow-wrap: anywhere; user-select: all; }
+.clinic-code-qr { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 10px; border: 1px solid #e4ebe5; border-radius: 14px; }
+.clinic-code-qr img { max-width: 100%; height: auto; }
+@media (max-width: 650px) { .clinic-code-content { grid-template-columns: minmax(0,1fr); padding: 0 18px 18px; } .clinic-code-qr { width: min(240px,100%); justify-self: center; } }
 .auth-switch { margin: 24px 0 0; color: var(--muted); text-align: center; font-size: 13px; }
 .auth-switch a { color: var(--brand); font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
 .auth-text-button { padding: 4px; border: 0; background: transparent; color: var(--brand); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
@@ -32,12 +44,50 @@
 button:disabled, fieldset:disabled .button { opacity: .6; cursor: wait; transform: none; }
 .workspace-auth-error { margin: 12px 24px; color: #923b3b; font-size: 13px; }
 .record-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.form-sections { display: grid; gap: 18px; }
+.checkup-form .form-section { padding: 22px; border: 1px solid #e0e9e3; border-radius: 16px; background: #fcfdfc; }
+.form-section > header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+.form-section > header > span { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 10px; color: var(--brand); background: var(--brand-soft); font-size: 11px; font-weight: 750; }
+.form-section h3 { margin: 0; font-size: 15px; font-weight: 650; color: var(--ink); }
+.form-section header p { margin: 4px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.checkup-form .form-grid { gap: 18px 20px; }
+.checkup-form .field > span:first-child, .date-words-field > label { color: var(--ink); font-size: 12px; font-weight: 650; }
+.checkup-form .field input:not([type="hidden"]):not([type="checkbox"]), .checkup-form .field select, .checkup-form .field textarea { min-height: 46px; border: 1px solid #d8e2da; border-radius: 11px; background: #fff; padding: 12px 14px; font-size: 14px; transition: border-color .15s, box-shadow .15s; }
+.checkup-form .field textarea { min-height: 110px; resize: vertical; line-height: 1.6; }
+.checkup-form .field:focus-within > span:first-child { color: var(--brand); }
+.date-words-field { position: relative; min-width: 0; }
+.date-words-controls { display: grid; gap: 8px; }
+.date-words-controls.with-time { grid-template-columns: minmax(0, 1fr) 118px; }
+.date-words-controls > div { position: relative; min-width: 0; }
+.date-words-controls > div > input { width: 100%; padding-right: 44px !important; }
+.date-words-controls .icon-button { position: absolute; right: 4px; top: 4px; width: 36px; height: 36px; color: var(--brand); }
+.date-words-popover { position: absolute; z-index: 25; top: 100%; left: 0; max-width: calc(100vw - 48px); padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 12px 36px #183c2d26; }
+.date-words-popover .rdp-root { --rdp-accent-color: var(--brand); --rdp-day_button-width: 34px; --rdp-day_button-height: 34px; --rdp-day-width: 34px; --rdp-day-height: 34px; font-size: 12px; }
+@media (max-width: 600px) { .checkup-form .form-section { padding: 16px 14px; } .date-words-controls.with-time { grid-template-columns: minmax(0, 1fr); } }
 .record-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
 .record-directory { display: grid; gap: 14px; }
 .directory-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 20px; }
 .directory-card h2, .directory-card h3 { margin: 0 0 6px; font-size: 18px; }
 .directory-card p { margin: 6px 0; color: var(--muted); font-size: 14px; }
 .directory-card small { color: var(--muted); }
+.inventory-item-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pet-sticker img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.pet-photo-field { display: grid; gap: 12px; min-width: 0; }
+.pet-photo-preview { width: 120px; height: 120px; object-fit: cover; border-radius: 18px; }
+.pet-photo-field input[type="file"] { display: block; max-width: 220px; font-size: 12px; margin-top: 8px; }
+.pet-photo-field label.button { display: block; white-space: normal; }
+.pet-camera { display: flex; flex-wrap: wrap; gap: 10px; }
+.pet-camera video { width: 100%; max-height: 320px; background: #152721; border-radius: 12px; }
+.walkin-steps { display: flex; flex-wrap: wrap; gap: 12px; padding: 0; list-style: none; margin: 0 0 20px; }
+.walkin-steps [aria-current="step"] { color: var(--brand); font-weight: 700; }
+.walkin-back { margin: 14px 0; }
+.medication-combobox { position: relative; min-width: 0; }
+.medication-options { position: absolute; z-index: 5; top: 100%; left: 0; right: 0; max-height: 260px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+.medication-options button { display: grid; gap: 4px; width: 100%; padding: 12px; border: 0; background: transparent; text-align: left; color: var(--ink); overflow-wrap: anywhere; }
+.medication-options button[aria-selected="true"] { background: var(--brand-soft); }
+.medication-options span, .medication-options p { font-size: 12px; color: var(--muted); }
+.medication-options p { padding: 8px 12px; }
+.inventory-record .directory-card > div:first-child { min-width: 0; max-width: 100%; }
 .owner-directory { margin-top: 24px; }
 .owner-directory > summary, .ledger-details > summary { padding: 16px 20px; font-weight: 650; cursor: pointer; }
 .directory-search { width: calc(100% - 40px); margin: 4px 20px 16px; border: 1px solid var(--line); padding: 10px 12px; border-radius: 8px; }
@@ -1042,7 +1092,58 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
 .flow-appointment-card > time { padding-top: 5px; color: #6e7c76; font-size: 12px; font-weight: 620; }
 .agenda-line { position: relative; width: 1px; height: 100%; min-height: 128px; background: #e1e7e3; }
 .agenda-line::before { content: ""; position: absolute; top: 7px; left: -4px; width: 9px; height: 9px; border: 2px solid #fff; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px #b9d8ce; }
-.agenda-card-body { padding: 14px; border: 1px solid #e5e9e6; border-radius: 14px; background: #fbfcfb; }
+.agenda-card-body { position: relative; isolation: isolate; padding: 14px; border: 1px solid #e5e9e6; border-radius: 14px; background: #fbfcfb; }
+.agenda-patient-link::after { content: ""; position: absolute; inset: 0; border-radius: 14px; }
+.agenda-card-body:has(.agenda-patient-link:focus-visible) { outline: 2px solid var(--brand); outline-offset: 3px; }
+.agenda-card-body:has(.agenda-patient-link:hover) { border-color: var(--brand); }
+.agenda-card-body .record-actions { position: relative; z-index: 1; }
+.patient-schedule { margin-bottom: 20px; }
+.patient-schedule > .section-header { align-items: center; gap: 16px; margin: 0; padding-bottom: 18px; }
+.patient-schedule-count { display: inline-flex; flex: none; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border: 1px solid #e0eae4; border-radius: 12px; color: var(--brand); background: #f4f8f5; font-size: 13px; font-weight: 650; }
+.patient-schedule-list { display: grid; gap: 12px; padding: 0 22px 22px; }
+.patient-schedule-entry { --schedule-accent: #347566; --schedule-tint: #edf5f0; display: grid; grid-template-columns: 60px minmax(0, 1fr); align-items: start; gap: 18px; padding: 20px; border: 1px solid #e3e9e5; border-radius: 16px; background: #fcfdfc; overflow-wrap: anywhere; scroll-margin-top: 90px; }
+.patient-schedule-follow-up { --schedule-accent: #3d728a; --schedule-tint: #edf4f8; background: #fbfcfe; border-color: #e1e9ee; }
+.patient-schedule-selected { border-color: #a8cbbd; box-shadow: inset 3px 0 0 #347566; }
+.patient-schedule-date { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 6px; border-radius: 12px; color: var(--schedule-accent); background: var(--schedule-tint); }
+.patient-schedule-date > span { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.patient-schedule-date > strong { font-size: 27px; font-weight: 650; line-height: 1.15; }
+.patient-schedule-date > small { font-size: 11px; }
+.patient-schedule-content { min-width: 0; }
+.patient-schedule-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.patient-schedule-heading .care-event-tags { margin: 0; gap: 6px; }
+.patient-schedule-kind { color: var(--schedule-accent); font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.patient-schedule-entry h3 { margin: 4px 0 0; color: var(--ink); font-size: 17px; font-weight: 650; line-height: 1.4; }
+.patient-schedule-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.patient-schedule-meta > span { display: flex; align-items: center; gap: 7px; }
+.patient-schedule-meta svg { flex: none; color: var(--schedule-accent); }
+.patient-schedule-notes { display: flex; align-items: flex-start; gap: 9px; padding: 12px; margin-top: 14px; border: 1px solid #e8ede9; border-radius: 10px; background: #fff; }
+.patient-schedule-notes > svg { flex: none; margin-top: 2px; color: var(--muted); }
+.patient-schedule-notes > div { min-width: 0; }
+.patient-schedule-notes > div > span { display: block; color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .3px; }
+.patient-schedule-notes p { margin: 4px 0 0; color: var(--ink); font-size: 13px; line-height: 1.6; }
+.patient-schedule-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; margin-top: 16px; }
+.patient-schedule-actions .button { min-height: 36px; }
+.patient-schedule-actions .button-secondary { background: #fff; }
+.prescription-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.prescription-actions > [role="alert"] { flex-basis: 100%; margin: 0; }
+.patient-schedule-actions .text-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.patient-schedule-unavailable { margin: 0; padding: 14px; color: var(--muted); font-size: 13px; background: #f5f7f5; border-radius: 12px; }
+@media (max-width: 600px) {
+  .patient-schedule > .section-header { padding: 18px 16px 16px; }
+  .patient-schedule > .section-header h2 { font-size: 16px; }
+  .patient-schedule-count { padding: 0 9px; gap: 5px; }
+  .patient-schedule-list { padding: 0 12px 12px; gap: 10px; }
+  .patient-schedule-entry { grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 14px 12px; border-radius: 12px; }
+  .patient-schedule-date { padding: 9px 4px; border-radius: 10px; }
+  .patient-schedule-date > strong { font-size: 23px; }
+  .patient-schedule-heading { gap: 8px; }
+  .patient-schedule-entry h3 { font-size: 15px; }
+  .patient-schedule-meta { margin-top: 10px; gap: 7px; }
+  .patient-schedule-meta > span { align-items: flex-start; }
+  .patient-schedule-meta svg { margin-top: 2px; }
+  .patient-schedule-actions { gap: 12px; }
+  .patient-schedule-actions .button, .patient-schedule-actions .text-link { min-height: 40px; }
+}
 .agenda-card-body > div:first-child { display: flex; align-items: center; gap: 10px; }
 .agenda-card-body > div:first-child > span:last-child { display: flex; flex-direction: column; gap: 2px; }
 .agenda-card-body strong { color: var(--ink); font-size: 14px; }

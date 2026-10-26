@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { prescriptionHtml, prescriptionMedications } from './prescriptions'
+import { prescriptionHtml, prescriptionImageName, prescriptionInventoryBatches, prescriptionMedications } from './prescriptions'
 
 const medications = [
   { medicationName: 'Medicine A', dose: 'Recorded dose A', frequency: 'Recorded frequency A', duration: 'Recorded duration A', instructions: 'First instructions' },
@@ -7,8 +7,22 @@ const medications = [
 ]
 
 describe('prescriptions', () => {
+  it('names downloaded photos safely using the prescription date in the clinic timezone', () => {
+    expect(prescriptionImageName({ prescription: { prescribed_at: '2026-10-17T17:00:00Z' }, pet: { name: 'Mochi / <Cat>' }, clinic: { timezone: 'Asia/Manila' } })).toBe('prescription-Mochi-Cat-2026-10-18.png')
+  })
+  it('offers only active stocked batches that have not expired on the clinic date', () => {
+    const item = { batches: [
+      { id: 'today', is_active: true, quantity: 2, expiration_date: '2026-10-24' },
+      { id: 'no-expiry', is_active: true, quantity: 0.25 },
+      { id: 'expired', is_active: true, quantity: 10, expiration_date: '2026-10-23' },
+      { id: 'empty', is_active: true, quantity: 0 },
+      { id: 'archived', is_active: false, quantity: 10 },
+    ] }
+    expect(prescriptionInventoryBatches(item, '2026-10-24').map((batch) => batch.id)).toEqual(['today', 'no-expiry'])
+    expect(prescriptionInventoryBatches(undefined, '2026-10-24')).toEqual([])
+  })
   it('retains historical single-medication records', () => {
-    expect(prescriptionMedications({ medication_name: 'Legacy', dose: 'Dose', frequency: 'Frequency', instructions: 'Notes' })).toEqual([{ medicationName: 'Legacy', dose: 'Dose', frequency: 'Frequency', duration: '', instructions: 'Notes' }])
+    expect(prescriptionMedications({ medication_name: 'Legacy', dose: 'Dose', frequency: 'Frequency', instructions: 'Notes' })).toEqual([{ medicationName: 'Legacy', dose: 'Dose', route: '', frequency: 'Frequency', duration: '', instructions: 'Notes' }])
   })
 
   it('prints every medication and the correct prescriber using clinic settings, escaping all text', () => {

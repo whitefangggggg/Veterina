@@ -52,11 +52,11 @@ begin
   if (select count(*) from public.visits v where v.id=visit_id)<>1 or (select count(*) from public.reminders r where r.visit_id=visit_id)<>1 then raise exception 'TEST: encounter replay duplicated rows'; end if;
   perform public.portal_mutation('update_encounter',data||jsonb_build_object('id',visit_id,'complaint','Edited checkup','weightKg','3'),gen_random_uuid());
   if (select weight_kg from public.visit_vitals v where v.visit_id=visit_id)<>3 then raise exception 'TEST: vitals edit'; end if;
-  rx_id:=(public.portal_mutation('create_prescription',jsonb_build_object('visitId',visit_id,'medicationName','Recorded medication','dose','Recorded dose','frequency','Recorded frequency'),gen_random_uuid())->>'id')::uuid;
+  rx_id:=(public.portal_mutation('create_prescription',jsonb_build_object('visitId',visit_id,'medicationName','Recorded medication','route','Oral','dose','Recorded dose','frequency','Recorded frequency'),gen_random_uuid())->>'id')::uuid;
   if (select medications from public.prescriptions where id=rx_id) is not null then raise exception 'TEST: legacy prescription changed'; end if;
   rx_data:=jsonb_build_object('visitId',visit_id,'medications',jsonb_build_array(
-    jsonb_build_object('medicationName','First medication','dose','First dose','frequency','First frequency','duration','7 days','instructions','First notes'),
-    jsonb_build_object('medicationName','Second medication','dose','Second dose','frequency','Second frequency','duration','3 days','instructions','Second notes')));
+    jsonb_build_object('medicationName','First medication','route','Oral','dose','First dose','frequency','First frequency','duration','7 days','instructions','First notes'),
+    jsonb_build_object('medicationName','Second medication','route','Oral','dose','Second dose','frequency','Second frequency','duration','3 days','instructions','Second notes')));
   key_id:=gen_random_uuid(); result:=public.portal_mutation('create_prescription',rx_data,key_id); rx_id:=(result->>'id')::uuid;
   if public.portal_mutation('create_prescription',rx_data,key_id)<>result then raise exception 'TEST: prescription replay mismatch'; end if;
   if (select medications from public.prescriptions where id=rx_id)<>rx_data->'medications' then raise exception 'TEST: medication list not saved'; end if;
@@ -83,7 +83,7 @@ begin
   begin perform public.portal_mutation('update_encounter',data||jsonb_build_object('id',visit_id),gen_random_uuid()); exception when others then if sqlerrm like 'RECORD_FINALIZED%' then rejected:=true; else raise; end if; end;
   if not rejected then raise exception 'TEST: finalized visit editable'; end if;
   rejected:=false;
-  begin perform public.portal_mutation('update_prescription',jsonb_build_object('id',rx_id,'medicationName','Changed','dose','Changed','frequency','Changed'),gen_random_uuid()); exception when others then if sqlerrm like 'RECORD_FINALIZED%' then rejected:=true; else raise; end if; end;
+  begin perform public.portal_mutation('update_prescription',jsonb_build_object('id',rx_id,'medicationName','Changed','route','Oral','dose','Changed','frequency','Changed'),gen_random_uuid()); exception when others then if sqlerrm like 'RECORD_FINALIZED%' then rejected:=true; else raise; end if; end;
   if not rejected then raise exception 'TEST: finalized prescription editable'; end if;
   rejected:=false;
   begin perform public.portal_mutation('update_prescription',rx_data,gen_random_uuid()); exception when others then if sqlerrm like 'RECORD_FINALIZED%' then rejected:=true; else raise; end if; end;
@@ -91,7 +91,7 @@ begin
   perform public.portal_mutation('correct_encounter',jsonb_build_object('id',visit_id,'reason','Rollback correction','correction','Corrected historical entry'),gen_random_uuid());
   if not exists(select 1 from public.visit_corrections c where c.visit_id=visit_id and c.before_data#>>'{visit,id}'=visit_id::text and c.after_data->>'appended_correction'='Corrected historical entry') then raise exception 'TEST: correction snapshots missing'; end if;
 
-  perform set_config('veterina_test.vaccine_item',(public.portal_mutation('create_inventory_item',jsonb_build_object('name','Rollback vaccine','brand','Rollback Brand','category','Vaccines','unit','dose','minimumStock','0'),gen_random_uuid())->>'id'),true);
+  perform set_config('veterina_test.vaccine_item',(public.portal_mutation('create_inventory_item',jsonb_build_object('name','Rollback vaccine','brand','Rollback Brand','category','Vaccines','unit','route','Oral','dose','minimumStock','0'),gen_random_uuid())->>'id'),true);
   data:=jsonb_build_object('petId',pet_id,'inventoryItemId',current_setting('veterina_test.vaccine_item'),'administeredAt',care_date,'nextDueAt',care_date+10,'veterinarianId',current_setting('veterina_test.owner'));
   vaccine_id:=(public.portal_mutation('create_vaccination',data,gen_random_uuid())->>'id')::uuid;
   perform public.portal_mutation('update_vaccination',data||jsonb_build_object('id',vaccine_id,'nextDueAt',care_date+20),gen_random_uuid());
@@ -139,16 +139,26 @@ begin
   supplier_id:=(public.portal_mutation('create_supplier',data,gen_random_uuid())->>'id')::uuid;
   perform public.portal_mutation('update_supplier',data||jsonb_build_object('id',supplier_id,'name','Updated supplier'),gen_random_uuid());
   -- No SKU input is needed. Retried creates return the same item and SKU.
-  data:=jsonb_build_object('name','Rollback item','category','Medicine','unit','unit','minimumStock','2','supplierId',supplier_id,'expirationDate',care_date+30);
+  data:=jsonb_build_object('name','Rollback item','category','Medicine','unit','unit','minimumStock','2','supplierId',supplier_id,'expirationDate',care_date+30,'notes',E'Keep refrigerated\nProtect from light');
   key_id:=gen_random_uuid();
   item_id:=(public.portal_mutation('create_inventory_item',data,key_id)->>'id')::uuid;
   select sku into generated_sku from public.inventory_items where id=item_id;
   if generated_sku !~ '^SKU-[0-9]{6,}$' then raise exception 'TEST: inventory SKU was not generated'; end if;
   if (public.portal_mutation('create_inventory_item',data,key_id)->>'id')::uuid<>item_id then raise exception 'TEST: inventory retry duplicated item'; end if;
+  if (select notes from public.inventory_items where id=item_id)<>data->>'notes' then raise exception 'TEST: inventory creation lost notes'; end if;
+  perform public.portal_mutation('update_inventory_item',(data-'notes')||jsonb_build_object('id',item_id,'name','Edited rollback item'),gen_random_uuid());
+  if (select notes from public.inventory_items where id=item_id)<>data->>'notes' then raise exception 'TEST: omitted notes were erased'; end if;
+  key_id:=gen_random_uuid();
+  result:=public.portal_mutation('update_inventory_item',data||jsonb_build_object('id',item_id,'notes',E'Updated storage\nKeep dry'),key_id);
+  if public.portal_mutation('update_inventory_item',data||jsonb_build_object('id',item_id,'notes',E'Updated storage\nKeep dry'),key_id)<>result then raise exception 'TEST: inventory note retry changed result'; end if;
+  if (select notes from public.inventory_items where id=item_id)<>E'Updated storage\nKeep dry' then raise exception 'TEST: inventory note update was not saved'; end if;
+  perform public.portal_mutation('update_inventory_item',data||jsonb_build_object('id',item_id,'notes',''),gen_random_uuid());
+  if (select notes from public.inventory_items where id=item_id)<>'' then raise exception 'TEST: inventory notes could not be cleared'; end if;
   perform public.portal_mutation('update_inventory_item',data||jsonb_build_object('id',item_id,'name','Edited rollback item'),gen_random_uuid());
   perform public.portal_mutation('update_inventory_item',data||jsonb_build_object('id',item_id,'sku','CLIENT-SUPPLIED-SKU'),gen_random_uuid());
   if (select sku from public.inventory_items where id=item_id)<>generated_sku then raise exception 'TEST: inventory edit changed SKU'; end if;
-  second_item_id:=(public.portal_mutation('create_inventory_item',data||jsonb_build_object('sku',generated_sku,'name','Second rollback item'),gen_random_uuid())->>'id')::uuid;
+  second_item_id:=(public.portal_mutation('create_inventory_item',(data-'notes')||jsonb_build_object('sku',generated_sku,'name','Second rollback item'),gen_random_uuid())->>'id')::uuid;
+  if (select notes from public.inventory_items where id=second_item_id)<>'' then raise exception 'TEST: optional inventory notes did not default to empty'; end if;
   if (select sku from public.inventory_items where id=second_item_id)=generated_sku then raise exception 'TEST: inventory SKUs are not unique'; end if;
   perform public.portal_mutation('delete_record',jsonb_build_object('entity','inventory_item','id',second_item_id,'reason','Rollback SKU uniqueness check'),gen_random_uuid());
   select id into batch_id from public.inventory_batches b where b.item_id=item_id;

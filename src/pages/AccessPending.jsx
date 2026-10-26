@@ -27,10 +27,10 @@ export default function AccessPending() {
   }
 
   return (
-    <AuthLayout title="Your account is ready" description="Clinic access requires staff approval.">
+    <AuthLayout title="Waiting for shop approval" description="Your shop owner approves access to clinic records.">
       <div className="auth-pending-info">
         <p>Signed in as <strong>{user.email}</strong>.</p>
-        <p>Ask your clinic administrator to activate your staff profile. If you previously had access, contact them to check your account status.</p>
+        <p>{user.email_confirmed_at ? 'Your email is confirmed. Ask your shop owner to approve your registration.' : 'Confirm your email, then ask your shop owner to approve your registration.'} If you previously had access, ask them to check your account status.</p>
       </div>
       {error && <p className="auth-message auth-error" role="alert">{error}</p>}
       {checked && <p className="auth-message" role="status">Your account does not have active clinic access yet. Please check with your administrator.</p>}

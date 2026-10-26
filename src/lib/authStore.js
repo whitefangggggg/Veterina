@@ -1,4 +1,5 @@
 import { getAccessState } from './authAccess'
+import { normalizeVeterinaCode } from './clinicAccess'
 
 const configurationError = 'Sign-in is unavailable. Please configure the Supabase project URL and publishable key.'
 
@@ -22,7 +23,7 @@ export function createAuthStore(client, { isPasswordRecoverySession = () => fals
   async function loadProfile(session, requestId, generation) {
     try {
       const { data, error } = await client.from('profiles')
-        .select('id, full_name, role, job_title, is_active')
+        .select('id, full_name, role, job_title, is_active, clinic_id')
         .eq('id', session.user.id).maybeSingle()
       if (!active || generation !== lifecycle || requestId !== request) return
       if (error) throw error
@@ -111,11 +112,16 @@ export function createAuthStore(client, { isPasswordRecoverySession = () => fals
       if (error) throw error
       return data
     },
-    async signUp({ fullName, email, password, emailRedirectTo }) {
+    async signUp({ fullName, email, password, emailRedirectTo, veterinaCode }) {
       requireClient()
+      const code = normalizeVeterinaCode(veterinaCode)
+      if (!code) throw new Error('Enter the Veterina Code provided by your shop owner.')
+      const { data: clinic, error: codeError } = await client.rpc('veterina_code_info', { p_code: code })
+      if (codeError) throw new Error('We could not verify the Veterina Code. Please try again.')
+      if (!clinic?.valid) throw new Error('This Veterina Code is invalid or has changed. Ask your shop owner for the current code.')
       const { data, error } = await client.auth.signUp({
         email: email.trim(), password,
-        options: { data: { full_name: fullName.trim(), application: 'veterina' }, emailRedirectTo },
+        options: { data: { full_name: fullName.trim(), application: 'veterina', veterina_code: code }, emailRedirectTo },
       })
       if (error) throw error
       return data
@@ -123,6 +129,13 @@ export function createAuthStore(client, { isPasswordRecoverySession = () => fals
     async requestPasswordReset({ email, redirectTo }) {
       requireClient()
       const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo })
+      if (error) throw error
+    },
+    async resendConfirmation({ email, emailRedirectTo }) {
+      requireClient()
+      const address = String(email || '').trim()
+      if (!address) throw new Error('Enter your email address to request a confirmation link.')
+      const { error } = await client.auth.resend({ type: 'signup', email: address, options: { emailRedirectTo } })
       if (error) throw error
     },
     async verifyPasswordResetSession() {

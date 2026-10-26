@@ -47,7 +47,8 @@ export function Modal({ title, description, children, onClose, wide = false }) {
   useEffect(() => {
     const previousFocus = document.activeElement
     document.body.classList.add('overlay-open')
-    dialogRef.current?.querySelector('input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled])')?.focus()
+    const firstControl = [...(dialogRef.current?.querySelectorAll('input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),button:not([disabled])') || [])].find((element) => element.getClientRects().length)
+    firstControl?.focus()
     return () => {
       document.body.classList.remove('overlay-open')
       if (previousFocus?.isConnected) previousFocus.focus()

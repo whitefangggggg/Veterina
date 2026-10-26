@@ -22,10 +22,11 @@ import { ActionDialog, DeleteRecordDialog, RecordEditor } from '../components/Re
 import { QueueDialog } from '../components/QueueEditors'
 import { isClinicDate } from '../lib/dailyWorkflow'
 import { useHashTarget } from '../lib/useHashTarget'
+import { appointmentPatientSource, upcomingFollowUps } from '../lib/appointmentSchedule'
 
 export function Appointments() {
   useHashTarget()
-  const { appointments, queueEntries, pets, getPet, getOwner, today: clinicDate } = useClinicData()
+  const { appointments, visits, queueEntries, pets, getPet, getOwner, today: clinicDate } = useClinicData()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedPetId = searchParams.get('petId')
   const newRequested = searchParams.get('new') === '1'
@@ -46,9 +47,11 @@ export function Appointments() {
   const [month, setMonth] = useState(() => startOfMonth(parseISO(selectedDate)))
   useEffect(() => { setMonth(startOfMonth(parseISO(selectedDate))) }, [selectedDate])
   const [modal, setModal] = useState(null)
+  const followUps = upcomingFollowUps(visits, pets, clinicDate)
+  const dayFollowUps = followUps.filter((item) => item.date === selectedDate)
   const dayAppointments = appointments.filter((item) => item.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time))
   const monthAppointments = appointments.filter((item) => isSameMonth(parseISO(item.date), month) && !['Cancelled', 'No Show'].includes(item.status))
-  const appointmentDates = [...new Set(appointments.filter((item) => !['Cancelled', 'No Show'].includes(item.status)).map((item) => item.date))].map(parseISO)
+  const appointmentDates = [...new Set([...appointments.filter((item) => !['Cancelled', 'No Show'].includes(item.status)), ...followUps].map((item) => item.date))].map(parseISO)
   const busyDates = Object.entries(appointments.filter((item) => !['Cancelled', 'No Show'].includes(item.status)).reduce((counts, item) => ({ ...counts, [item.date]: (counts[item.date] || 0) + 1 }), {}))
     .filter(([, count]) => count >= 2)
     .map(([date]) => parseISO(date))
@@ -75,6 +78,7 @@ export function Appointments() {
         <div><strong>{monthAppointments.length}</strong><span>visits this month</span></div>
         <div><strong>{monthAppointments.filter((item) => item.status === 'Confirmed').length}</strong><span>confirmed</span></div>
         <div><strong>{monthAppointments.filter((item) => item.status === 'Pending').length}</strong><span>awaiting confirmation</span></div>
+        <div><strong>{followUps.filter((item) => isSameMonth(parseISO(item.date), month)).length}</strong><span>follow-ups due</span></div>
         <button onClick={() => { setSelectedDay(parseISO(clinicDate)); setMonth(startOfMonth(parseISO(clinicDate))) }}>Jump to today</button>
       </div>
 
@@ -100,16 +104,16 @@ export function Appointments() {
             modifiersClassNames={{ hasAppointments: 'calendar-has-appointments', busyDay: 'calendar-busy-day' }}
             className="veterina-day-picker"
           />
-          <div className="calendar-legend"><span><i className="legend-dot booked" /> Appointments</span><span><i className="legend-dot busy" /> Busy day</span><span><i className="legend-ring" /> Selected day</span></div>
+          <div className="calendar-legend"><span><i className="legend-dot booked" /> Appointments / follow-ups</span><span><i className="legend-dot busy" /> Busy day</span><span><i className="legend-ring" /> Selected day</span></div>
         </section>
 
         <aside className="selected-day-panel">
           <header>
             <div className="selected-date-badge"><span>{format(selectedDay, 'EEE')}</span><strong>{format(selectedDay, 'd')}</strong></div>
-            <div><span>{format(selectedDay, 'MMMM yyyy')}</span><h2>{format(selectedDay, 'EEEE')}</h2><p>{dayAppointments.length} appointment{dayAppointments.length === 1 ? '' : 's'} scheduled</p></div>
+            <div><span>{format(selectedDay, 'MMMM yyyy')}</span><h2>{format(selectedDay, 'EEEE')}</h2><p>{dayAppointments.length} appointment{dayAppointments.length === 1 ? '' : 's'} scheduled{dayFollowUps.length > 0 && ` · ${dayFollowUps.length} follow-up${dayFollowUps.length === 1 ? '' : 's'} due`}</p></div>
           </header>
           <div className="day-agenda">
-            {dayAppointments.length ? dayAppointments.map((appointment) => {
+            {dayAppointments.map((appointment) => {
               const pet = getPet(appointment.petId)
               const owner = getOwner(pet?.ownerId)
               const queueEntry = queueEntries.find((entry) => entry.appointmentId === appointment.id)
@@ -118,9 +122,10 @@ export function Appointments() {
                   <time>{format(parseISO(`${selectedDate}T${appointment.time}`), 'h:mm a')}</time>
                   <span className="agenda-line" />
                   <div className="agenda-card-body">
-                    <div><PetSticker pet={pet} size="small" /><span><Link className="text-link" to={`/patients/${appointment.petId}`}>{pet?.name || 'View patient'}</Link><small>{pet?.breed} · {owner?.fullName}</small></span></div>
+                    <div><PetSticker pet={pet} size="small" /><span><Link className="text-link agenda-patient-link" title={`Open patient details for ${appointment.service}`} to={appointmentPatientSource(appointment)}>{pet?.name || 'View patient'}</Link><small>{pet?.breed} · {owner?.fullName}</small></span></div>
                     <h3>{appointment.service}</h3>
                     <p>{appointment.veterinarian}</p>
+                    {appointment.notes && <p className="service-notes">{appointment.notes}</p>}
                     <Badge tone={appointment.status === 'Confirmed' ? 'success' : 'warning'}>{appointment.status}</Badge>
                     {queueEntry && <Badge tone="blue">Queue {queueEntry.queueNumber} · {queueEntry.queueDate}</Badge>}
                     <div className="record-actions">
@@ -135,7 +140,21 @@ export function Appointments() {
                   </div>
                 </article>
               )
-            }) : (
+            })}
+            {dayFollowUps.map((followUp) => {
+              const pet = getPet(followUp.petId)
+              const owner = getOwner(pet?.ownerId)
+              return <article className="flow-appointment-card" key={followUp.id} id={followUp.id}>
+                <time>Time not set</time><span className="agenda-line" />
+                <div className="agenda-card-body">
+                  <div><PetSticker pet={pet} size="small" /><span><Link className="text-link agenda-patient-link" aria-label={`Open ${pet?.name || 'patient'} follow-up checkup`} to={followUp.href}>{pet?.name || 'View patient'}</Link><small>{pet?.breed} · {owner?.fullName}</small></span></div>
+                  <h3>{followUp.service}</h3><p>{followUp.veterinarian}</p>
+                  <Badge tone="blue">Follow-up due</Badge>
+                  {followUp.notes && <p className="service-notes">{followUp.notes}</p>}
+                </div>
+              </article>
+            })}
+            {!dayAppointments.length && !dayFollowUps.length && (
               <div className="open-day-state"><span><CalendarDots size={38} weight="duotone" /></span><h3>The day is open</h3><p>No appointments are scheduled yet.</p><button className="button button-secondary" onClick={() => setModal({ type: 'appointment' })}><Plus size={17} weight="bold" /> Add appointment</button></div>
             )}
           </div>

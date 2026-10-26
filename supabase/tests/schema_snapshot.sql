@@ -8,6 +8,10 @@ with app_relations as (
   select 0 as position, 'schemas' as name,
     'create schema if not exists private; create schema if not exists extensions; set check_function_bodies = off; set search_path = public, extensions;' as sql
   union all
+  select 0.5, 'rpc_role',
+    'do $$ begin if not exists(select 1 from pg_roles where rolname=''veterina_rpc'') then create role veterina_rpc nologin inherit nobypassrls; end if; end $$; grant veterina_rpc to postgres; grant authenticated to veterina_rpc;'
+  where exists(select 1 from pg_roles where rolname='veterina_rpc')
+  union all
   select 1, 'extensions', string_agg(format('create extension if not exists %I with schema %I;', e.extname,n.nspname), E'\n' order by e.extname)
   from pg_extension e join pg_namespace n on n.oid=e.extnamespace where e.extname in ('pgcrypto','uuid-ossp','vector','btree_gist','pg_cron','pg_net','supabase_vault')
   union all
@@ -56,5 +60,26 @@ with app_relations as (
   union all
   select 15, 'function_grants', string_agg(format('revoke all on function %I.%I(%s) from public, anon, authenticated, service_role;%s',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid),coalesce((select string_agg(format('grant execute on function %I.%I(%s) to %s;',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid),case when a.grantee=0 then 'public' else quote_ident(pg_get_userbyid(a.grantee)) end),E'\n') from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a where a.grantee=0 or pg_get_userbyid(a.grantee) in ('anon','authenticated','service_role')),'')),E'\n' order by p.oid)
   from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','private') and p.prokind='f'
+  union all
+  -- Preserve the restricted definer role. Restoring its functions as postgres
+  -- would bypass clinic RLS and make a security test stack unrepresentative.
+  select 16, 'rpc_role_grants_and_ownership',
+    'grant usage,create on schema private to veterina_rpc;'||E'\n'||
+    coalesce((select string_agg(format('grant %s on schema %I to veterina_rpc;',a.privilege_type,n.nspname),E'\n')
+      from pg_namespace n cross join lateral aclexplode(coalesce(n.nspacl,acldefault('n',n.nspowner))) a
+      where pg_get_userbyid(a.grantee)='veterina_rpc'),'')||E'\n'||
+    coalesce((select string_agg(format('grant %s on %s %s to veterina_rpc;',a.privilege_type,case when c.relkind='S' then 'sequence' else 'table' end,c.qualified),E'\n')
+      from app_relations c cross join lateral aclexplode(coalesce(c.relacl,acldefault(case when c.relkind='S' then 's'::"char" else 'r'::"char" end,c.relowner))) a
+      where pg_get_userbyid(a.grantee)='veterina_rpc'),'')||E'\n'||
+    coalesce((select string_agg(format('grant execute on function %I.%I(%s) to veterina_rpc;',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)),E'\n')
+      from pg_proc p join pg_namespace n on n.oid=p.pronamespace cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+      where n.nspname in ('public','private','auth') and pg_get_userbyid(a.grantee)='veterina_rpc'),'')||E'\n'||
+    coalesce((select string_agg(format('alter function %I.%I(%s) owner to veterina_rpc;',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)),E'\n')
+      from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','private') and pg_get_userbyid(p.proowner)='veterina_rpc'),'')||E'\n'||
+    'revoke create on schema private from veterina_rpc;'
+  where exists(select 1 from pg_roles where rolname='veterina_rpc')
+  union all
+  select 17, 'auth_signup_triggers',string_agg(pg_get_triggerdef(t.oid,true)||';',E'\n' order by t.tgname)
+  from pg_trigger t where t.tgrelid='auth.users'::regclass and t.tgname in ('veterina_staff_signup','veterina_staff_email') and not t.tgisinternal
 )
 select name, sql from sections where sql is not null order by position;

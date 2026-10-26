@@ -45,6 +45,7 @@ try {
     const request = route.request(), url = new URL(request.url())
     const reply = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
     if (url.pathname === '/auth/v1/user') return reply(session.user)
+    if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
     if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204 })
     if (url.pathname === '/functions/v1/assistant-query') return reply({ answer: 'Use the published checklist.', interaction_id: 'answer', citations: [{ source_type: 'kb_document', source_id: 'doc-4', label: 'Clinic checklist 4', version: 1 }] })
     if (url.pathname === '/functions/v1/export-report') return route.fulfill({ status: 200, contentType: 'text/csv', headers: { 'X-Row-Count': '2' }, body: 'name,quantity\nLinked medicine,8\nOther medicine,0\n' })
@@ -139,7 +140,8 @@ try {
   assert.equal(saves[0].key, saves[1].key)
   await page.reload()
   await page.locator('.flow-appointment-card').last().getByRole('link', { name: 'Mochi', exact: true }).click()
-  await expect(page).toHaveURL(app.origin + `/patients/${petId}`)
+  await expect(page).toHaveURL(app.origin + `/patients/${petId}?appointmentId=new-booking#patient-appointment-new-booking`)
+  await expect(page.locator('#patient-appointment-new-booking')).toBeFocused()
   for (const id of ['missing', 'inactive-pet', '']) {
     await page.goto(app.origin + '/appointments?new=1&petId=' + id)
     await expect(page.getByRole('alert')).toContainText('unavailable or inactive')
@@ -214,7 +216,7 @@ try {
   ]
   raw.appointments.push({ id: 'historical', pet_id: petId, service_type_id: 'service', veterinarian_id: userId, status: 'completed', starts_at: '2026-09-15T02:00:00Z', ends_at: '2026-09-15T02:30:00Z' })
   raw.visits = [{ id: 'timeline-visit', pet_id: petId, visit_type: 'Wellness check', chief_complaint: 'Timeline checkup', visited_at: now.toISOString(), attending_veterinarian_id: userId }]
-  raw.prescriptions = [{ id: 'timeline-rx', visit_id: 'timeline-visit', prescribed_at: now.toISOString(), medication_name: 'Daily tablet', dose: 'As recorded', frequency: 'As recorded' }]
+  raw.prescriptions = [{ id: 'timeline-rx', visit_id: 'timeline-visit', prescribed_at: now.toISOString(), medication_name: 'Daily tablet', route: 'Oral', dose: 'As recorded', frequency: 'As recorded' }]
   raw.vaccinations = [{ id: 'timeline-vaccine', pet_id: petId, vaccine_name: 'Rabies', administered_at: '2026-10-16', next_due_at: '2027-10-16', brand: 'Clinic brand' }]
   raw.reminder_worklist.push({ id: 'closed-reminder', pet_id: petId, title: 'Historical follow-up', reminder_type: 'follow_up', status: 'completed', due_at: '2026-09-16T04:00:00Z', outcome: 'Reached owner' })
   raw.reminder_activity = [{ id: 'contact', reminder_id: 'closed-reminder', action: 'contact_attempt', note: 'Owner contacted', created_at: '2026-09-15T04:00:00Z' }]
@@ -260,6 +262,7 @@ try {
     await page.setViewportSize({ width, height: 900 })
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Care timeline overflows at ${width}`)
   }
+  await page.getByRole('button', { name: /^Advanced/ }).click()
   await page.getByLabel('Timeline activity').selectOption('Prescription')
   await expect(page.locator('.care-event')).toHaveCount(1)
   await page.locator('.care-event').getByRole('link', { name: 'View source', exact: true }).click()
