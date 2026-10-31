@@ -13,8 +13,23 @@ export function AsyncForm({ onSave, onSaveDraft, onClose, children, submitLabel 
     event.preventDefault()
     if (busy) return
     submitter.current = event.nativeEvent.submitter
-    const values = Object.fromEntries(new FormData(event.currentTarget))
     const saveDraft = event.nativeEvent.submitter?.value === 'draft'
+    const form = event.currentTarget
+    const lockedSections = [...form.querySelectorAll('fieldset[data-readonly-section]:disabled')]
+    let values
+    // Disabled section controls stay visible but cannot be edited. Include their
+    // current values in saves, including custom date and body-condition fields.
+    try {
+      lockedSections.forEach((section) => { section.disabled = false })
+      if (!saveDraft) {
+        const invalid = lockedSections.find((section) => [...section.elements].some((control) => !control.checkValidity()))
+        if (invalid) {
+          setError(`Check the required fields in ${invalid.dataset.readonlySection}. Click Edit to update this section.`)
+          return
+        }
+      }
+      values = Object.fromEntries(new FormData(form))
+    } finally { lockedSections.forEach((section) => { section.disabled = true }) }
     setBusy(true)
     setError('')
     try {
@@ -45,8 +60,8 @@ export function RecordEditor({ title, description, fields, initial = {}, onSave,
     <AsyncForm className={className} onSave={onSave} onSaveDraft={onSaveDraft} onClose={onClose} submitLabel={submitLabel} submitActions={submitActions}>
       <div className={grouped ? 'form-sections' : 'form-grid'}>
         {fields.map((field, index) => field.fields ? <section className="form-section" key={field.name} aria-labelledby={`${sectionId}-${field.name}`}>
-          <header><span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span><div><h3 id={`${sectionId}-${field.name}`}>{field.title}</h3>{field.description && <p>{field.description}</p>}</div></header>
-          <div className="form-grid">{field.fields.map(renderField)}</div>
+          <header><span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span><div><h3 id={`${sectionId}-${field.name}`}>{field.title}</h3>{field.description && <p>{field.description}</p>}</div>{field.onToggleEdit && <button type="button" className="button button-secondary small-button section-edit-button" onClick={field.onToggleEdit} aria-label={`${field.readOnly ? 'Edit' : 'Done editing'} ${field.title}`} aria-controls={`${sectionId}-${field.name}-fields`} aria-pressed={!field.readOnly}>{field.readOnly ? 'Edit' : 'Done'}</button>}</header>
+          {field.onToggleEdit ? <fieldset id={`${sectionId}-${field.name}-fields`} className="form-grid section-fields" disabled={field.readOnly} data-readonly-section={field.title} aria-label={field.title}>{field.fields.map(renderField)}</fieldset> : <div className="form-grid">{field.fields.map(renderField)}</div>}
         </section> : renderField(field))}
       </div>
     </AsyncForm>

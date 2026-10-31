@@ -17,6 +17,7 @@ let currentCode = originalCode
 try {
   await mkdir('test-artifacts.local', { recursive: true })
   const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' })
+  context.setDefaultTimeout(15000)
   await context.addInitScript(() => {
     window.cameraRequests = 0; window.cameraStops = 0; window.cameraAllowed = false
     navigator.mediaDevices.getUserMedia = async () => {
@@ -91,7 +92,7 @@ try {
   await page.getByRole('button', { name: 'Create account', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
   assert.equal(signups.length, 1)
-  assert.deepEqual(signups[0].data, { full_name: 'New clinician', application: 'veterina', veterina_code: originalCode })
+  assert.deepEqual(signups[0].data, { full_name: 'New clinician', application: 'veterina', account_type: 'staff', veterina_code: originalCode })
   await expect(page.getByRole('button', { name: /^Resend in/ })).toBeDisabled()
   await page.clock.fastForward(61000)
   await page.getByRole('button', { name: 'Resend confirmation email', exact: true }).click()
@@ -113,12 +114,36 @@ try {
   await expect(page.getByLabel('Email address', { exact: true })).toHaveValue('staff@example.org')
   console.log('PASS signup and sign-in confirmation resend, cooldown, rate-limit errors, preserved address and no duplicate registration')
   console.log('PASS signup code prefill, invalid code rejection, QR decoding, foreign QR rejection, camera denial, retained values and mobile layout')
+  await page.goto(`${app.origin}/create-account`)
+  await page.getByLabel('Create account as', { exact: true }).selectOption('owner')
+  await expect(page.getByLabel('Veterina Code', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Scan QR code', exact: true })).toHaveCount(0)
+  await page.getByLabel('Clinic name', { exact: true }).fill('New owner clinic')
+  await page.getByLabel('Full name', { exact: true }).fill('New owner')
+  await page.getByLabel('Email address', { exact: true }).fill('owner@example.org')
+  await page.getByLabel('Password', { exact: true }).fill('Browser-test-87!')
+  await page.getByLabel('Confirm password', { exact: true }).fill('Browser-test-87!')
+  await page.getByLabel('Create account as', { exact: true }).selectOption('staff')
+  await expect(page.getByLabel('Clinic name', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('Veterina Code', { exact: true })).toBeVisible()
+  await page.getByLabel('Create account as', { exact: true }).selectOption('owner')
+  await expect(page.getByLabel('Clinic name', { exact: true })).toHaveValue('New owner clinic')
+  await expect(page.getByLabel('Full name', { exact: true })).toHaveValue('New owner')
+  await page.setViewportSize({ width: 320, height: 812 })
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Owner signup overflowed mobile')
+  await page.screenshot({ path: 'test-artifacts.local/owner-registration-mobile.png', fullPage: true })
+  await page.getByRole('button', { name: 'Create account', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
+  assert.equal(signups.length, 2)
+  assert.deepEqual(signups[1].data, { full_name: 'New owner', application: 'veterina', account_type: 'owner', clinic_name: 'New owner clinic' })
+  console.log('PASS owner/staff selection, field retention, new clinic signup without a code and 320px layout')
   await context.close()
 
   const ownerContext = await app.browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' })
+  ownerContext.setDefaultTimeout(15000)
   const token = mockAccessToken(actor).split('.')
   token[1] = Buffer.from(JSON.stringify({ sub: actor, role: 'authenticated', aal: 'aal1', exp: 2000000000 })).toString('base64url')
-  const session = { access_token: token.join('.'), refresh_token: 'browser-test', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user: { id: actor, aud: 'authenticated', role: 'authenticated', email: 'owner@example.org', app_metadata: {}, user_metadata: {}, factors: [] } }
+  const session = { access_token: token.join('.'), refresh_token: 'browser-test', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user: { id: actor, aud: 'authenticated', role: 'authenticated', email: 'owner@example.org', app_metadata: {}, user_metadata: {}, factors: [{ id: 'existing-authenticator', factor_type: 'totp', status: 'verified' }] } }
   let accounts = [
     { id: 'verified', full_name: 'Verified staff', email: 'verified@example.org', email_confirmed: true, role: 'clinical_staff', status: 'pending' },
     { id: 'unverified', full_name: 'Unverified staff', email: 'unverified@example.org', email_confirmed: false, role: 'clinical_staff', status: 'pending' },
@@ -145,7 +170,10 @@ try {
   })
   const ownerPage = await ownerContext.newPage()
   ownerPage.on('pageerror', (error) => errors.push(error.message))
-  await ownerPage.goto(app.origin + '/settings')
+  await ownerPage.goto(app.origin + '/sign-in?next=%2Fsettings')
+  await expect(ownerPage).toHaveURL(app.origin + '/settings')
+  await expect(ownerPage.getByRole('heading', { name: 'Verify your sign-in' })).toHaveCount(0)
+  console.log('PASS enrolled authenticator no longer blocks password sign-in')
   await expect(ownerPage.locator('.clinic-registration-code')).toHaveText(originalCode)
   const qrImage = ownerPage.getByAltText("Scan to register as staff with this shop's Veterina Code prefilled")
   await expect(qrImage).toBeVisible()

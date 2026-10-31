@@ -189,7 +189,7 @@ describe('auth actions', () => {
     await expect(store.signUp({ fullName: ' Test Staff ', email: ' staff@example.org ', password: 'password123', veterinaCode: 'VET-1234567890ABCDEF1234', emailRedirectTo: 'https://clinic.example/sign-in' })).resolves.toEqual({ session: null })
     expect(mock.client.auth.signUp).toHaveBeenCalledWith({
       email: 'staff@example.org', password: 'password123',
-      options: { data: { full_name: 'Test Staff', application: 'veterina', veterina_code: 'VET-1234567890ABCDEF1234' }, emailRedirectTo: 'https://clinic.example/sign-in' },
+      options: { data: { full_name: 'Test Staff', application: 'veterina', account_type: 'staff', veterina_code: 'VET-1234567890ABCDEF1234' }, emailRedirectTo: 'https://clinic.example/sign-in' },
     })
     expect(mock.client.from).not.toHaveBeenCalled()
   })
@@ -199,6 +199,28 @@ describe('auth actions', () => {
     await expect(store.signUp({ fullName: 'Staff', email: 'staff@example.org', password: 'password123', veterinaCode: 'invalid' })).rejects.toThrow('Veterina Code')
     mock.client.rpc.mockResolvedValue({ data: { valid: false }, error: null })
     await expect(store.signUp({ fullName: 'Staff', email: 'staff@example.org', password: 'password123', veterinaCode: 'VET-1234567890ABCDEF1234' })).rejects.toThrow('invalid or has changed')
+    expect(mock.client.auth.signUp).not.toHaveBeenCalled()
+  })
+
+  it('registers a new clinic owner without looking up a staff code', async () => {
+    const mock = mockClient()
+    const store = createAuthStore(mock.client)
+    await store.signUp({ fullName: ' New Owner ', email: ' owner@example.org ', password: 'password123', accountType: 'owner', clinicName: ' New clinic ', veterinaCode: 'ignored', emailRedirectTo: 'https://clinic.example/sign-in' })
+    expect(mock.client.rpc).not.toHaveBeenCalled()
+    expect(mock.client.auth.signUp).toHaveBeenCalledWith({
+      email: 'owner@example.org', password: 'password123',
+      options: { data: { full_name: 'New Owner', application: 'veterina', account_type: 'owner', clinic_name: 'New clinic' }, emailRedirectTo: 'https://clinic.example/sign-in' },
+    })
+    expect(mock.client.from).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing clinic names and unsupported account types before signup', async () => {
+    const mock = mockClient()
+    const store = createAuthStore(mock.client)
+    const details = { fullName: 'Owner', email: 'owner@example.org', password: 'password123', accountType: 'owner' }
+    await expect(store.signUp({ ...details, clinicName: ' ' })).rejects.toThrow('clinic name')
+    await expect(store.signUp({ ...details, clinicName: 'a'.repeat(161) })).rejects.toThrow('clinic name')
+    await expect(store.signUp({ ...details, accountType: 'admin' })).rejects.toThrow('Choose Owner or Staff')
     expect(mock.client.auth.signUp).not.toHaveBeenCalled()
   })
 

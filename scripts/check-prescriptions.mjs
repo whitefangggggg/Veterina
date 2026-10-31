@@ -41,6 +41,8 @@ const raw = {
 }
 const calls = [], errors = []
 let failOnce = true
+let failLogoOnce = true
+const logoSaves = []
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '5179', '--strictPort'], { stdio: 'pipe', windowsHide: true })
 let browser
 try {
@@ -52,6 +54,7 @@ try {
   assert.ok(ready, 'Vite did not start')
   browser = await chromium.launch({ channel: 'chrome', headless: true })
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+  context.setDefaultTimeout(15000)
   const session = { access_token: mockAccessToken(userId), refresh_token: 'browser-test', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user: { id: userId, aud: 'authenticated', role: 'authenticated', email: 'prescriptions@example.org', app_metadata: {}, user_metadata: {} } }
   await context.addInitScript(({ key, session }) => localStorage.setItem(key, JSON.stringify(session)), { key: `sb-${api.hostname.split('.')[0]}-auth-token`, session })
   await context.route(`${api.origin}/**`, async (route) => {
@@ -59,6 +62,13 @@ try {
     const reply = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
     if (url.pathname === '/auth/v1/user') return reply(session.user)
     if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
+    if (url.pathname === '/rest/v1/rpc/owner_veterina_code') return reply({ code: 'VET-0123456789ABCDEF0123' })
+    if (url.pathname === '/rest/v1/rpc/save_clinic_logo') {
+      logoSaves.push(request.postDataJSON().p_logo)
+      if (failLogoOnce) { failLogoOnce = false; return reply({ message: 'Interrupted logo save', code: 'P0001' }, 400) }
+      raw.clinic_settings[0].logo_data_url = request.postDataJSON().p_logo
+      return reply({ id: 'settings' })
+    }
     if (url.pathname === '/rest/v1/rpc/portal_mutation') {
       const { p_action: action, p_data: payload, p_key: key } = request.postDataJSON()
       calls.push({ action, payload, key })
@@ -79,6 +89,44 @@ try {
   })
   const page = await context.newPage()
   page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto(`${origin}/settings`)
+  const logoForm = page.locator('.clinic-logo-form')
+  await expect(logoForm.getByText('No logo uploaded', { exact: true })).toBeVisible()
+  await logoForm.getByLabel('Upload shop logo', { exact: true }).setInputFiles({ name: 'fake.png', mimeType: 'image/png', buffer: Buffer.from('<svg onload="alert(1)"></svg>') })
+  await expect(logoForm.getByRole('alert')).toContainText('PNG, JPEG or WebP')
+  const logoData = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256
+    const paint = canvas.getContext('2d'); paint.fillStyle = '#e22178'; paint.fillRect(0, 0, 512, 256)
+    paint.fillStyle = 'white'; paint.font = 'bold 100px Arial'; paint.fillText('VET', 150, 160)
+    return canvas.toDataURL('image/png')
+  })
+  const uploadLogo = () => logoForm.getByLabel(/(?:Upload|Replace) shop logo/).setInputFiles({ name: 'shop-logo.png', mimeType: 'image/png', buffer: Buffer.from(logoData.split(',')[1], 'base64') })
+  await uploadLogo()
+  const logoPreview = logoForm.getByAltText('Shop logo preview')
+  await expect(logoPreview).toBeVisible()
+  assert.deepEqual(await logoPreview.evaluate((image) => [image.naturalWidth, image.naturalHeight]), [256, 128])
+  await logoForm.getByRole('button', { name: 'Cancel logo changes', exact: true }).click()
+  await expect(logoPreview).toHaveCount(0)
+  assert.equal(logoSaves.length, 0)
+  await uploadLogo()
+  const preparedLogo = await logoPreview.getAttribute('src')
+  await logoForm.getByRole('button', { name: 'Save logo', exact: true }).click()
+  await expect(logoForm.getByRole('alert')).toContainText('could not be saved')
+  await expect(logoPreview).toHaveAttribute('src', preparedLogo)
+  await logoForm.getByRole('button', { name: 'Save logo', exact: true }).click()
+  await expect(logoForm.getByRole('status')).toContainText('Shop logo saved')
+  await page.reload()
+  await expect(logoPreview).toHaveAttribute('src', preparedLogo)
+  for (const width of [320, 375]) {
+    await page.setViewportSize({ width, height: 1000 })
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Shop logo controls overflow at ${width}px`)
+  }
+  await logoForm.screenshot({ path: 'test-artifacts.local/shop-logo-settings.png' })
+  await logoForm.getByRole('button', { name: 'Remove logo', exact: true }).click()
+  await logoForm.getByRole('button', { name: 'Cancel logo changes', exact: true }).click()
+  await expect(logoPreview).toHaveAttribute('src', preparedLogo)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  console.log('PASS shop logo upload validation, resize, preview, cancel, save failure/retry, persisted reload and mobile layout')
   await page.goto(`${origin}/patients/${petId}`)
   await expect(page.getByRole('heading', { name: 'Mochi', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Add prescription', exact: true }).click()
@@ -127,6 +175,10 @@ try {
   await page.getByRole('button', { name: 'Print prescription / PDF' }).click()
   await page.waitForFunction(() => window.prescriptionPrinted)
   const printFrame = page.frameLocator('iframe[title="Prescription"]')
+  await expect(printFrame.locator('header h1 + .prc-license')).toHaveText('PRC License No.: 123456')
+  await expect(printFrame.locator('.signature-name .prc-license')).toHaveText('PRC License No.: 123456')
+  await expect(printFrame.getByAltText('Veterina Animal Clinic logo')).toHaveAttribute('src', preparedLogo)
+  assert.equal(await printFrame.locator('.shop-logo').evaluate((image) => image.complete && image.naturalWidth > 0), true)
   for (const text of ['Medicine A', 'Medicine B', 'Route: Oral', 'Route: Custom route', 'Dr. Alex Rivera', '123456', 'PTR-2026', 'Recorded diagnosis', '3.5 kg', '24 Garden Street', 'Veterina Animal Clinic']) await expect(printFrame.locator('body')).toContainText(text)
   const html = await printFrame.locator('html').evaluate((element) => element.outerHTML)
   const preview = await context.newPage()
@@ -153,6 +205,15 @@ try {
   assert.equal(png.subarray(1, 4).toString(), 'PNG')
   assert.ok(png.readUInt32BE(16) >= 1400 && png.readUInt32BE(20) >= 1900, 'Prescription photo is too small')
   assert.ok(png.length > 20000, 'Prescription photo appears blank')
+  assert.ok(await page.evaluate(async (encoded) => {
+    const image = new Image(); image.src = `data:image/png;base64,${encoded}`; await image.decode()
+    const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height
+    const paint = canvas.getContext('2d'); paint.drawImage(image, 0, 0)
+    const pixels = paint.getImageData(0, 0, canvas.width, canvas.height).data
+    let brandedPixels = 0
+    for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 190 && pixels[i + 1] < 70 && pixels[i + 2] > 90 && pixels[i + 2] < 170) brandedPixels++
+    return brandedPixels > 1000
+  }, png.toString('base64')), 'Downloaded prescription PNG omitted the shop logo')
   await expect(page.locator('iframe[title="Prescription image export"]')).toHaveCount(0)
   await expect(page.getByRole('alert')).toHaveCount(0)
   assert.equal(calls.length, beforeImage, 'Downloading an image must not write or dispense again')
@@ -243,6 +304,17 @@ try {
   await page.reload()
   await expect(page.getByRole('button', { name: 'Print prescription / PDF' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Edit prescription', exact: true })).toHaveCount(0)
+  await page.goto(`${origin}/settings`)
+  await logoForm.getByRole('button', { name: 'Remove logo', exact: true }).click()
+  await logoForm.getByRole('button', { name: 'Save logo', exact: true }).click()
+  await expect(logoForm.getByRole('status')).toContainText('Shop logo removed')
+  await page.reload()
+  await expect(logoForm.getByText('No logo uploaded', { exact: true })).toBeVisible()
+  profile.role = 'clinical_staff'
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Clinic settings', exact: true })).toBeVisible()
+  await expect(logoForm).toHaveCount(0)
+  console.log('PASS saved logo in prescription print/PDF and actual PNG pixels, persisted removal and staff upload controls hidden')
   assert.deepEqual(errors, [])
   console.log('PASS prescriptions: custom/inventory combo, search/name collisions, batches, quantities, snapshots, immutable dispensing, added rows, keyboard/mobile, retry, print/PDF, real PNG download/retry and finalized controls')
 } finally {

@@ -34,11 +34,11 @@ The connected development project is `yerrtkosxksacqxznrhk`. It already contains
 
 ## Account creation and first owner
 
-Create a login at `/create-account` and sign in at `/sign-in`. A login alone does not grant access: every clinic page requires an active `public.profiles` row with role `owner` or `clinical_staff`. Registration stores a display name and an application marker in user metadata; neither grants roles. Accounts awaiting approval see `/access-pending` with a retry and sign-out control.
+Create a login at `/create-account` and choose **Owner** or **Staff**, then sign in at `/sign-in`. Owners enter a clinic name; after email confirmation, the private Auth trigger creates a new, isolated clinic with its settings, services, Veterina Code and active owner profile. Owners cannot use signup to join or take over an existing clinic. Staff enter an existing clinic's Veterina Code and wait for that clinic's owner to approve access. Every clinic page requires an active `public.profiles` row with role `owner` or `clinical_staff`. Staff awaiting approval see `/access-pending` with a retry and sign-out control. Apply `20261031090803_owner_staff_signup.sql` before releasing this signup UI.
 
 Email/password signup is enabled on the connected project; email confirmation is currently disabled. These settings intentionally follow the approved signup-and-staff-approval workflow, overriding the draft PRD's invite-only proposal. If confirmation is enabled later, configure the localhost/deployed `/sign-in` redirect URLs (including the `next` query parameter) in Supabase Authentication → URL Configuration. Registration handles confirmation-required responses.
 
-The **first owner must be explicitly selected by a database administrator**. Register that account, verify its identity and email, then use the Supabase SQL Editor or MCP:
+New clinics get their first owner through the Owner registration flow. For the legacy clinic only, a database administrator can explicitly bootstrap its first owner after verifying the account's identity and email:
 
 ```sql
 select id, email, email_confirmed_at
@@ -56,7 +56,7 @@ The first registrant is never automatically promoted. Existing registered accoun
 
 After initial setup, the clinic owner can open **Settings → Staff accounts** to see pending staff registrations linked to their shop's Veterina Code. The list loads automatically and has Approve and Reject actions, with no authenticator step or role selection. The deployed `admin-staff` Edge Function and database both verify the active owner role and shop membership. Approval grants only Clinical staff access and requires a confirmed email. Approved accounts disappear from this list. The last active owner cannot be deactivated or demoted. Inactive users lose database access on their next request.
 
-Existing invitation callbacks open password setup. Accounts with an enrolled authenticator are challenged during sign-in. Existing `/login` links lead into the current account flow; old `/demo` links lead to sign-in.
+Existing invitation callbacks open password setup. Sign-in uses email and password without an authenticator challenge, including accounts with previously enrolled factors. Existing `/login` links lead into the current account flow; old `/demo` links lead to sign-in.
 
 ## Password recovery
 
@@ -70,10 +70,12 @@ Email delivery uses the project's existing SMTP configuration. Supabase's defaul
 
 ## Saved workflows
 
+- Shop logo: owners upload, preview, replace or remove a logo in Settings → Clinic profile → Shop logo, then choose **Save logo**. PNG, JPEG and WebP files up to 5 MB are resized with their proportions and transparency preserved. The clinic's saved logo appears on prescription print/PDF and PNG exports for owners and staff. Logos are embedded in clinic settings and exported documents, so no public image URL is required. Apply `20261031091223_clinic_prescription_logo.sql` before releasing this feature.
+
 - Owners: create, search (including normalized Philippine phone numbers), edit, deactivate, and owner-only deletion after linked pets are removed or reassigned.
 - Patients: register with a server-generated record number, search/filter species, edit identity/status/owner, and owner-only permanent deletion of clinical history. Empty microchips are null; supplied microchips must be unique 15-digit identifiers.
 - Registration and patient edits require Male or Female. Birth information can be an exact date or age in years/months; age is converted using the server's clinic date and marked estimated. Diet/feeding notes are retained in the profile and exports.
-- Checkups: atomic encounter/vitals/follow-up saves, actual time of care in the clinic timezone, editing before finalization, finalization, and owner corrections with retained snapshots. Clinician names are captured with the original record. Finalized notes and prescriptions cannot be overwritten.
+- Checkups: atomic encounter/vitals/follow-up saves, actual time of care in the clinic timezone, editing before finalization, finalization, and owner corrections with retained snapshots. After Start care, Visit details and Vitals & condition open read-only. Each section has an Edit button and a Done button to lock it again; reopening a record or draft restores the locks. Clinical observations and Diagnosis & follow-up stay editable. Clinician names are captured with the original record. Finalized notes and prescriptions cannot be overwritten.
 - Creating a checkup from a patient's page also adds that patient to the queue as Waiting and displays the ticket number. An existing active checkup ticket without a record or draft is reused. Queued care loads and updates the same saved checkup; completing it never creates a second encounter or follow-up reminder. Complete or cancel the ticket before finalizing the record. Existing historical records are not automatically queued.
 - Adding a vaccine from the patient page also creates a Waiting ticket, or reuses an active vaccination ticket without a record/draft. Completing queued vaccination updates the same record and keeps one live next-dose reminder. Both checkups and vaccines show their saved queue status (Waiting, In progress, Completed, or Cancelled) and ticket in patient history; unlinked historical records show Recorded. Vaccine next-dose status is displayed separately.
 - Vaccinations: create/edit/delete, optional next-due dates, one live next-dose reminder, and retained history for superseded reminders. Next-dose badges show Up to date, Due today, Overdue, or No next dose scheduled using the configured clinic date.
@@ -202,17 +204,17 @@ queued care uses the completion confirmation. Apply
 Staff registration requires the shop's Veterina Code. Owners can copy or rotate
 their code and download a registration QR from Settings → Clinic profile. QR
 links prefill the code; the signup page can scan a camera or an uploaded QR image.
-Registrations require email confirmation and owner approval in Settings → Staff
+Staff registrations require email confirmation and owner approval in Settings → Staff
 accounts, where owners can approve or reject pending requests without an
-authenticator challenge. New registrations can only become Clinical staff.
+authenticator challenge. Staff registrations can only become Clinical staff.
 Approved staff retain clinical, patient, queue, appointment and inventory work;
 owners manage staff, settings, exports and permanent deletion. Records and RPCs
 are isolated by clinic, and suspension takes effect without waiting for a JWT
 refresh. Existing owners and records remain together in the original shop.
 
-An administrator creates each new shop's first owner through Supabase Auth,
-without a public signup role, then calls the service-only provisioning function
-from a trusted backend or the SQL editor after verifying the account's email:
+New owners use Owner registration to create a separate clinic after email
+confirmation. Administrative provisioning also remains available through the
+service-only function from a trusted backend or SQL editor:
 
 ```sql
 select public.provision_vetshop(
@@ -227,8 +229,8 @@ Use an account without an existing clinic profile; each account belongs to one
 shop. No service key belongs in the browser. Apply the `clinic_tenancy_rbac`,
 `veterina_staff_onboarding`, `clinic_rbac_policy_indexes`, and
 `pending_staff_approval_without_mfa` migrations and deploy
-`admin-staff` before releasing the registration UI. Enable email signup and TOTP
-enrollment/verification in the Auth configuration. The design and rollout are in
+`admin-staff` before releasing the registration UI. Enable email signup and email
+confirmation in the Auth configuration. The design and rollout are in
 [docs/veterina-code-rbac-plan.md](docs/veterina-code-rbac-plan.md).
 
 Keep **Confirm email** enabled in Development's Auth email provider settings

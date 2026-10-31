@@ -8,7 +8,6 @@ import { QrCode } from '@phosphor-icons/react'
 import { authErrorMessage, safeReturnTo } from '../lib/authAccess'
 import AuthLayout from '../components/AuthLayout'
 import { AuthAccessError, AuthLoading } from '../components/AuthStatus'
-import SignInVerification from '../components/SignInVerification'
 import ConfirmationEmailActions from '../components/ConfirmationEmailActions'
 
 export default function Auth({ mode = 'sign-in' }) {
@@ -25,6 +24,8 @@ export default function Auth({ mode = 'sign-in' }) {
   const confirmationHeading = useRef(null)
   useEffect(() => { if (confirmation) confirmationHeading.current?.focus() }, [confirmation])
   const [showPassword, setShowPassword] = useState(false)
+  const [accountType, setAccountType] = useState('staff')
+  const [clinicName, setClinicName] = useState('')
   const [veterinaCode, setVeterinaCode] = useState(() => normalizeVeterinaCode(searchParams.get('code')) || searchParams.get('code') || '')
   const [clinicInfo, setClinicInfo] = useState(null)
   const [scan, setScan] = useState(false)
@@ -32,19 +33,19 @@ export default function Auth({ mode = 'sign-in' }) {
     let alive = true
     const code = normalizeVeterinaCode(veterinaCode)
     const timer = setTimeout(async () => {
-      if (!creating || !isSupabaseConfigured || !code) { if (alive) setClinicInfo(null); return }
+      if (!creating || accountType !== 'staff' || !isSupabaseConfigured || !code) { if (alive) setClinicInfo(null); return }
       try {
         const { data, error } = await supabase.rpc('veterina_code_info', { p_code: code })
         if (alive) setClinicInfo(error ? null : data)
       } catch { if (alive) setClinicInfo(null) }
     }, 300)
     return () => { alive = false; clearTimeout(timer) }
-  }, [creating, veterinaCode])
+  }, [creating, accountType, veterinaCode])
   const callbackFailed = searchParams.has('error') || new URLSearchParams(location.hash.slice(1)).has('error')
 
   if (access === 'loading') return <AuthLoading />
   if (access === 'error') return <AuthAccessError />
-  if (access === 'approved') return <SignInVerification returnTo={returnTo} />
+  if (access === 'approved') return <Navigate to={returnTo} replace />
   if (access === 'pending') return <Navigate to={`/access-pending${nextQuery}`} replace />
 
   const submit = async (event) => {
@@ -61,7 +62,7 @@ export default function Auth({ mode = 'sign-in' }) {
     setBusy(true)
     try {
       if (creating) {
-        const data = await signUp({ fullName, email, password, veterinaCode,
+        const data = await signUp({ fullName, email, password, veterinaCode, accountType, clinicName,
           emailRedirectTo: `${window.location.origin}/sign-in${nextQuery}` })
         if (!data.session) { setConfirmationEmail(email); setConfirmation(true) }
       } else {
@@ -77,7 +78,7 @@ export default function Auth({ mode = 'sign-in' }) {
 
   return (
     <AuthLayout title={creating ? 'Create your account' : 'Welcome back'} description={creating
-      ? 'Join your vetshop with its Veterina Code. Your shop owner approves access after registration.'
+      ? (accountType === 'owner' ? 'Create your own clinic workspace. Confirm your email to get started.' : 'Join your vetshop with its Veterina Code. Your shop owner approves access after registration.')
       : 'Sign in to your Veterina clinic workspace.'}>
       {confirmation ? (
         <div className="auth-confirmation" role="region" aria-label="Email confirmation">
@@ -90,7 +91,9 @@ export default function Auth({ mode = 'sign-in' }) {
         <form className="auth-form" onSubmit={submit} aria-busy={busy}>
           {(error || callbackFailed) && <p className="auth-message auth-error" role="alert">{error || 'This confirmation link is invalid or has expired. Please sign in or contact your clinic administrator.'}</p>}
           <fieldset disabled={busy || !isSupabaseConfigured}>
-            {creating && <div className="registration-code-field">
+            {creating && <div className="account-type-field"><label htmlFor="account-type">Create account as</label><select id="account-type" name="accountType" value={accountType} onChange={(event) => { setAccountType(event.target.value); setError(''); setScan(false) }} aria-describedby="account-type-help"><option value="owner">Owner</option><option value="staff">Staff</option></select><p className="account-type-help" id="account-type-help">{accountType === 'owner' ? 'Start a new clinic and share your Veterina Code with your staff.' : 'Join an existing clinic after your shop owner approves your account.'}</p></div>}
+            {creating && accountType === 'owner' && <label htmlFor="clinic-name">Clinic name<input id="clinic-name" name="clinicName" autoComplete="organization" required maxLength={160} value={clinicName} onChange={(event) => setClinicName(event.target.value)} placeholder="Your clinic name" /></label>}
+            {creating && accountType === 'staff' && <div className="registration-code-field">
               <label htmlFor="veterina-code">Veterina Code<input id="veterina-code" name="veterinaCode" required maxLength={60} value={veterinaCode} onChange={(event) => { setVeterinaCode(event.target.value); setClinicInfo(null) }} autoComplete="off" spellCheck={false} placeholder="VET-…" aria-describedby="clinic-code-help" /></label>
               <button type="button" className="button button-secondary" onClick={() => setScan(true)}><QrCode size={18} />Scan QR code</button>
               <small id="clinic-code-help">Get this code or QR from your shop owner.</small>

@@ -6,7 +6,7 @@ export async function invokeClinicFunction(name, body, includeResponse = false) 
   if (error) {
     let code = ''
     try { code = (await error.context?.json())?.error || '' } catch { /* Transport failures have no JSON response. */ }
-    const messages = { MFA_REQUIRED: 'Verify with your authenticator before managing staff.', FORBIDDEN: 'Only an active clinic owner can perform this action.', PROVIDER_NOT_CONFIGURED: 'Email invitations are not configured. Ask the person to register, then approve their account.', UNAUTHENTICATED: 'Your session has expired. Please sign in again.' }
+    const messages = { FORBIDDEN: 'Only an active clinic owner can perform this action.', PROVIDER_NOT_CONFIGURED: 'Email invitations are not configured. Ask the person to register, then approve their account.', UNAUTHENTICATED: 'Your session has expired. Please sign in again.' }
     throw new Error(messages[code] || code || error.message)
   }
   return includeResponse ? { data, response } : data

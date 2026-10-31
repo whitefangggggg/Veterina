@@ -29,7 +29,7 @@ assert.equal(sql('select count(*) from public.owners'), '0', 'Start with an empt
 const admin = createClient(env.TEST_SUPABASE_URL, env.TEST_SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 const checked = ({ data, error }) => { if (error) throw error; return data }
 await mkdir('test-artifacts.local', { recursive: true })
-for (const suite of ['security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'follow_up_arrivals', 'clinic_rbac', 'checkup_completion']) {
+for (const suite of ['security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'follow_up_arrivals', 'clinic_rbac', 'owner_staff_signup', 'clinic_logo', 'checkup_completion']) {
   const result = spawnSync('psql', [env.TEST_DATABASE_URL, '-X', '-v', 'ON_ERROR_STOP=1', '-f', `supabase/tests/${suite}.sql`], { encoding: 'utf8', windowsHide: true })
   await writeFile(`test-artifacts.local/${suite}.log`, (result.stdout || '') + (result.stderr || ''))
   if (result.error) throw result.error
@@ -118,6 +118,10 @@ try {
   await page.getByRole('button', { name: 'Start care', exact: true }).click()
   await page.getByRole('button', { name: 'Confirm', exact: true }).click()
   await page.getByRole('button', { name: 'Record checkup', exact: true }).click()
+  await expect(page.getByLabel('Chief complaint', { exact: false })).toBeDisabled()
+  await expect(page.getByLabel('Weight (kg)', { exact: false })).toBeDisabled()
+  await page.getByRole('button', { name: 'Edit Visit details', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit Vitals & condition', exact: true }).click()
   await page.getByLabel('Chief complaint', { exact: false }).fill('Synthetic follow-up check')
   await page.getByLabel('Clinical notes', { exact: true }).fill('Observed gait improving after rest.')
   await page.getByLabel('Weight (kg)', { exact: false }).fill('4.5')
@@ -128,6 +132,8 @@ try {
   await page.reload()
   await page.getByRole('button', { name: 'Resume checkup', exact: true }).click()
   await expect(page.getByLabel('Chief complaint', { exact: false })).toHaveValue('Synthetic follow-up check')
+  await expect(page.getByLabel('Chief complaint', { exact: false })).toBeDisabled()
+  await expect(page.getByLabel('Weight (kg)', { exact: false })).toBeDisabled()
   await expect(page.getByLabel('Clinical notes', { exact: true })).toHaveValue('Observed gait improving after rest.')
   // Lose one acknowledgement after the real RPC commits; retry must not duplicate care.
   let dropAcknowledgement = true

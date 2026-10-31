@@ -14,6 +14,9 @@
 .auth-form label { display: grid; gap: 7px; color: var(--ink); font-size: 13px; font-weight: 600; }
 .auth-form input:not([type="checkbox"]) { width: 100%; min-height: 46px; border: 1px solid #cbd6cf; border-radius: 10px; padding: 10px 12px; color: var(--ink); background: #fcfdfb; font-size: 16px; font-weight: 400; }
 .auth-form input::placeholder { color: #76827b; }
+.auth-form select { width: 100%; min-height: 46px; border: 1px solid #cbd6cf; border-radius: 10px; padding: 10px 12px; color: var(--ink); background: #fcfdfb; font-size: 16px; font-weight: 400; }
+.account-type-field { display: grid; gap: 7px; }
+.account-type-help { margin: 0; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; }
 .auth-form .auth-show-password { display: flex; align-items: center; gap: 9px; min-height: 32px; color: var(--muted); cursor: pointer; font-weight: 400; }
 .auth-show-password input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); }
 .auth-hint { margin: -12px 0 0; color: var(--muted); font-size: 12px; }
@@ -50,6 +53,10 @@ button:disabled, fieldset:disabled .button { opacity: .6; cursor: wait; transfor
 .form-section > header > span { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 10px; color: var(--brand); background: var(--brand-soft); font-size: 11px; font-weight: 750; }
 .form-section h3 { margin: 0; font-size: 15px; font-weight: 650; color: var(--ink); }
 .form-section header p { margin: 4px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.form-section > header > div { flex: 1; min-width: 0; }
+.section-edit-button { flex: none; margin-left: auto; }
+.section-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
+.section-fields:disabled input:not([type="hidden"]), .section-fields:disabled select, .section-fields:disabled textarea { opacity: 1; color: var(--ink); -webkit-text-fill-color: var(--ink); background: #f0f4f1; cursor: default; }
 .checkup-form .form-grid { gap: 18px 20px; }
 .checkup-form .field > span:first-child, .date-words-field > label { color: var(--ink); font-size: 12px; font-weight: 650; }
 .checkup-form .field input:not([type="hidden"]):not([type="checkbox"]), .checkup-form .field select, .checkup-form .field textarea { min-height: 46px; border: 1px solid #d8e2da; border-radius: 11px; background: #fff; padding: 12px 14px; font-size: 14px; transition: border-color .15s, box-shadow .15s; }
@@ -107,8 +114,13 @@ button:disabled, fieldset:disabled .button { opacity: .6; cursor: wait; transfor
 .prescription-items li { padding: 6px 0; overflow-wrap: anywhere; }
 .prescription-items p { white-space: pre-wrap; }
 .settings-panel { padding: 24px; }
-.mfa-setup { max-width: 440px; overflow-wrap: anywhere; }
-.mfa-setup img { display: block; margin: 20px 0; }
+.clinic-logo-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; }
+.clinic-logo-preview { display: grid; place-items: center; flex: 0 0 128px; width: 128px; height: 128px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.clinic-logo-preview img { width: 100%; height: 100%; object-fit: contain; }
+.clinic-logo-preview > div { display: grid; justify-items: center; gap: 8px; color: var(--muted); font-size: 11px; text-align: center; }
+.clinic-logo-controls { flex: 1 1 220px; min-width: 0; }
+.clinic-logo-controls input[type="file"] { width: 100%; max-width: 100%; font-size: 12px; }
+.clinic-logo-controls p { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .staff-admin > .record-directory { margin-top: 20px; }
 .reminder-list .record-actions { max-width: 250px; }
 .reminder-main details { margin-top: 12px; font-size: 12px; color: var(--muted); }

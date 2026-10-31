@@ -1,7 +1,8 @@
 # Veterina Codes and clinic access
 
-The public registration flow is for staff only. An administrator provisions each
-vetshop's first owner. Existing accounts and records stay in the existing shop.
+The public registration flow offers Owner and Staff. Owner signup creates a new
+vetshop after email confirmation; staff join an existing vetshop with its code.
+Existing accounts and records stay in the existing shop.
 The two application roles remain Owner and Clinical staff.
 
 ## Registration and approval
@@ -16,8 +17,11 @@ The two application roles remain Owner and Clinical staff.
   authenticator challenge. Only pending requests from the owner's shop appear.
   Role changes, suspension and rejection remain scoped to the owner's shop.
   Keep at least one active owner.
-- Existing public signup cannot create owners. Provisioning another shop is an
-  administrator-only operation, not a role supplied in signup metadata.
+- Owner signup requires a clinic name and confirmed email. The private Auth
+  trigger records the signup request in a private table and provisions a new
+  clinic after confirmation. Metadata edits cannot convert staff into owners,
+  change the captured request, or choose ownership of an existing clinic.
+- Sign-in uses email and password without an authenticator challenge.
 
 ## Isolation and RBAC
 

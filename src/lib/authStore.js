@@ -112,16 +112,25 @@ export function createAuthStore(client, { isPasswordRecoverySession = () => fals
       if (error) throw error
       return data
     },
-    async signUp({ fullName, email, password, emailRedirectTo, veterinaCode }) {
+    async signUp({ fullName, email, password, emailRedirectTo, veterinaCode, accountType = 'staff', clinicName }) {
       requireClient()
-      const code = normalizeVeterinaCode(veterinaCode)
-      if (!code) throw new Error('Enter the Veterina Code provided by your shop owner.')
-      const { data: clinic, error: codeError } = await client.rpc('veterina_code_info', { p_code: code })
-      if (codeError) throw new Error('We could not verify the Veterina Code. Please try again.')
-      if (!clinic?.valid) throw new Error('This Veterina Code is invalid or has changed. Ask your shop owner for the current code.')
+      if (!['owner', 'staff'].includes(accountType)) throw new Error('Choose Owner or Staff to create your account.')
+      const metadata = { full_name: fullName.trim(), application: 'veterina', account_type: accountType }
+      if (accountType === 'owner') {
+        const name = String(clinicName || '').trim()
+        if (!name || name.length > 160) throw new Error('Enter your clinic name (up to 160 characters).')
+        metadata.clinic_name = name
+      } else {
+        const code = normalizeVeterinaCode(veterinaCode)
+        if (!code) throw new Error('Enter the Veterina Code provided by your shop owner.')
+        const { data: clinic, error: codeError } = await client.rpc('veterina_code_info', { p_code: code })
+        if (codeError) throw new Error('We could not verify the Veterina Code. Please try again.')
+        if (!clinic?.valid) throw new Error('This Veterina Code is invalid or has changed. Ask your shop owner for the current code.')
+        metadata.veterina_code = code
+      }
       const { data, error } = await client.auth.signUp({
         email: email.trim(), password,
-        options: { data: { full_name: fullName.trim(), application: 'veterina', veterina_code: code }, emailRedirectTo },
+        options: { data: metadata, emailRedirectTo },
       })
       if (error) throw error
       return data

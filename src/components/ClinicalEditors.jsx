@@ -40,6 +40,12 @@ export function VisitEditor({ pet, record, queueEntry, onSaved, onClose }) {
   useEffect(() => { if (completion) completionCancel.current?.focus() }, [completion])
   const [completionVersion] = useState(() => queueEntry?.draftVersion ?? record?.careQueue?.draftVersion ?? 0)
   const careQueue = queueEntry || record?.careQueue
+  const careStarted = Boolean(careQueue?.startedAt || careQueue?.started_at || ['in_progress', 'completed'].includes(careQueue?.status))
+  const [editingSections, setEditingSections] = useState({ visit: false, vitals: false })
+  const sectionEditing = (name) => careStarted ? {
+    readOnly: !editingSections[name],
+    onToggleEdit: () => setEditingSections((current) => ({ ...current, [name]: !current[name] })),
+  } : {}
   const canComplete = !record || ['waiting', 'in_progress'].includes(careQueue?.status)
   const activeCheckup = queueEntries.find((entry) => entry.petId === pet.id && entry.category === 'checkup' && ['waiting', 'in_progress'].includes(entry.status))
   const initial = { type: queueEntry?.service || 'Wellness check', hydration: 'Normal', weightKg: pet.latestWeight, veterinarianId: activeCheckup?.veterinarianId || user.id, ...record,
@@ -75,13 +81,13 @@ export function VisitEditor({ pet, record, queueEntry, onSaved, onClose }) {
       return saved
     }}
     fields={[
-      { name: 'visit', title: 'Visit details', description: 'When the care took place, who is attending, and the reason for the visit.', fields: [
+      { name: 'visit', title: 'Visit details', description: 'When the care took place, who is attending, and the reason for the visit.', ...sectionEditing('visit'), fields: [
       { name: 'type', label: 'Visit type', type: 'select', options: [...new Set(['Wellness check', 'Sick visit', 'Follow-up', 'Emergency', 'Procedure', ...services.filter((service) => service.workflow === 'checkup').map((service) => service.name), initial.type])] },
       { name: 'veterinarianId', label: 'Attending veterinarian', type: 'select', required: true, options: staffOptions(profiles).filter((option) => !queueEntry || option.value === queueEntry.veterinarianId) },
       { name: 'encounteredAt', render: () => <DateWordsField name="encounteredAt" label={`Time of care (${timezone})`} initial={initial.encounteredAt} includeTime required /> },
       { name: 'complaint', label: 'Chief complaint', type: 'textarea', required: true, span: true },
       ] },
-      { name: 'vitals', title: 'Vitals & condition', description: 'Record measurements taken during this checkup.', fields: [
+      { name: 'vitals', title: 'Vitals & condition', description: 'Record measurements taken during this checkup.', ...sectionEditing('vitals'), fields: [
       { name: 'weightKg', label: 'Weight (kg)', type: 'number', min: '0.01', step: '0.01', required: true },
       { name: 'temperatureC', label: 'Temperature (°C)', type: 'number', min: '30', max: '45', step: '0.1' },
       { name: 'heartRate', label: 'Heart rate (bpm)', type: 'number', min: '1', step: '1' },

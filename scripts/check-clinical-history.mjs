@@ -46,6 +46,7 @@ let failServiceSave = true
 const app = await browserServer(5185)
 try {
   const context = await app.browser.newContext({ viewport: { width: 1440, height: 1100 }, serviceWorkers: 'block' })
+  context.setDefaultTimeout(15000)
   const session = { access_token: mockAccessToken(actor), refresh_token: 'browser-test', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user: { id: actor, aud: 'authenticated', role: 'authenticated', email: 'history@veterina-test.invalid', app_metadata: {}, user_metadata: {} } }
   await context.addInitScript(({ key, session }) => localStorage.setItem(key, JSON.stringify(session)), { key: `sb-${api.hostname.split('.')[0]}-auth-token`, session })
   await context.route(`${api.origin}/**`, async (route) => {
@@ -336,11 +337,14 @@ try {
   await preview.getByRole('button', { name: 'Edit checkup', exact: true }).click()
   await expect(preview).toHaveCount(1)
   await expect(preview).toHaveAttribute('aria-label', 'Edit checkup for Mochi')
+  await expect(preview.getByLabel('Chief complaint')).toBeDisabled()
+  await preview.getByRole('button', { name: 'Edit Visit details', exact: true }).click()
   await preview.getByLabel('Chief complaint').fill('Unsaved calendar edit')
   await preview.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(preview).toHaveAttribute('aria-label', 'Clinical history · 18 October 2026')
   await expect(preview).toContainText('Vomiting after meals')
   await preview.getByRole('button', { name: 'Edit checkup', exact: true }).click()
+  await preview.getByRole('button', { name: 'Edit Visit details', exact: true }).click()
   await preview.getByLabel('Chief complaint').fill('Updated from calendar preview')
   await saveCheckup(page)
   await expect(preview).toHaveAttribute('aria-label', 'Clinical history · 18 October 2026')

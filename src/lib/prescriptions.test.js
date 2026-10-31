@@ -7,6 +7,18 @@ const medications = [
 ]
 
 describe('prescriptions', () => {
+  it('embeds the saved shop logo and keeps the default symbol when no valid logo exists', () => {
+    const context = { prescription: { prescribed_at: '2026-10-17T04:00:00Z' }, pet: { name: 'Mochi' }, visit: {}, clinic: { clinic_name: 'Clinic & Co', logo_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==' } }
+    const html = prescriptionHtml(context)
+    expect(html).toContain('<img class="shop-logo"')
+    expect(html).toContain('alt="Clinic &amp; Co logo"')
+    expect(html).not.toContain('<div class="medical-symbol"')
+    for (const value of [null, 'https://example.org/logo.png', 'data:image/svg+xml,<svg onload="alert(1)">']) {
+      const fallback = prescriptionHtml({ ...context, clinic: { ...context.clinic, logo_data_url: value } })
+      expect(fallback).not.toContain('<img class="shop-logo"')
+      expect(fallback).toContain('<div class="medical-symbol"')
+    }
+  })
   it('names downloaded photos safely using the prescription date in the clinic timezone', () => {
     expect(prescriptionImageName({ prescription: { prescribed_at: '2026-10-17T17:00:00Z' }, pet: { name: 'Mochi / <Cat>' }, clinic: { timezone: 'Asia/Manila' } })).toBe('prescription-Mochi-Cat-2026-10-18.png')
   })

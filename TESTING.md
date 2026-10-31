@@ -26,9 +26,20 @@ and no duplicate signup. Unit tests cover the Auth resend arguments and failures
 `test:api` checks the hosted Auth confirmation setting without sending email;
 inbox delivery requires acceptance with a real staff registration.
 
+The clinic-access browser suite also checks Owner/Staff switching, retained form
+values, owner signup without a code, 320px layout, and sign-in with an existing
+verified authenticator factor without showing a challenge. `owner_staff_signup.sql`
+checks confirmation-gated provisioning, clinic isolation, default services/code,
+repeat confirmation, frozen signup intent, staff metadata forgery and approval
+with an ordinary password session. Fixtures are rolled back.
+
 Checkup browser checks cover the four form sections, dates shown in words,
 calendar keyboard dismissal, clinic date/time serialization, drafts and mobile
 layout. Dates are stored as clinic dates/timestamps, independently of display.
+Once care starts, Visit details and Vitals & condition open locked with separate
+Edit/Done buttons. Queue checks cover independent unlocking, keyboard access,
+required-field validation, retained locked values in drafts and completion,
+relocking on reopen and mobile layout. Calendar edits follow the same controls.
 
 `npm run test:checkup-completion` checks the completion confirmation, Cancel and
 value retention, required fields, completion errors/retries, a prescription locked
@@ -119,6 +130,13 @@ releasing the updated follow-up UI, followed by
 across competing tabs.
 
 ## Isolated database setup
+
+The prescription browser suite includes shop-logo format validation, resize and
+preview, cancel, save failure/retry, persisted reload/removal, mobile controls,
+and owner-only upload controls. It checks the logo in the print/PDF document and
+the actual downloaded PNG pixels. `clinic_logo.sql` verifies same-clinic staff
+read access, owner-only saves, isolation, invalid/oversized payload rejection,
+removal and suspended-owner denial in rolled-back transactions.
 
 Use Docker, the Supabase CLI, PostgreSQL `psql`, and installed Chrome. Keep this
 stack separate from the linked Development project. Tests refuse remote database
