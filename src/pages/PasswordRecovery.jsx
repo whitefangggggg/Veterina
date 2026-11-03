@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { useAuth } from '../context/AuthContext'
-import { authErrorMessage, safeReturnTo } from '../lib/authAccess'
+import { authErrorMessage, safeAuthReturnTo } from '../lib/authAccess'
 import { validateNewPassword } from '../lib/passwordRecovery'
 import { isSupabaseConfigured } from '../lib/supabaseClient'
 
@@ -11,7 +11,7 @@ export default function PasswordRecovery({ mode = 'request' }) {
   const { requestPasswordReset, verifyPasswordResetSession, updatePassword, recoveringPassword, signOut } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const returnTo = safeReturnTo(searchParams.get('next'))
+  const returnTo = safeAuthReturnTo(searchParams.get('next'))
   const nextQuery = `?next=${encodeURIComponent(returnTo)}`
   const [verifying, setVerifying] = useState(resetting)
   const [verifiedUser, setVerifiedUser] = useState(null)

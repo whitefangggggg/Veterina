@@ -26,7 +26,13 @@
     "test:inventory": "node scripts/check-inventory.mjs",
     "test:registration": "node scripts/check-registration.mjs",
     "test:clinic-access": "node scripts/check-clinic-access.mjs",
+    "test:google-auth": "node scripts/check-google-auth.mjs",
+    "test:google-provider": "node scripts/check-google-provider.mjs",
+    "test:owner-onboarding": "node scripts/check-owner-onboarding.mjs",
     "test:checkup-completion": "node scripts/check-checkup-completion.mjs",
+    "test:subscriptions": "node scripts/check-subscriptions.mjs",
+    "test:subscription-api": "node scripts/check-subscription-api.mjs",
+    "test:subscription-concurrency": "node scripts/check-subscription-concurrency.mjs",
     "test:api": "node scripts/check-supabase.mjs"
   },
   "dependencies": {

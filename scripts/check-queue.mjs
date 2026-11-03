@@ -1,3 +1,4 @@
+import { mockAccountAccess } from './helpers/mock-access.mjs'
 import { saveCheckup } from './helpers/checkup.mjs'
 // Browser acceptance uses intercepted API responses; real database behavior is
 // exercised independently by supabase/tests/queue_workflows.sql.
@@ -58,6 +59,7 @@ try {
     const request = route.request()
     const url = new URL(request.url())
     const reply = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
+    if (url.pathname === '/rest/v1/rpc/account_access') return reply(mockAccountAccess(raw.profiles[0]))
     if (url.pathname === '/auth/v1/user') return reply(session.user)
     if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
     if (url.pathname === '/rest/v1/rpc/portal_mutation') {

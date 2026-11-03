@@ -1,3 +1,4 @@
+import { mockAccountAccess } from './helpers/mock-access.mjs'
 import assert from 'node:assert/strict'
 import { expect } from '@playwright/test'
 import { browserServer, frontendEnvironment } from './helpers/browser.mjs'
@@ -24,6 +25,7 @@ try {
   await context.route(`${api.origin}/**`, (route) => {
     const url = new URL(route.request().url()), request = route.request()
     const reply = (value, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
+    if (url.pathname === '/rest/v1/rpc/account_access') return reply(mockAccountAccess(raw.profiles[0]))
     if (url.pathname === '/auth/v1/user') return reply(session.user)
     if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
     if (url.pathname === '/rest/v1/rpc/portal_mutation') {
@@ -49,14 +51,15 @@ try {
   const page = await context.newPage(); page.on('pageerror', (failure) => errors.push(failure.message))
   await page.goto(`${app.origin}/patients/${patient}`)
   await page.getByRole('button', { name: 'Record checkup', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Clinical observations', includeHidden: true })).toBeHidden()
+  await expect(page.getByRole('heading', { name: 'Diagnosis & follow-up', includeHidden: true })).toBeHidden()
   await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
   assert.equal(calls.length, 0, 'Invalid care was persisted')
   await page.getByLabel('Chief complaint').fill('Today’s checkup')
-  await page.getByLabel('Clinical notes').fill('Keep these notes after cancelling confirmation')
   await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveAccessibleName('Complete this checkup?')
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
-  await expect(page.getByLabel('Clinical notes')).toHaveValue('Keep these notes after cancelling confirmation')
+  await expect(page.getByLabel('Chief complaint')).toHaveValue('Today’s checkup')
   assert.equal(calls.length, 0, 'Cancel saved a checkup')
   await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
   await page.getByRole('button', { name: 'Add Prescription', exact: true }).click()
@@ -83,6 +86,10 @@ try {
   assert.equal(raw.prescriptions[0].visit_id, visitId)
   assert.equal(raw.queue_entries.length, 1)
   assert.equal(raw.queue_entries[0].status, 'completed')
+  await page.locator('.visit-card').filter({ hasText: 'Today’s checkup' }).getByRole('button', { name: 'Edit checkup', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Clinical observations', includeHidden: true })).toBeHidden()
+  await expect(page.getByRole('heading', { name: 'Diagnosis & follow-up', includeHidden: true })).toBeHidden()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await page.getByRole('button', { name: 'Record checkup', exact: true }).click()
   await page.getByLabel('Chief complaint').fill('Complete without prescription')
   await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
@@ -103,6 +110,10 @@ try {
   await expect(page.locator('.visit-card').filter({ hasText: 'Leave prescription unfinished' })).toContainText('In progress')
   assert.equal(raw.queue_entries.at(-1).status, 'in_progress')
   assert.equal(raw.prescriptions.length, 1)
+  await page.locator('.visit-card').filter({ hasText: 'Leave prescription unfinished' }).getByRole('button', { name: 'Edit checkup', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Clinical observations' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Diagnosis & follow-up' })).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   assert.deepEqual(errors, [])
   console.log('PASS checkup confirmation, cancel/value retention, required fields, completion retry, current-visit prescription, prescription retry, completion without prescription and mobile layout')
 } finally { await app.close() }

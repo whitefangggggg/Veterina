@@ -1,3 +1,4 @@
+import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Stateful intercepted API checks: UI contracts, never proof of database integrity.
 import { expect as baseExpect } from '@playwright/test'
 import assert from 'node:assert/strict'
@@ -44,6 +45,7 @@ try {
   await context.route(`${api.origin}/**`, async (route) => {
     const request = route.request(), url = new URL(request.url())
     const reply = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
+    if (url.pathname === '/rest/v1/rpc/account_access') return reply(mockAccountAccess(raw.profiles[0]))
     if (url.pathname === '/auth/v1/user') return reply(session.user)
     if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
     if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204 })

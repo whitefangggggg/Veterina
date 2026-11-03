@@ -6,6 +6,7 @@ insert into auth.users(id,email,email_confirmed_at) values
 insert into public.profiles(id,full_name,role,is_active) values(current_setting('rbac.owner_a')::uuid,'Shop A owner','owner',true);
 select set_config('rbac.clinic_a',(select clinic_id::text from public.profiles where id=current_setting('rbac.owner_a')::uuid),true);
 select set_config('rbac.clinic_b',public.provision_vetshop(current_setting('rbac.owner_b')::uuid,'Second isolated shop','Shop B owner')::text,true);
+insert into private.clinic_subscriptions(clinic_id,expires_at) values(current_setting('rbac.clinic_b')::uuid,now()+interval '30 days');
 select set_config('rbac.code_a',(select code from private.clinic_codes where clinic_id=current_setting('rbac.clinic_a')::uuid),true);
 select set_config('rbac.code_b',(select code from private.clinic_codes where clinic_id=current_setting('rbac.clinic_b')::uuid),true);
 create function pg_temp.reject_rbac(query text,pattern text) returns void language plpgsql as $$

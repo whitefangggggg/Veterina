@@ -1,3 +1,4 @@
+import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Browser contracts use intercepted APIs; portal_workflows.sql verifies storage.
 import assert from 'node:assert/strict'
 import { expect } from '@playwright/test'
@@ -19,6 +20,7 @@ try {
   await context.route(`${api.origin}/**`, async (route) => {
     const url = new URL(route.request().url())
     const reply = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
+    if (url.pathname === '/rest/v1/rpc/account_access') return reply(mockAccountAccess(raw.profiles[0]))
     if (url.pathname === '/auth/v1/user') return reply(session.user)
     if (url.pathname === '/rest/v1/rpc/portal_mutation') {
       const { p_action: action, p_data: payload, p_key: key } = route.request().postDataJSON()

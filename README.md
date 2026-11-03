@@ -1,5 +1,59 @@
 # Veterina
 
+Website administrators use `/admin/sign-in` and `/admin` to manage clinic
+subscriptions and activation codes. `moronaldrin3@gmail.com` is the initial
+administrator, bound to its verified Auth UUID through trusted migration setup.
+Clinic owners do not automatically have platform-administrator permissions.
+Payments are recorded outside Veterina; administrators can add subscription
+time with an optional reference note and review each clinic's history.
+
+Subscription activation codes (`VET-ACCESS-...`) are reusable across clinics,
+once per clinic. Administrators choose separate availability-window and
+subscription-term durations (30/90/365 days or custom). Unused codes have no
+deadline; the first successful redemption starts the availability window.
+Every clinic receives its complete independent term. Revoking a code prevents
+future redemption and preserves existing subscriptions. Only the hash and
+suffix are stored; copy the complete code when it is generated.
+
+Owners activate a new clinic after verifying their account, then enter clinic
+personalization. Owners renew at `/subscription` with a different valid code.
+Renewals and administrator extensions add time from the later of the existing
+expiry and database time. The workspace shows a server-synchronized countdown.
+Expired clinics retain their records, but database policies, Storage policies
+and verified-auth Edge Functions deny clinic access until renewal. Staff see a
+notice directing them to their owner. The staff-joining **Veterina Code** remains
+separate from subscription activation codes.
+
+Deploy `20261103150007_platform_subscriptions.sql`, `platform-admin`,
+`clinic-activation`, and the updated shared-auth consumers (`admin-staff`,
+`export-report`, `assistant-query`, `embed-worker`, `pet-photo`, and
+`google-registration`) together with this frontend. The migration gives every
+existing clinic a 30-day transition subscription while retaining disabled
+clinic and inactive-account restrictions. New Supabase Storage uploads to the
+clinic-file and knowledge-base buckets must use `<clinic UUID>/<path>`;
+unprefixed legacy files remain accessible exclusively to the original clinic.
+
+Google provider checks now pass against Development: the provider is enabled
+and hosted authorization redirects to Google. A real interactive Google login,
+callback to Veterina, correct account/admin/subscription restoration and
+persistent session after reload are still required for final OAuth acceptance.
+The interactive check was deferred by the user.
+
+Google authentication is available on **Sign in** and **Create account** through
+**Continue with Google**. Existing approved accounts return to the requested
+workspace. New Google accounts finish Owner/Staff setup after authentication:
+owners redeem a subscription activation code to create a separate clinic, while staff enter a current Veterina Code and
+wait for owner approval. Google signup does not require a Veterina password.
+
+Apply `20261103131556_google_account_registration.sql` and deploy the
+`google-registration` Edge Function before using Google signup. Enable Google
+under Supabase Authentication → Sign In / Providers using the web client ID and
+secret. In Google Cloud, allow the Supabase callback
+`https://<project-ref>.supabase.co/auth/v1/callback`. In Supabase URL Configuration,
+allow the app's `/sign-in` callback on each deployed origin and the development
+origins (`http://localhost:5173/**` and `http://127.0.0.1:5173/**` when using the
+default Vite port). Keep the Google client secret in Supabase's provider settings.
+
 For complete regression checks and isolated database setup, see [TESTING.md](TESTING.md).
 Run `npm run test:all` for an aggregate report, including real local persistence checks.
 
@@ -34,7 +88,16 @@ The connected development project is `yerrtkosxksacqxznrhk`. It already contains
 
 ## Account creation and first owner
 
-Create a login at `/create-account` and choose **Owner** or **Staff**, then sign in at `/sign-in`. Owners enter a clinic name; after email confirmation, the private Auth trigger creates a new, isolated clinic with its settings, services, Veterina Code and active owner profile. Owners cannot use signup to join or take over an existing clinic. Staff enter an existing clinic's Veterina Code and wait for that clinic's owner to approve access. Every clinic page requires an active `public.profiles` row with role `owner` or `clinical_staff`. Staff awaiting approval see `/access-pending` with a retry and sign-out control. Apply `20261031090803_owner_staff_signup.sql` before releasing this signup UI.
+New clinic owners complete a four-step clinic setup after signing in with email
+or Google: clinic contact details, image/logo and brand color, timezone/reminder
+preferences and optional opening hours, then review. Progress is saved between
+steps and can be resumed after reloading. The saved name, tagline, image and
+color personalize the workspace; the image also appears on prescriptions.
+Owners can reopen setup from **Settings → Personalize clinic**. Existing clinics
+retain access without being forced through setup. Apply
+`20261103143412_owner_clinic_onboarding.sql` before using this feature.
+
+Create a login at `/create-account` and choose **Owner** or **Staff**, then sign in at `/sign-in`. Owners enter a clinic name and verify their email, then redeem a valid subscription activation code. Activation atomically creates an isolated clinic, subscription, default services, staff Veterina Code and active owner profile. Email confirmation alone does not provision a clinic. Owners cannot use signup to join or take over an existing clinic. Staff enter an existing clinic's Veterina Code and wait for that clinic's owner to approve access. Every clinic page requires an active `public.profiles` row with role `owner` or `clinical_staff`. Staff awaiting approval see `/access-pending` with a retry and sign-out control. Apply `20261031090803_owner_staff_signup.sql` before releasing this signup UI.
 
 Email/password signup is enabled on the connected project; email confirmation is currently disabled. These settings intentionally follow the approved signup-and-staff-approval workflow, overriding the draft PRD's invite-only proposal. If confirmation is enabled later, configure the localhost/deployed `/sign-in` redirect URLs (including the `next` query parameter) in Supabase Authentication → URL Configuration. Registration handles confirmation-required responses.
 
@@ -75,7 +138,7 @@ Email delivery uses the project's existing SMTP configuration. Supabase's defaul
 - Owners: create, search (including normalized Philippine phone numbers), edit, deactivate, and owner-only deletion after linked pets are removed or reassigned.
 - Patients: register with a server-generated record number, search/filter species, edit identity/status/owner, and owner-only permanent deletion of clinical history. Empty microchips are null; supplied microchips must be unique 15-digit identifiers.
 - Registration and patient edits require Male or Female. Birth information can be an exact date or age in years/months; age is converted using the server's clinic date and marked estimated. Diet/feeding notes are retained in the profile and exports.
-- Checkups: atomic encounter/vitals/follow-up saves, actual time of care in the clinic timezone, editing before finalization, finalization, and owner corrections with retained snapshots. After Start care, Visit details and Vitals & condition open read-only. Each section has an Edit button and a Done button to lock it again; reopening a record or draft restores the locks. Clinical observations and Diagnosis & follow-up stay editable. Clinician names are captured with the original record. Finalized notes and prescriptions cannot be overwritten.
+- Checkups: atomic encounter/vitals/follow-up saves, actual time of care in the clinic timezone, editing before finalization, finalization, and owner corrections with retained snapshots. After Start care, Visit details and Vitals & condition open read-only. Each section has an Edit button and a Done button to lock it again; reopening a record or draft restores the locks. Clinical observations and Diagnosis & follow-up are visible and editable only while the checkup is In progress; saved values are preserved when hidden. Clinician names are captured with the original record. Finalized notes and prescriptions cannot be overwritten.
 - Creating a checkup from a patient's page also adds that patient to the queue as Waiting and displays the ticket number. An existing active checkup ticket without a record or draft is reused. Queued care loads and updates the same saved checkup; completing it never creates a second encounter or follow-up reminder. Complete or cancel the ticket before finalizing the record. Existing historical records are not automatically queued.
 - Adding a vaccine from the patient page also creates a Waiting ticket, or reuses an active vaccination ticket without a record/draft. Completing queued vaccination updates the same record and keeps one live next-dose reminder. Both checkups and vaccines show their saved queue status (Waiting, In progress, Completed, or Cancelled) and ticket in patient history; unlinked historical records show Recorded. Vaccine next-dose status is displayed separately.
 - Vaccinations: create/edit/delete, optional next-due dates, one live next-dose reminder, and retained history for superseded reminders. Next-dose badges show Up to date, Due today, Overdue, or No next dose scheduled using the configured clinic date.

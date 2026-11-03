@@ -55,7 +55,7 @@ Deno.serve(async(req:Request)=>{
   }catch(error){
     if(release)await release().catch(()=>{});
     const message=error instanceof Error?error.message:String((error as {message?:string})?.message||'');
-    const code=['UNAUTHENTICATED','FORBIDDEN','NOT_FOUND','PHOTO_TOO_LARGE','PHOTO_INVALID_FORMAT','PHOTO_CONFLICT','PHOTO_BUSY','PROVIDER_NOT_CONFIGURED','PHOTO_PROVIDER_FAILED'].find((value)=>message.includes(value))||'VALIDATION_FAILED';
-    return new Response(JSON.stringify({error:code}),{status:code==='UNAUTHENTICATED'?401:code==='FORBIDDEN'?403:code==='NOT_FOUND'?404:code==='PHOTO_TOO_LARGE'?413:code==='PHOTO_CONFLICT'||code==='PHOTO_BUSY'?409:code==='PROVIDER_NOT_CONFIGURED'?503:400,headers:responseHeaders});
+    const code=['UNAUTHENTICATED','FORBIDDEN','SUBSCRIPTION_EXPIRED','NOT_FOUND','PHOTO_TOO_LARGE','PHOTO_INVALID_FORMAT','PHOTO_CONFLICT','PHOTO_BUSY','PROVIDER_NOT_CONFIGURED','PHOTO_PROVIDER_FAILED'].find((value)=>message.includes(value))||'VALIDATION_FAILED';
+    return new Response(JSON.stringify({error:code}),{status:code==='UNAUTHENTICATED'?401:code==='FORBIDDEN'||code==='SUBSCRIPTION_EXPIRED'?403:code==='NOT_FOUND'?404:code==='PHOTO_TOO_LARGE'?413:code==='PHOTO_CONFLICT'||code==='PHOTO_BUSY'?409:code==='PROVIDER_NOT_CONFIGURED'?503:400,headers:responseHeaders});
   }
 });

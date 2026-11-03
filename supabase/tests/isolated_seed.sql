@@ -16,5 +16,8 @@ do $$ declare clinic uuid; begin
     insert into public.service_types(clinic_id,name,default_duration_minutes,workflow) values
       (clinic,'Wellness check',30,'checkup'),(clinic,'Vaccination',20,'vaccination'),(clinic,'Surgery',60,'checkup'),(clinic,'Grooming',60,'maintenance') on conflict(clinic_id,name) do nothing;
   end if;
+  if to_regclass('private.clinic_subscriptions') is not null then
+    insert into private.clinic_subscriptions(clinic_id,expires_at) values(clinic,now()+interval '30 days') on conflict(clinic_id) do update set expires_at=excluded.expires_at;
+  end if;
 end $$;
 notify pgrst, 'reload schema';

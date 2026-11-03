@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ClipboardText, ClockCountdown, FileText, PawPrint, ShieldCheck, Syringe } from '@phosphor-icons/react'
 import { PageHeader, SectionCard } from '../components/ui'
 import { AsyncForm } from '../components/RecordForm'
@@ -78,7 +79,7 @@ export function Settings() {
   const ownProfile = profiles.find((entry) => entry.id === user.id)
   if (profile.role !== 'owner') return <div className="page"><PageHeader title="Clinic settings" description="Clinic settings and staff administration are managed by the clinic owner." /><SectionCard title={settings?.clinic_name}><div className="directory-card"><p>{settings?.address}</p><p>{settings?.phone}</p><p>{settings?.email}</p><p>Clinic timezone: {settings?.timezone}</p></div></SectionCard></div>
   return <div className="page">
-    <PageHeader eyebrow="Owner access" title="Clinic settings" description="Persisted clinic identity, professional details, privacy settings and staff access." />
+    <PageHeader eyebrow="Owner access" title="Clinic settings" description="Persisted clinic identity, professional details, privacy settings and staff access." actions={<Link className="button button-secondary" to="/clinic-setup?next=%2Fsettings">Personalize clinic</Link>} />
     <div className="tabs"><button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'staff' ? 'active' : ''} onClick={() => setTab('staff')}>Staff accounts</button><button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Services</button></div>
     {tab === 'services' ? <ServiceSettings /> : tab === 'staff' ? <SectionCard className="settings-panel"><StaffAdmin /></SectionCard> : <><ClinicJoinCode /><ClinicLogoSettings /><SectionCard title="Clinic profile">
       <div className="settings-panel">
@@ -89,6 +90,9 @@ export function Settings() {
           <label className="field"><span>Clinic phone</span><input name="phone" type="tel" defaultValue={settings?.phone || ''} /></label>
           <label className="field"><span>Clinic email</span><input name="email" type="email" defaultValue={settings?.email || ''} /></label>
           <label className="field"><span>Clinic address</span><input name="address" defaultValue={settings?.address || ''} /></label>
+          {settings?.tagline && <div className="field"><span>Clinic tagline</span><p>{settings.tagline}</p></div>}
+          {settings?.website && <div className="field"><span>Clinic website</span><p>{settings.website}</p></div>}
+          {settings?.business_hours && Object.keys(settings.business_hours).length > 0 && <div className="field field-span"><span>Clinic opening hours</span>{Object.entries(settings.business_hours).map(([day, hours]) => <small key={day}>{day.toUpperCase()}: {hours.closed ? 'Closed' : `${hours.open} – ${hours.close}`}</small>)}</div>}
           <label className="field"><span>Clinic timezone *</span><input name="timezone" defaultValue={settings?.timezone || 'Asia/Manila'} required placeholder="Asia/Manila" /></label>
           <label className="field"><span>Retention (years) *</span><input name="retentionYears" type="number" min="1" max="50" required defaultValue={settings?.record_retention_years || 10} /></label>
           <label className="field"><span>Reminder lead days *</span><input name="reminderLeadDays" type="number" min="0" max="365" required defaultValue={settings?.reminder_lead_days ?? 3} /></label>

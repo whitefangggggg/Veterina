@@ -59,7 +59,7 @@ export function RecordEditor({ title, description, fields, initial = {}, onSave,
   const content = <>
     <AsyncForm className={className} onSave={onSave} onSaveDraft={onSaveDraft} onClose={onClose} submitLabel={submitLabel} submitActions={submitActions}>
       <div className={grouped ? 'form-sections' : 'form-grid'}>
-        {fields.map((field, index) => field.fields ? <section className="form-section" key={field.name} aria-labelledby={`${sectionId}-${field.name}`}>
+        {fields.map((field, index) => field.fields ? <section className="form-section" key={field.name} hidden={field.hidden} aria-labelledby={`${sectionId}-${field.name}`}>
           <header><span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span><div><h3 id={`${sectionId}-${field.name}`}>{field.title}</h3>{field.description && <p>{field.description}</p>}</div>{field.onToggleEdit && <button type="button" className="button button-secondary small-button section-edit-button" onClick={field.onToggleEdit} aria-label={`${field.readOnly ? 'Edit' : 'Done editing'} ${field.title}`} aria-controls={`${sectionId}-${field.name}-fields`} aria-pressed={!field.readOnly}>{field.readOnly ? 'Edit' : 'Done'}</button>}</header>
           {field.onToggleEdit ? <fieldset id={`${sectionId}-${field.name}-fields`} className="form-grid section-fields" disabled={field.readOnly} data-readonly-section={field.title} aria-label={field.title}>{field.fields.map(renderField)}</fieldset> : <div className="form-grid">{field.fields.map(renderField)}</div>}
         </section> : renderField(field))}

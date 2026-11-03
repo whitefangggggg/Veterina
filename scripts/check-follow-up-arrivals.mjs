@@ -57,7 +57,7 @@ try {
 } finally {
   await Promise.allSettled(pending)
   if (setup) {
-    sql("do $$ declare targets text; begin select string_agg(format('%I.%I',schemaname,tablename),', ') into targets from pg_tables where schemaname in ('public','private') and tablename not in ('clinic_settings','service_types','pet_photo_config','rag_schedule_config','clinics','legacy_clinic','clinic_codes'); execute 'truncate '||targets||' restart identity cascade'; end $$;")
+    sql("do $$ declare targets text; begin select string_agg(format('%I.%I',schemaname,tablename),', ') into targets from pg_tables where schemaname in ('public','private') and tablename not in ('clinic_settings','service_types','pet_photo_config','rag_schedule_config','clinics','legacy_clinic','clinic_codes','clinic_subscriptions'); execute 'truncate '||targets||' restart identity cascade'; end $$;")
     sql(`delete from auth.users where id='${actor}';`)
     assert.equal(sql('select count(*) from public.visits'), '0')
     console.log('PASS synthetic follow-up concurrency fixtures removed')

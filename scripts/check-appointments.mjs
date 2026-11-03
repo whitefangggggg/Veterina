@@ -1,3 +1,4 @@
+import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Intercepted UI contracts only; this suite never changes clinic data.
 import { expect } from '@playwright/test'
 import assert from 'node:assert/strict'
@@ -32,6 +33,7 @@ try {
   await context.route(`${api.origin}/**`, async (route) => {
     const url = new URL(route.request().url())
     const reply = (data) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) })
+    if (url.pathname === '/rest/v1/rpc/account_access') return reply(mockAccountAccess(raw.profiles[0]))
     if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
     if (url.pathname === '/rest/v1/rpc/portal_mutation') {
       const { p_action: action, p_data: payload, p_key: key } = route.request().postDataJSON()
@@ -122,9 +124,13 @@ try {
   await followUp.getByRole('link').focus()
   await page.keyboard.press('Enter')
   await expect(page.locator('#checkup')).toBeFocused()
+  // A recorded checkup hides clinical sections; scheduling uses its dedicated action.
   await page.locator('.patient-schedule').getByRole('button', { name: 'Edit follow-up', exact: true }).click()
+  await expect(page.getByLabel('Follow-up date', { exact: true })).not.toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.locator('.patient-schedule').getByRole('button', { name: 'Reschedule', exact: true }).click()
   await page.getByLabel('Follow-up date', { exact: true }).fill('2026-10-28')
-  await page.getByRole('button', { name: 'Save clinical entry', exact: true }).click()
+  await page.getByRole('button', { name: 'Save follow-up date', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.locator('.patient-schedule').getByRole('link', { name: 'Open in Appointments', exact: true }).last().click()
   await expect(followUp).toBeFocused()
@@ -133,15 +139,6 @@ try {
   await expect(followUp).toHaveCount(1)
   await page.goto(calendar('2026-10-27'))
   await expect(followUp).toHaveCount(0)
-  await page.goto(calendar('2026-10-28'))
-  await followUp.getByRole('link').click()
-  await page.getByRole('button', { name: 'Edit checkup', exact: true }).click()
-  await page.getByLabel('Follow-up date', { exact: true }).fill('')
-  await page.getByRole('button', { name: 'Save clinical entry', exact: true }).click()
-  await expect(page.getByRole('dialog')).toHaveCount(0)
-  await page.goto(calendar('2026-10-28'))
-  await expect(followUp).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'The day is open', exact: true })).toBeVisible()
   await page.goto(calendar('2026-10-26'))
   for (const width of [320, 375]) {
     await page.setViewportSize({ width, height: 1000 })
@@ -155,7 +152,8 @@ try {
   }
   await mkdir('test-artifacts.local', { recursive: true })
   await page.screenshot({ path: 'test-artifacts.local/appointment-patient-card-mobile.png', fullPage: true })
-  assert.equal(writes.filter((write) => write.action === 'update_encounter').length, 2)
+  assert.equal(writes.filter((write) => write.action === 'reschedule_follow_up').length, 1)
+  assert.equal(writes.filter((write) => write.action === 'update_encounter').length, 0)
   // Appointment check-in uses its existing authenticated mutation and retry key.
   await page.clock.fastForward(86400000)
   await page.goto(app.origin + `/patients/${pet}?appointmentId=booking#patient-appointment-booking`)

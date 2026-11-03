@@ -1,4 +1,4 @@
-const clinicPath = /^\/(dashboard|queue|patients|appointments|reminders|inventory|suppliers|reports|settings|knowledge)(\/|$)/
+const clinicPath = /^\/(dashboard|queue|patients|appointments|reminders|inventory|suppliers|reports|settings|knowledge|clinic-setup|subscription)(\/|$)/
 
 // Only return to known clinic routes. Reject protocol-relative and encoded URLs.
 export function safeReturnTo(value) {
@@ -13,11 +13,22 @@ export function safeReturnTo(value) {
   }
 }
 
-export function getAccessState({ loading, error, user, profile }) {
+export function safeAuthReturnTo(value) {
+  if (value === '/admin') return '/admin'
+  return safeReturnTo(value)
+}
+
+export function getAccessState({ loading, error, user, profile, needsRegistration, accountAccess }) {
   if (loading) return 'loading'
   if (error) return 'error'
   if (!user) return 'signed-out'
-  if (profile?.id === user.id && profile.is_active === true && ['owner', 'clinical_staff'].includes(profile.role)) return 'approved'
+  if (profile?.id === user.id && profile.is_active === true && ['owner', 'clinical_staff'].includes(profile.role)) {
+    if (accountAccess?.subscription?.status === 'expired') return 'expired'
+    if (accountAccess?.subscription?.status === 'disabled') return 'pending'
+    return 'approved'
+  }
+  if (accountAccess?.isPlatformAdmin) return 'platform-admin'
+  if (needsRegistration) return 'onboarding'
   return 'pending'
 }
 

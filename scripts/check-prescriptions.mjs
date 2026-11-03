@@ -1,3 +1,4 @@
+import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Browser UI checks use intercepted API responses; portal_workflows.sql covers
 // persistence, validation, atomicity and finalized-record guards on Postgres.
 import { chromium, expect } from '@playwright/test'
@@ -60,6 +61,7 @@ try {
   await context.route(`${api.origin}/**`, async (route) => {
     const request = route.request(), url = new URL(request.url())
     const reply = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
+    if (url.pathname === '/rest/v1/rpc/account_access') return reply(mockAccountAccess(raw.profiles[0]))
     if (url.pathname === '/auth/v1/user') return reply(session.user)
     if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
     if (url.pathname === '/rest/v1/rpc/owner_veterina_code') return reply({ code: 'VET-0123456789ABCDEF0123' })

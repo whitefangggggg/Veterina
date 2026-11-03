@@ -6,6 +6,10 @@ select set_config('logo.owner_a',gen_random_uuid()::text,true),
 insert into auth.users(id,email,email_confirmed_at,raw_user_meta_data) values
   (current_setting('logo.owner_a')::uuid,'logo-a-'||gen_random_uuid()||'@veterina-test.invalid',now(),'{"application":"veterina","account_type":"owner","full_name":"Logo owner A","clinic_name":"Logo test shop A"}'),
   (current_setting('logo.owner_b')::uuid,'logo-b-'||gen_random_uuid()||'@veterina-test.invalid',now(),'{"application":"veterina","account_type":"owner","full_name":"Logo owner B","clinic_name":"Logo test shop B"}');
+-- Trusted fixtures; code activation is exercised in platform_subscriptions.sql.
+select public.provision_vetshop(r.id,r.clinic_name,r.full_name) from private.owner_registrations r where r.id=current_setting('logo.owner_a')::uuid;
+select public.provision_vetshop(r.id,r.clinic_name,r.full_name) from private.owner_registrations r where r.id=current_setting('logo.owner_b')::uuid;
+insert into private.clinic_subscriptions(clinic_id,expires_at) select clinic_id,now()+interval '30 days' from public.profiles where id in (current_setting('logo.owner_a')::uuid,current_setting('logo.owner_b')::uuid);
 select set_config('logo.clinic_a',(select clinic_id::text from public.profiles where id=current_setting('logo.owner_a')::uuid),true),
   set_config('logo.clinic_b',(select clinic_id::text from public.profiles where id=current_setting('logo.owner_b')::uuid),true);
 insert into auth.users(id,email,email_confirmed_at) values(current_setting('logo.staff')::uuid,'logo-staff-'||gen_random_uuid()||'@veterina-test.invalid',now());

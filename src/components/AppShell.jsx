@@ -21,6 +21,10 @@ import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { authErrorMessage } from '../lib/authAccess'
 import PetSticker from './PetSticker'
+import { isClinicLogoDataUrl } from '../lib/clinicLogo'
+import { clinicThemeStyle } from '../lib/clinicPersonalization'
+import SubscriptionTimer from './SubscriptionTimer'
+import '../pages/PlatformAdmin.css'
 
 const workspaces = [
   { to: '/queue', label: 'In-site queue', detail: 'Arrivals and care in progress', icon: FirstAidKit, color: 'amber' },
@@ -35,10 +39,12 @@ const workspaces = [
 ]
 
 function Brand() {
+  const { settings } = useClinicData()
+  const personalized = Boolean(settings?.onboarding_completed_at && settings?.brand_color)
   return (
     <Link to="/dashboard" className="header-brand" aria-label="Veterina home">
-      <span><Stethoscope size={23} weight="duotone" /></span>
-      <div><strong>Veterina</strong><small>Clinic care system</small></div>
+      <span>{personalized && isClinicLogoDataUrl(settings?.logo_data_url) ? <img src={settings.logo_data_url} alt="Clinic logo" /> : <Stethoscope size={23} weight="duotone" />}</span>
+      <div><strong>{personalized ? settings.clinic_name : 'Veterina'}</strong><small>{personalized ? settings.tagline || 'Powered by Veterina' : 'Clinic care system'}</small></div>
     </Link>
   )
 }
@@ -127,8 +133,8 @@ function GlobalSearch({ onClose }) {
 export default function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
-  const { reminders, reload, refreshing } = useClinicData()
-  const { profile, user, signOut } = useAuth()
+  const { reminders, reload, refreshing, settings } = useClinicData()
+  const { profile, user, signOut, accountAccess } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
   const name = profile.full_name || user.email
@@ -163,7 +169,7 @@ export default function AppShell() {
   }, [overlayOpen])
 
   return (
-    <div className="app-shell spacious-shell">
+    <div className="app-shell spacious-shell" style={clinicThemeStyle(settings?.brand_color)}>
       <header className="workspace-header">
         <div className="workspace-header-inner">
           <Brand />
@@ -174,6 +180,7 @@ export default function AppShell() {
             <MagnifyingGlass size={18} /><span>Search clinic records</span><kbd>Ctrl K</kbd>
           </button>
           <div className="header-actions">
+            {accountAccess?.isPlatformAdmin && <Link className="text-link" to="/admin">Platform admin</Link>}
             <button className="icon-button header-refresh" onClick={reload} disabled={refreshing} aria-label="Refresh clinic records" title="Refresh clinic records"><ArrowsClockwise size={20} /></button>
             <Link to="/reminders" className="notification-button icon-button" aria-label={`${dueCount} reminders due`}>
               <BellRinging size={21} weight="duotone" />
@@ -185,6 +192,7 @@ export default function AppShell() {
         </div>
       </header>
       {signOutError && <p className="workspace-auth-error" role="alert">{signOutError}</p>}
+      <SubscriptionTimer />
       <main className="main-content spacious-content"><Outlet /></main>
       {workspacesOpen && <WorkspaceSwitcher onClose={() => setWorkspacesOpen(false)} />}
       {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} />}

@@ -1,3 +1,4 @@
+import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Browser behavior is intercepted; clinic isolation/approval is tested in Postgres.
 import assert from 'node:assert/strict'
 import QRCode from 'qrcode'
@@ -155,6 +156,7 @@ try {
   await ownerContext.route(`${api.origin}/**`, (route) => {
     const request = route.request(), url = new URL(request.url())
     const reply = (value) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(value) })
+    if (url.pathname === '/rest/v1/rpc/account_access') return reply(mockAccountAccess(raw.profiles[0]))
     if (url.pathname === '/auth/v1/user') return reply(session.user)
     if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
     if (url.pathname === '/rest/v1/rpc/owner_veterina_code') { if (request.postDataJSON().p_rotate) currentCode = rotatedCode; return reply({ code: currentCode }) }

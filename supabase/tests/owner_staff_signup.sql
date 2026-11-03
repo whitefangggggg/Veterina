@@ -15,6 +15,15 @@ end $$;
 update auth.users set raw_user_meta_data='{"application":"veterina","account_type":"staff","full_name":"Forged name","clinic_name":"Forged clinic"}'
   where id=current_setting('signup.owner_a')::uuid;
 update auth.users set email_confirmed_at=now() where id=current_setting('signup.owner_a')::uuid;
+do $$ begin
+  if exists(select 1 from public.profiles where id=current_setting('signup.owner_a')::uuid) then raise exception 'TEST: confirmed owner bypassed activation'; end if;
+end $$;
+-- A separate trusted platform administrator issues the reusable activation code.
+select set_config('signup.admin',gen_random_uuid()::text,true);
+insert into auth.users(id,email,email_confirmed_at) values(current_setting('signup.admin')::uuid,'signup-admin-'||gen_random_uuid()||'@veterina-test.invalid',now());
+insert into private.platform_admins(user_id) values(current_setting('signup.admin')::uuid);
+select set_config('signup.activation',public.platform_subscription_admin(current_setting('signup.admin')::uuid,'generate','{"windowDays":30,"termDays":30}')->>'code',true);
+select public.redeem_clinic_activation(current_setting('signup.owner_a')::uuid,current_setting('signup.activation'),'{}',gen_random_uuid(),false);
 select set_config('signup.clinic_a',(select clinic_id::text from public.profiles where id=current_setting('signup.owner_a')::uuid),true);
 do $$ begin
   if not exists(select 1 from public.profiles where id=current_setting('signup.owner_a')::uuid and role='owner' and is_active and full_name='First owner' and clinic_id<>private.legacy_clinic_id()) then raise exception 'TEST: owner not provisioned in a new clinic'; end if;
@@ -33,6 +42,7 @@ end $$;
 insert into auth.users(id,email,email_confirmed_at,raw_user_meta_data) values
   (current_setting('signup.owner_b')::uuid,'owner-b-'||gen_random_uuid()||'@veterina-test.invalid',now(),
     '{"application":"veterina","account_type":"owner","full_name":"Second owner","clinic_name":"New signup clinic B"}');
+select public.redeem_clinic_activation(current_setting('signup.owner_b')::uuid,current_setting('signup.activation'),'{}',gen_random_uuid(),false);
 select set_config('signup.clinic_b',(select clinic_id::text from public.profiles where id=current_setting('signup.owner_b')::uuid),true);
 do $$ begin
   if current_setting('signup.clinic_b')='' or current_setting('signup.clinic_b')=current_setting('signup.clinic_a') then raise exception 'TEST: owners share a clinic'; end if;

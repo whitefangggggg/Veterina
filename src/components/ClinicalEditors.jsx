@@ -95,11 +95,11 @@ export function VisitEditor({ pet, record, queueEntry, onSaved, onClose }) {
       { name: 'bodyConditionScore', render: () => <BodyConditionField record={record} draft={draft.values} /> },
       { name: 'hydration', label: 'Hydration', type: 'select', options: ['Normal', 'Mild dehydration', 'Moderate dehydration', 'Severe dehydration'] },
       ] },
-      { name: 'soap', title: 'Clinical observations', description: 'Subjective history, objective findings, assessment, and care plan.', fields: [
+      { name: 'soap', title: 'Clinical observations', description: 'Subjective history, objective findings, assessment, and care plan.', hidden: careQueue?.status !== 'in_progress', fields: [
       ...['subjective', 'objective', 'assessment', 'plan'].map((name) => ({ name, label: name.charAt(0).toUpperCase() + name.slice(1), type: 'textarea' })),
       { name: 'clinicalNotes', label: 'Clinical notes', type: 'textarea', maxLength: 10000, span: true },
       ] },
-      { name: 'followup', title: 'Diagnosis & follow-up', description: 'Save the diagnosis and arrange any next checkup.', fields: [
+      { name: 'followup', title: 'Diagnosis & follow-up', description: 'Save the diagnosis and arrange any next checkup.', hidden: careQueue?.status !== 'in_progress', fields: [
       { name: 'diagnosis', label: 'Diagnosis', span: true },
       { name: 'followUpDate', render: () => <DateWordsField name="followUpDate" label="Follow-up date" initial={initial.followUpDate || ''} hint="Optional. This date appears in the appointment calendar." /> },
       ] },

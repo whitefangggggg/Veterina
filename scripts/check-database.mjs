@@ -29,7 +29,7 @@ assert.equal(sql('select count(*) from public.owners'), '0', 'Start with an empt
 const admin = createClient(env.TEST_SUPABASE_URL, env.TEST_SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 const checked = ({ data, error }) => { if (error) throw error; return data }
 await mkdir('test-artifacts.local', { recursive: true })
-for (const suite of ['security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'follow_up_arrivals', 'clinic_rbac', 'owner_staff_signup', 'clinic_logo', 'checkup_completion']) {
+for (const suite of ['security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'follow_up_arrivals', 'clinic_rbac', 'owner_staff_signup', 'google_account_registration', 'clinic_logo', 'owner_clinic_onboarding', 'platform_subscriptions', 'checkup_completion']) {
   const result = spawnSync('psql', [env.TEST_DATABASE_URL, '-X', '-v', 'ON_ERROR_STOP=1', '-f', `supabase/tests/${suite}.sql`], { encoding: 'utf8', windowsHide: true })
   await writeFile(`test-artifacts.local/${suite}.log`, (result.stdout || '') + (result.stderr || ''))
   if (result.error) throw result.error
@@ -45,6 +45,10 @@ const followUpConcurrency = spawnSync(process.execPath, ['scripts/check-follow-u
 await writeFile('test-artifacts.local/follow-up-arrivals.log', (followUpConcurrency.stdout || '') + (followUpConcurrency.stderr || ''))
 assert.equal(followUpConcurrency.status, 0, 'Follow-up concurrency failed; see test-artifacts.local/follow-up-arrivals.log')
 console.log('PASS isolated follow-up arrival concurrency')
+const subscriptions = spawnSync(process.execPath, ['scripts/check-subscription-concurrency.mjs'], { encoding: 'utf8', windowsHide: true })
+await writeFile('test-artifacts.local/subscription-concurrency.log', (subscriptions.stdout || '') + (subscriptions.stderr || ''))
+assert.equal(subscriptions.status, 0, 'Subscription concurrency failed; see test-artifacts.local/subscription-concurrency.log')
+console.log('PASS isolated subscription concurrency')
 // Local Edge Functions must be running with the source in supabase/functions.
 const edge = await fetch(`${env.TEST_SUPABASE_URL}/functions/v1/export-report`, { method: 'POST', headers: { apikey: env.TEST_SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: '{}' })
 assert.equal(edge.status, 401, 'Start the matching local Edge Functions before running database browser checks')
@@ -53,6 +57,10 @@ for (const action of ['capabilities', 'read', 'remove']) {
   assert.equal(response.status, 401, 'Anonymous photo access must be denied')
   assert.equal(response.headers.get('Cache-Control'), 'no-store')
 }
+const subscriptionApi = spawnSync(process.execPath, ['scripts/check-subscription-api.mjs'], { encoding: 'utf8', windowsHide: true })
+await writeFile('test-artifacts.local/subscription-api.log', (subscriptionApi.stdout || '') + (subscriptionApi.stderr || ''))
+assert.equal(subscriptionApi.status, 0, 'Subscription Auth/Edge acceptance failed; see test-artifacts.local/subscription-api.log')
+console.log('PASS real subscription Auth/Edge acceptance')
 const password = 'Isolated-veterina-test-87!'
 const users = []
 let app
@@ -345,7 +353,7 @@ try {
   // The guards above restrict this cleanup to an otherwise empty local test stack.
   // Preserve configuration/services; every other public/private row is synthetic.
   if (users.length) {
-    sql("do $$ declare targets text; begin select string_agg(format('%I.%I',schemaname,tablename),', ') into targets from pg_tables where schemaname in ('public','private') and tablename not in ('clinic_settings','service_types','pet_photo_config','rag_schedule_config','clinics','legacy_clinic','clinic_codes'); execute 'truncate '||targets||' restart identity cascade'; end $$;")
+    sql("do $$ declare targets text; begin select string_agg(format('%I.%I',schemaname,tablename),', ') into targets from pg_tables where schemaname in ('public','private') and tablename not in ('clinic_settings','service_types','pet_photo_config','rag_schedule_config','clinics','legacy_clinic','clinic_codes','clinic_subscriptions'); execute 'truncate '||targets||' restart identity cascade'; end $$;")
     for (const user of users) checked(await admin.auth.admin.deleteUser(user.id))
     checked(await admin.from('clinic_settings').update({ timezone: 'Asia/Manila' }).eq('clinic_name', 'Veterina isolated test clinic'))
     assert.equal(sql('select count(*) from public.owners'), '0')

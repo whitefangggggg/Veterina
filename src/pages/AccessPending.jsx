@@ -17,6 +17,9 @@ export default function AccessPending() {
   if (access === 'error') return <AuthAccessError />
   if (access === 'signed-out') return <Navigate to={`/sign-in?next=${encodeURIComponent(returnTo)}`} replace />
   if (access === 'approved') return <Navigate to={returnTo} replace />
+  if (access === 'expired') return <Navigate to="/subscription" replace />
+  if (access === 'platform-admin') return <Navigate to="/admin" replace />
+  if (access === 'onboarding') return <Navigate to={`/complete-account?next=${encodeURIComponent(returnTo)}`} replace />
 
   const run = async (action, rechecking = false) => {
     setError('')

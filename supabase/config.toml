@@ -13,6 +13,12 @@ verify_jwt = false
 verify_jwt = false
 [functions.admin-staff]
 verify_jwt = false
+[functions.google-registration]
+verify_jwt = false
+[functions.platform-admin]
+verify_jwt = false
+[functions.clinic-activation]
+verify_jwt = false
 [functions.export-report]
 verify_jwt = false
 [functions.pet-photo]

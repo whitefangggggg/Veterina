@@ -1,23 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
+import { isSupabaseConfigured } from '../lib/supabaseClient'
 import { normalizeVeterinaCode } from '../lib/clinicAccess'
-import ClinicQrScanner from '../components/ClinicQrScanner'
-import { QrCode } from '@phosphor-icons/react'
-import { authErrorMessage, safeReturnTo } from '../lib/authAccess'
+import ClinicRegistrationFields from '../components/ClinicRegistrationFields'
+import GoogleAuthButton from '../components/GoogleAuthButton'
+import { saveGoogleRegistrationDraft } from '../lib/googleRegistration'
+import { authErrorMessage, safeAuthReturnTo } from '../lib/authAccess'
 import AuthLayout from '../components/AuthLayout'
 import { AuthAccessError, AuthLoading } from '../components/AuthStatus'
 import ConfirmationEmailActions from '../components/ConfirmationEmailActions'
 
 export default function Auth({ mode = 'sign-in' }) {
   const creating = mode === 'create-account'
-  const { access, signIn, signUp } = useAuth()
+  const platform = mode === 'admin'
+  const { access, accountAccess, user, signOut, signIn, signInWithGoogle, signUp } = useAuth()
   const [searchParams] = useSearchParams()
   const location = useLocation()
-  const returnTo = safeReturnTo(searchParams.get('next'))
+  const returnTo = safeAuthReturnTo(platform ? '/admin' : searchParams.get('next'))
   const nextQuery = `?next=${encodeURIComponent(returnTo)}`
   const [busy, setBusy] = useState(false)
+  const [googleBusy, setGoogleBusy] = useState(false)
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState(false)
   const [confirmationEmail, setConfirmationEmail] = useState('')
@@ -27,26 +30,24 @@ export default function Auth({ mode = 'sign-in' }) {
   const [accountType, setAccountType] = useState('staff')
   const [clinicName, setClinicName] = useState('')
   const [veterinaCode, setVeterinaCode] = useState(() => normalizeVeterinaCode(searchParams.get('code')) || searchParams.get('code') || '')
-  const [clinicInfo, setClinicInfo] = useState(null)
-  const [scan, setScan] = useState(false)
-  useEffect(() => {
-    let alive = true
-    const code = normalizeVeterinaCode(veterinaCode)
-    const timer = setTimeout(async () => {
-      if (!creating || accountType !== 'staff' || !isSupabaseConfigured || !code) { if (alive) setClinicInfo(null); return }
-      try {
-        const { data, error } = await supabase.rpc('veterina_code_info', { p_code: code })
-        if (alive) setClinicInfo(error ? null : data)
-      } catch { if (alive) setClinicInfo(null) }
-    }, 300)
-    return () => { alive = false; clearTimeout(timer) }
-  }, [creating, accountType, veterinaCode])
   const callbackFailed = searchParams.has('error') || new URLSearchParams(location.hash.slice(1)).has('error')
 
   if (access === 'loading') return <AuthLoading />
   if (access === 'error') return <AuthAccessError />
+  if (platform && user && !accountAccess?.isPlatformAdmin) return <AuthLayout title="Administrator access required" description="This account does not have website administrator access."><p className="auth-message">Signed in as {user.email}. Clinic owner permissions do not grant platform administration.</p><button className="button button-secondary" onClick={() => void signOut().catch((failure) => setError(failure.message))}>Sign out to switch accounts</button>{error && <p role="alert" className="auth-message auth-error">{error}</p>}<p className="auth-switch"><Link to="/dashboard">Return to my clinic</Link></p></AuthLayout>
+  if (accountAccess?.isPlatformAdmin && (platform || returnTo === '/admin' || access === 'platform-admin')) return <Navigate to="/admin" replace />
+  if (access === 'expired') return <Navigate to="/subscription" replace />
   if (access === 'approved') return <Navigate to={returnTo} replace />
+  if (access === 'onboarding') return <Navigate to={`/complete-account${nextQuery}`} replace />
   if (access === 'pending') return <Navigate to={`/access-pending${nextQuery}`} replace />
+
+  const continueWithGoogle = async () => {
+    if (busy) return
+    setBusy(true); setGoogleBusy(true); setError('')
+    saveGoogleRegistrationDraft(creating ? { accountType, clinicName, veterinaCode } : null)
+    try { await signInWithGoogle({ origin: window.location.origin, returnTo }) }
+    catch (failure) { setError(authErrorMessage(failure)); setBusy(false); setGoogleBusy(false) }
+  }
 
   const submit = async (event) => {
     event.preventDefault()
@@ -77,7 +78,7 @@ export default function Auth({ mode = 'sign-in' }) {
   }
 
   return (
-    <AuthLayout title={creating ? 'Create your account' : 'Welcome back'} description={creating
+    <AuthLayout title={platform ? 'Website admin sign in' : creating ? 'Create your account' : 'Welcome back'} description={platform ? 'Manage clinic subscriptions and activation codes.' : creating
       ? (accountType === 'owner' ? 'Create your own clinic workspace. Confirm your email to get started.' : 'Join your vetshop with its Veterina Code. Your shop owner approves access after registration.')
       : 'Sign in to your Veterina clinic workspace.'}>
       {confirmation ? (
@@ -89,31 +90,24 @@ export default function Auth({ mode = 'sign-in' }) {
         </div>
       ) : (
         <form className="auth-form" onSubmit={submit} aria-busy={busy}>
-          {(error || callbackFailed) && <p className="auth-message auth-error" role="alert">{error || 'This confirmation link is invalid or has expired. Please sign in or contact your clinic administrator.'}</p>}
+          {(error || callbackFailed) && <p className="auth-message auth-error" role="alert">{error || (searchParams.get('auth') === 'google' ? 'Google sign-in was cancelled or could not be completed. Please try again.' : 'This confirmation link is invalid or has expired. Please sign in or contact your clinic administrator.')}</p>}
           <fieldset disabled={busy || !isSupabaseConfigured}>
-            {creating && <div className="account-type-field"><label htmlFor="account-type">Create account as</label><select id="account-type" name="accountType" value={accountType} onChange={(event) => { setAccountType(event.target.value); setError(''); setScan(false) }} aria-describedby="account-type-help"><option value="owner">Owner</option><option value="staff">Staff</option></select><p className="account-type-help" id="account-type-help">{accountType === 'owner' ? 'Start a new clinic and share your Veterina Code with your staff.' : 'Join an existing clinic after your shop owner approves your account.'}</p></div>}
-            {creating && accountType === 'owner' && <label htmlFor="clinic-name">Clinic name<input id="clinic-name" name="clinicName" autoComplete="organization" required maxLength={160} value={clinicName} onChange={(event) => setClinicName(event.target.value)} placeholder="Your clinic name" /></label>}
-            {creating && accountType === 'staff' && <div className="registration-code-field">
-              <label htmlFor="veterina-code">Veterina Code<input id="veterina-code" name="veterinaCode" required maxLength={60} value={veterinaCode} onChange={(event) => { setVeterinaCode(event.target.value); setClinicInfo(null) }} autoComplete="off" spellCheck={false} placeholder="VET-…" aria-describedby="clinic-code-help" /></label>
-              <button type="button" className="button button-secondary" onClick={() => setScan(true)}><QrCode size={18} />Scan QR code</button>
-              <small id="clinic-code-help">Get this code or QR from your shop owner.</small>
-              {clinicInfo?.valid && <p className="registration-clinic-name" role="status">Joining <strong>{clinicInfo.clinicName}</strong> · Owner approval required</p>}
-              {clinicInfo && !clinicInfo.valid && <p className="auth-message auth-error" role="status">Code not found. Check the code with your shop owner.</p>}
-            </div>}
+            <GoogleAuthButton busy={googleBusy} onClick={continueWithGoogle} />
+            <div className="auth-divider"><span>or continue with email</span></div>
+            {creating && <ClinicRegistrationFields {...{ accountType, setAccountType, clinicName, setClinicName, veterinaCode, setVeterinaCode }} />}
             {creating && <label htmlFor="full-name">Full name<input id="full-name" name="fullName" autoComplete="name" required maxLength={120} placeholder="Your full name" /></label>}
             <label htmlFor="email">Email address<input id="email" name="email" type="email" autoComplete="email" required maxLength={254} placeholder="you@clinic.com" /></label>
             <label htmlFor="password">Password<input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete={creating ? 'new-password' : 'current-password'} required minLength={creating ? 8 : undefined} aria-describedby={creating ? 'password-help' : undefined} /></label>
             {creating && <p className="auth-hint" id="password-help">Use at least 8 characters.</p>}
             {creating && <label htmlFor="confirm-password">Confirm password<input id="confirm-password" name="confirmPassword" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required minLength={8} /></label>}
             <label className="auth-show-password"><input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />Show {creating ? 'passwords' : 'password'}</label>
-            <button className="button button-primary auth-submit" type="submit">{busy ? (creating ? 'Creating account...' : 'Signing in...') : (creating ? 'Create account' : 'Sign in')}</button>
+            <button className="button button-primary auth-submit" type="submit">{busy && !googleBusy ? (creating ? 'Creating account...' : 'Signing in...') : (creating ? 'Create account' : 'Sign in')}</button>
           </fieldset>
         </form>
       )}
       {!confirmation && confirmationEmail && <ConfirmationEmailActions key={confirmationEmail} email={confirmationEmail} emailRedirectTo={`${window.location.origin}/sign-in${nextQuery}`} />}
-      {scan && <ClinicQrScanner onCode={(code) => { setVeterinaCode(code); setClinicInfo(null); setScan(false) }} onClose={() => setScan(false)} />}
       {!creating && <p className="auth-switch"><Link to={`/forgot-password${nextQuery}`}>Forgot your password?</Link></p>}
-      <p className="auth-switch">{creating ? 'Already have an account? ' : 'New to Veterina? '}<Link to={`${creating ? '/sign-in' : '/create-account'}${nextQuery}`}>{creating ? 'Sign in' : 'Create an account'}</Link></p>
+      {!platform && <p className="auth-switch">{creating ? 'Already have an account? ' : 'New to Veterina? '}<Link to={`${creating ? '/sign-in' : '/create-account'}${nextQuery}`}>{creating ? 'Sign in' : 'Create an account'}</Link></p>}
     </AuthLayout>
   )
 }

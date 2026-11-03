@@ -1,3 +1,4 @@
+import { mockAccountAccess } from './helpers/mock-access.mjs'
 // UI acceptance with intercepted API responses; no clinic data is changed.
 import { expect } from '@playwright/test'
 import assert from 'node:assert/strict'
@@ -51,6 +52,7 @@ try {
   await context.addInitScript(({ key, session }) => localStorage.setItem(key, JSON.stringify(session)), { key: `sb-${api.hostname.split('.')[0]}-auth-token`, session })
   await context.route(`${api.origin}/**`, async (route) => {
     const url = new URL(route.request().url())
+    if (url.pathname === '/rest/v1/rpc/account_access') return route.fulfill({ contentType: 'application/json', body: JSON.stringify(mockAccountAccess(raw.profiles[0])) })
     if (url.pathname === '/rest/v1/rpc/portal_mutation') {
       const { p_action: action, p_data: payload, p_key: key } = route.request().postDataJSON()
       writes.push({ action, payload, key })

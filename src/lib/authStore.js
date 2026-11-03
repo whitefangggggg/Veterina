@@ -1,4 +1,4 @@
-import { getAccessState } from './authAccess'
+import { getAccessState, safeAuthReturnTo } from './authAccess'
 import { normalizeVeterinaCode } from './clinicAccess'
 
 const configurationError = 'Sign-in is unavailable. Please configure the Supabase project URL and publishable key.'
@@ -8,7 +8,7 @@ export function createAuthStore(client, { isPasswordRecoverySession = () => fals
   let state = {
     session: null, user: null, profile: null,
     loading: Boolean(client), checking: false, error: client ? null : configurationError,
-    recoveringPassword: false,
+    recoveringPassword: false, needsRegistration: false, accountAccess: null, serverTimeOffset: 0,
   }
   let active = false
   let lifecycle = 0
@@ -27,10 +27,16 @@ export function createAuthStore(client, { isPasswordRecoverySession = () => fals
         .eq('id', session.user.id).maybeSingle()
       if (!active || generation !== lifecycle || requestId !== request) return
       if (error) throw error
-      publish({ ...state, profile: data, loading: false, checking: false, error: null })
+      const { data: accountAccess, error: accessError } = await client.rpc('account_access')
+      if (accessError) throw accessError
+      if (!accountAccess || typeof accountAccess.isPlatformAdmin !== 'boolean' || !Number.isFinite(Date.parse(accountAccess.serverNow))) throw new Error('Invalid account access response')
+      if (data?.is_active && !['active', 'expired', 'disabled'].includes(accountAccess.subscription?.status)) throw new Error('Missing clinic subscription')
+      const needsRegistration = accountAccess.needsRegistration === true
+      if (!active || generation !== lifecycle || requestId !== request) return
+      publish({ ...state, profile: data, needsRegistration, accountAccess, serverTimeOffset: Date.parse(accountAccess.serverNow) - Date.now(), loading: false, checking: false, error: null })
     } catch {
       if (!active || generation !== lifecycle || requestId !== request) return
-      publish({ ...state, profile: null, loading: false, checking: false,
+      publish({ ...state, profile: null, accountAccess: null, needsRegistration: false, loading: false, checking: false,
         error: 'We could not check your clinic access. Please try again.' })
     }
   }
@@ -42,7 +48,9 @@ export function createAuthStore(client, { isPasswordRecoverySession = () => fals
     const profile = user?.id === state.user?.id ? state.profile : null
     const recoveringPassword = Boolean(user && (event === 'PASSWORD_RECOVERY'
       || isPasswordRecoverySession(user) || (state.recoveringPassword && user.id === state.user?.id)))
-    publish({ session, user, profile, loading: Boolean(user && !profile), checking: Boolean(user), error: null, recoveringPassword })
+    publish({ session, user, profile, needsRegistration: false, accountAccess: user && user.id === state.user?.id ? state.accountAccess : null,
+      serverTimeOffset: user && user.id === state.user?.id ? state.serverTimeOffset : 0,
+      loading: Boolean(user && !profile), checking: Boolean(user), error: null, recoveringPassword })
     // Supabase calls auth listeners while holding its auth lock. Start queries
     // after the callback returns to avoid deadlocking the client.
     if (user) queueMicrotask(() => {
@@ -87,11 +95,17 @@ export function createAuthStore(client, { isPasswordRecoverySession = () => fals
     getSnapshot: () => state,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
     start,
+    expireSubscription() {
+      const subscription = state.accountAccess?.subscription
+      if (subscription?.status === 'active' && Date.parse(subscription.expiresAt) <= Date.now() + state.serverTimeOffset) {
+        publish({ ...state, accountAccess: { ...state.accountAccess, subscription: { ...subscription, status: 'expired' } } })
+      }
+    },
     async refreshAccess() {
       requireClient()
       if (state.session) {
         const requestId = ++request
-        publish({ ...state, loading: !state.profile, checking: true, error: null })
+        publish({ ...state, loading: !state.accountAccess, checking: true, error: null })
         await loadProfile(state.session, requestId, lifecycle)
       } else {
         const requestId = ++request
@@ -110,6 +124,31 @@ export function createAuthStore(client, { isPasswordRecoverySession = () => fals
       requireClient()
       const { data, error } = await client.auth.signInWithPassword({ email: email.trim(), password })
       if (error) throw error
+      return data
+    },
+    async signInWithGoogle({ origin, returnTo }) {
+      requireClient()
+      const redirectTo = new URL('/sign-in', origin)
+      redirectTo.searchParams.set('next', safeAuthReturnTo(returnTo))
+      redirectTo.searchParams.set('auth', 'google')
+      const { data, error } = await client.auth.signInWithOAuth({
+        provider: 'google', options: { redirectTo: redirectTo.href, queryParams: { prompt: 'select_account' } },
+      })
+      if (error) throw error
+      return data
+    },
+    async completeGoogleRegistration({ fullName, accountType, clinicName, veterinaCode }) {
+      requireClient()
+      const { data, error } = await client.functions.invoke('google-registration', { body: {
+        fullName: fullName.trim(), accountType, clinicName: String(clinicName || '').trim(), veterinaCode: normalizeVeterinaCode(veterinaCode),
+      } })
+      if (error) {
+        if (error.context instanceof Response) {
+          const details = await error.context.json().catch(() => null)
+          if (details?.error) throw new Error(details.error)
+        }
+        throw error
+      }
       return data
     },
     async signUp({ fullName, email, password, emailRedirectTo, veterinaCode, accountType = 'staff', clinicName }) {

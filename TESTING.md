@@ -1,5 +1,66 @@
 # Testing Veterina
 
+`npm run test:subscriptions` covers admin OAuth return paths, owner/staff denial,
+clinic search and filters, history, independent code durations, generation and
+revocation, extension retries, expired owner/staff notices, renewal, verified
+email-owner activation, automatic workspace unmount at expiry, and mobile
+layouts using intercepted APIs. Screenshots are saved under
+`test-artifacts.local/subscriptions-admin-*.png`.
+
+The rolled-back `platform_subscriptions.sql` suite covers code timing, different
+clinics sharing a code, independent terms, once-per-clinic redemption, role
+forgery, private function/table grants, idempotency, extensions, revocation,
+expiry boundaries, failed provisioning rollback, clinic/file isolation,
+expired records/mutations/Storage denial and renewal without record loss.
+`npm run test:subscription-concurrency` uses real concurrent local PostgreSQL
+sessions for first-use contention, simultaneous activation retries, extension
+retries and expiry while waiting for a code lock. Only its generated fixtures
+are removed afterward.
+
+`npm run test:subscription-api` uses real local Auth, PostgREST and Edge Functions
+to verify activation and renewal, untrusted actor/clinic/role/duration rejection,
+admin/staff separation and expiry enforcement for exports, photos, AI and
+mutations. It refuses hosted databases and requires an empty synthetic local
+stack. These SQL, concurrency and API checks are included in `test:database`;
+the intercepted UI suite is included in `test:all`.
+
+Development rollout: the subscription migration and eight matching Edge
+Functions have been deployed through Supabase MCP. The initial administrator
+and transition grants were verified. Hosted anonymous endpoint checks pass.
+Google is enabled and redirects to Google, but a real login and persistent
+callback session remain pending at the user's request. Supabase advisors show
+the existing five unrelated public-definer warnings and disabled leaked-password
+protection; private subscription tables intentionally deny browser access through
+RLS without policies. No new exposed-definer warning was introduced.
+
+`npm run test:owner-onboarding` checks required clinic details, image validation
+and preview, color selection, opening hours and timezone, saved progress after
+reload, completion retry, personalized workspace branding, settings revisit,
+staff exclusion and 320/375/1440px layouts using intercepted APIs. Screenshots
+are saved under `test-artifacts.local/owner-onboarding-brand-*.png`. The SQL suite
+`owner_clinic_onboarding.sql` tests new-clinic setup state, draft/completion
+persistence, validation, atomic image saves, retries, owner-only writes, inactive
+owners and clinic isolation. Its synthetic fixtures roll back. Both suites are
+included in the corresponding aggregate checks.
+
+`npm run test:google-auth` checks Google buttons on sign-in/signup, OAuth callback
+restoration and safe return paths, new owner setup/retry, staff code validation
+and pending approval, cancelled OAuth, sign-out and mobile layouts. Google and
+Supabase responses are intercepted; this suite does not authenticate a real
+Google account. Auth-store unit tests cover status failures and account-switch
+races. `google_account_registration.sql` verifies trusted Google identity and
+confirmed-email requirements, service-only provisioning, new clinic isolation,
+request retries, metadata forgery, pending staff isolation and owner approval.
+All SQL fixtures roll back. The Google browser suite is included in `test:all`,
+and the SQL suite in `test:database`; deploy the matching migration and Edge
+Function before running hosted acceptance with a real Google account.
+
+`npm run test:google-provider` performs read-only hosted checks: Google provider
+availability, a redirect to Google's authorization server, and rejection of
+unauthenticated registration requests. It sends no email and creates no users.
+It reports exit code 2 when the hosted provider is disabled. A complete Google
+consent/login still requires interactive acceptance with a real Google account.
+
 Run `npm run test:all` (`npm.cmd run test:all` in restricted Windows PowerShell).
 It runs unit tests, lint, build, public-page and authenticated-connection browser
 checks, queue, prescriptions, PWA, anonymous API checks and isolated database checks.
@@ -27,9 +88,9 @@ and no duplicate signup. Unit tests cover the Auth resend arguments and failures
 inbox delivery requires acceptance with a real staff registration.
 
 The clinic-access browser suite also checks Owner/Staff switching, retained form
-values, owner signup without a code, 320px layout, and sign-in with an existing
+values, login signup before subscription activation, 320px layout, and sign-in with an existing
 verified authenticator factor without showing a challenge. `owner_staff_signup.sql`
-checks confirmation-gated provisioning, clinic isolation, default services/code,
+checks verified-account activation, clinic isolation, default services/code,
 repeat confirmation, frozen signup intent, staff metadata forgery and approval
 with an ordinary password session. Fixtures are rolled back.
 

@@ -8,7 +8,8 @@ const deferred = () => {
   const promise = new Promise((done) => { resolve = done })
   return { promise, resolve }
 }
-const settle = async () => { for (let i = 0; i < 8; i += 1) await Promise.resolve() }
+const settle = async () => { for (let i = 0; i < 20; i += 1) await Promise.resolve() }
+const accountAccess = (extra = {}) => ({ isPlatformAdmin: false, needsRegistration: false, serverNow: new Date().toISOString(), subscription: null, ...extra })
 
 function mockClient(initial = null) {
   const subscriptions = []
@@ -19,7 +20,9 @@ function mockClient(initial = null) {
   const eq = vi.fn(() => ({ maybeSingle }))
   const select = vi.fn(() => ({ eq }))
   const client = {
-    rpc: vi.fn(async () => ({ data: { valid: true, clinicName: 'Test clinic' }, error: null })),
+    rpc: vi.fn(async (name) => ({ data: name === 'account_access' ? accountAccess({ needsRegistration: !profile && current?.user.app_metadata?.providers?.includes('google') === true,
+      subscription: profile ? { status: 'active', expiresAt: new Date(Date.now() + 86400000).toISOString() } : null }) : { valid: true, clinicName: 'Test clinic' }, error: null })),
+    functions: { invoke: vi.fn(async () => ({ data: { status: 'pending' }, error: null })) },
     from: vi.fn(() => ({ select })),
     auth: {
       onAuthStateChange: vi.fn((callback) => {
@@ -29,6 +32,7 @@ function mockClient(initial = null) {
       }),
       getSession: vi.fn(async () => ({ data: { session: current }, error: null })),
       signInWithPassword: vi.fn(async () => ({ data: { session: current }, error: null })),
+      signInWithOAuth: vi.fn(async () => ({ data: { provider: 'google', url: 'https://accounts.google.com/' }, error: null })),
       signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
       resend: vi.fn(async () => ({ data: {}, error: null })),
       resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
@@ -45,7 +49,118 @@ function mockClient(initial = null) {
   }
 }
 
+describe('Google authentication', () => {
+  const googleSession = { ...sessionFor('google-user'), user: { ...sessionFor('google-user').user, app_metadata: { providers: ['google'] } } }
+
+  it('starts Google OAuth with a same-origin callback and a safe return path', async () => {
+    const mock = mockClient()
+    const store = createAuthStore(mock.client)
+    await store.signInWithGoogle({ origin: 'https://veterina.example', returnTo: '/patients?view=all#records' })
+    expect(mock.client.auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: {
+      redirectTo: 'https://veterina.example/sign-in?next=%2Fpatients%3Fview%3Dall%23records&auth=google', queryParams: { prompt: 'select_account' },
+    } })
+    await store.signInWithGoogle({ origin: 'https://veterina.example', returnTo: '//evil.example' })
+    expect(mock.client.auth.signInWithOAuth.mock.lastCall[0].options.redirectTo).toContain('next=%2Fdashboard')
+    const error = new Error('Google is unavailable')
+    mock.client.auth.signInWithOAuth.mockResolvedValueOnce({ error })
+    await expect(store.signInWithGoogle({ origin: 'https://veterina.example' })).rejects.toThrow('Google is unavailable')
+  })
+
+  it('routes new Google identities into setup without granting clinic access', async () => {
+    const mock = mockClient(googleSession)
+    mock.setProfile(null)
+    mock.client.rpc.mockResolvedValue({ data: accountAccess({ needsRegistration: true }), error: null })
+    const store = createAuthStore(mock.client)
+    const stop = store.start()
+    await settle()
+    expect(store.getSnapshot()).toMatchObject({ access: 'onboarding', profile: null })
+    expect(mock.client.rpc).toHaveBeenCalledWith('account_access')
+    stop()
+  })
+
+  it.each(['pending', 'rejected', 'registered'])('does not reopen setup for a %s registration', async (status) => {
+    const mock = mockClient(googleSession)
+    mock.setProfile(null)
+    mock.client.rpc.mockResolvedValue({ data: accountAccess({ registrationType: status }), error: null })
+    const store = createAuthStore(mock.client)
+    const stop = store.start()
+    await settle()
+    expect(store.getSnapshot().access).toBe('pending')
+    stop()
+  })
+
+  it('fails closed when registration lookup fails and ignores a result after sign-out', async () => {
+    const mock = mockClient(googleSession)
+    mock.setProfile(null)
+    mock.client.rpc.mockResolvedValueOnce({ error: new Error('Network failure') })
+    const store = createAuthStore(mock.client)
+    const stop = store.start()
+    await settle()
+    expect(store.getSnapshot().access).toBe('error')
+    const lookup = deferred()
+    mock.client.rpc.mockReturnValueOnce(lookup.promise)
+    const refreshing = store.refreshAccess()
+    await settle()
+    mock.emit(null, 'SIGNED_OUT')
+    lookup.resolve({ data: accountAccess({ needsRegistration: true }), error: null })
+    await refreshing
+    expect(store.getSnapshot()).toMatchObject({ access: 'signed-out', needsRegistration: false })
+    stop()
+  })
+
+  it('submits only registration choices and propagates validation failures', async () => {
+    const mock = mockClient()
+    const store = createAuthStore(mock.client)
+    await store.completeGoogleRegistration({ fullName: ' Google Staff ', accountType: 'staff', veterinaCode: 'vet 0123456789abcdef0123' })
+    expect(mock.client.functions.invoke).toHaveBeenCalledWith('google-registration', { body: {
+      fullName: 'Google Staff', accountType: 'staff', clinicName: '', veterinaCode: 'VET-0123456789ABCDEF0123',
+    } })
+    const error = new Error('Invalid Veterina Code')
+    mock.client.functions.invoke.mockResolvedValueOnce({ error })
+    await expect(store.completeGoogleRegistration({ fullName: 'Staff', accountType: 'staff' })).rejects.toThrow('Invalid Veterina Code')
+  })
+})
+
 describe('auth session lifecycle', () => {
+  it('expires at server time and clears subscription state on account changes', async () => {
+    const mock = mockClient(sessionFor('owner-a'))
+    const serverNow = Date.now() + 3600000
+    mock.client.rpc.mockResolvedValue({ data: accountAccess({ serverNow: new Date(serverNow).toISOString(), subscription: { status: 'active', expiresAt: new Date(serverNow + 1000).toISOString() } }), error: null })
+    const store = createAuthStore(mock.client)
+    const stop = store.start()
+    await settle()
+    expect(store.getSnapshot().serverTimeOffset).toBeGreaterThan(3599000)
+    const current = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(current + 1100)
+    try {
+      store.expireSubscription()
+      expect(store.getSnapshot().access).toBe('expired')
+      mock.emit(sessionFor('owner-b'))
+      expect(store.getSnapshot()).toMatchObject({ accountAccess: null, profile: null, access: 'loading' })
+    } finally { clock.mockRestore(); stop() }
+  })
+
+  it('recognizes a platform administrator without granting a clinic profile', async () => {
+    const mock = mockClient(sessionFor('platform-admin'))
+    mock.setProfile(null)
+    mock.client.rpc.mockResolvedValue({ data: accountAccess({ isPlatformAdmin: true }), error: null })
+    const store = createAuthStore(mock.client)
+    const stop = store.start()
+    await settle()
+    expect(store.getSnapshot()).toMatchObject({ access: 'platform-admin', profile: null })
+    stop()
+  })
+
+  it('fails closed when an active profile has no subscription response', async () => {
+    const mock = mockClient(sessionFor('owner-a'))
+    mock.client.rpc.mockResolvedValue({ data: accountAccess(), error: null })
+    const store = createAuthStore(mock.client)
+    const stop = store.start()
+    await settle()
+    expect(store.getSnapshot()).toMatchObject({ access: 'error', profile: null, accountAccess: null })
+    stop()
+  })
+
   it('restores an approved session, scopes the profile lookup, and unsubscribes', async () => {
     const mock = mockClient(sessionFor('staff-a'))
     const store = createAuthStore(mock.client)
