@@ -23,7 +23,7 @@ do $$ declare o uuid; p uuid; q uuid; v uuid; vac uuid; key uuid; data jsonb; it
   if public.create_encounter(data,key)<>result then raise exception 'FAIL: idempotent response';end if;
   begin perform public.create_encounter(data || '{"complaint":"different payload"}'::jsonb,key);raise exception 'FAIL: changed payload replay';exception when raise_exception then if sqlerrm not like '%retry payload changed%' then raise;end if;end;
   if (select count(*) from public.visits where pet_id=p)<>1 or (select count(*) from public.visit_vitals where visit_id=v)<>1 or (select count(*) from public.reminders where visit_id=v)<>1 then raise exception 'FAIL: atomic encounter';end if;
-  vaccine_item:=(public.portal_mutation('create_inventory_item',jsonb_build_object('name','Fixture Rabies','brand','Fixture Brand','category','Vaccines','unit','dose','minimumStock',0,'allowsFraction','false'),gen_random_uuid())->>'id')::uuid;
+  vaccine_item:=(public.portal_mutation('create_inventory_item',jsonb_build_object('name','Fixture Rabies','brand','Fixture Brand','category','Vaccines','unit','route','Oral','dose','minimumStock',0,'allowsFraction','false'),gen_random_uuid())->>'id')::uuid;
   key:=gen_random_uuid();data:=jsonb_build_object('petId',p,'inventoryItemId',vaccine_item,'lotNumber','TEST-LOT','administeredAt',current_date,'nextDueAt',current_date+30);
   vac:=(public.create_vaccination(data,key)->>'id')::uuid;perform public.create_vaccination(data,key);
   if (select count(*) from public.reminders where vaccination_id=vac)<>1 then raise exception 'FAIL: duplicate vaccine reminder';end if;
@@ -42,7 +42,7 @@ do $$ declare o uuid; p uuid; q uuid; v uuid; vac uuid; key uuid; data jsonb; it
   begin perform public.export_report('patients');raise exception 'FAIL: staff export';exception when raise_exception then if sqlerrm not like '%FORBIDDEN%' then raise;end if;end;
   begin perform public.manage_kb('{"action":"create","title":"x","content":"x"}');raise exception 'FAIL: staff KB publication';exception when raise_exception then if sqlerrm not like '%FORBIDDEN%' then raise;end if;end;
   perform public.finalize_encounter(jsonb_build_object('id',v),gen_random_uuid());
-  begin perform public.create_prescription(jsonb_build_object('visitId',v,'medicationName','x','dose','x','frequency','x'),gen_random_uuid());raise exception 'FAIL: finalized change';exception when raise_exception then if sqlerrm not like '%RECORD_FINALIZED%' then raise;end if;end;
+  begin perform public.create_prescription(jsonb_build_object('visitId',v,'medicationName','x','route','Oral','dose','x','frequency','x'),gen_random_uuid());raise exception 'FAIL: finalized change';exception when raise_exception then if sqlerrm not like '%RECORD_FINALIZED%' then raise;end if;end;
   perform set_config('test.pet',p::text,true);perform set_config('test.other_pet',q::text,true);perform set_config('test.visit',v::text,true);
 end $$;
 reset role;

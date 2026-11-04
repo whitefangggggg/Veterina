@@ -39,6 +39,7 @@ describe('auth error messages', () => {
     expect(authErrorMessage({ code: 'invalid_credentials' })).toContain('email or password is incorrect')
     expect(authErrorMessage({ code: 'email_not_confirmed' })).toContain('confirm your email')
     expect(authErrorMessage({ code: 'over_email_send_rate_limit' })).toContain('Too many attempts')
+    expect(authErrorMessage({ code: 'email_address_not_authorized' })).toContain('Email delivery is not available')
     expect(authErrorMessage({ message: 'Password is too weak' })).toBe('Password is too weak')
     expect(authErrorMessage(null)).toContain('Please try again')
   })

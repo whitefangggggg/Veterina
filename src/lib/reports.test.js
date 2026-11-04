@@ -9,10 +9,10 @@ describe('clinical exports', () => {
       { medication_name: 'Historical medicine', dose: 'Historical dose', frequency: 'Historical frequency' },
       { medication_name: 'First medicine', medications: [
         { medicationName: 'First medicine', dose: 'First dose', frequency: 'First frequency', duration: 'First duration' },
-        { medicationName: 'Second medicine', dose: 'Second dose', frequency: 'Second frequency', instructions: 'Second <instructions>' },
+        { medicationName: 'Second medicine', dose: 'Second dose', route: 'Custom <route>', frequency: 'Second frequency', instructions: 'Second <instructions>' },
       ] },
     ] })
-    for (const text of ['Historical medicine', 'First medicine', 'Second medicine', 'Second dose', 'First duration', 'Second &lt;instructions&gt;']) expect(html).toContain(text)
+    for (const text of ['Historical medicine', 'First medicine', 'Second medicine', 'Second dose', 'First duration', 'Second &lt;instructions&gt;', 'Custom &lt;route&gt;', 'Not recorded']) expect(html).toContain(text)
   })
   it('prints diet, estimated dates, score scales, brands and maintenance notes', () => {
     const html = historyHtml({ patient: { name: 'Pet', diet: 'Diet <plan>', birth_date_estimated: true }, vitals: [{ body_condition_score: 3, body_condition_scale: 5 }, { body_condition_score: 7, body_condition_scale: 9 }], vaccinations: [{ brand: 'Brand A', lot_number: 'Old lot' }], maintenance: [{ service_name: 'Grooming', service_notes: 'Trimmed & brushed', status: 'completed' }] })
@@ -25,9 +25,9 @@ describe('clinical exports', () => {
   })
 
   it('prints every clinical section independently of the currently selected UI tab and escapes record text', () => {
-    const html = historyHtml({ patient: { name: '<script>alert(1)</script>' }, owner: { full_name: 'Owner' }, visits: [{ complaint: 'First' }, { complaint: 'Second' }, { complaint: 'Third' }], vitals: [{ weight: 2 }], alerts: [{ description: 'Allergy' }], vaccinations: [], prescriptions: [], corrections: [], reminders: [] })
+    const html = historyHtml({ patient: { name: '<script>alert(1)</script>' }, owner: { full_name: 'Owner' }, visits: [{ complaint: 'First', clinical_notes: 'Notes <observations>\nSecond line' }, { complaint: 'Second' }, { complaint: 'Third' }], vitals: [{ weight: 2 }], alerts: [{ description: 'Allergy' }], vaccinations: [], prescriptions: [], corrections: [], reminders: [] })
     expect(html).not.toContain('<script>')
-    for (const text of ['Owner', 'First', 'Second', 'Third', 'Vitals', 'Care alerts', 'Vaccinations', 'Prescriptions', 'Corrections', 'Reminders']) expect(html).toContain(text)
+    for (const text of ['Owner', 'First', 'Second', 'Third', 'Vitals', 'Care alerts', 'Vaccinations', 'Prescriptions', 'Corrections', 'Reminders', 'Clinical notes', 'Notes &lt;observations&gt;\nSecond line']) expect(html).toContain(text)
   })
 
   it('streams UTF-8 CSV with spreadsheet protections applied on the server', async () => {

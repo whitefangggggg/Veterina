@@ -3,6 +3,31 @@ import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { ActionDialog, RecordEditor } from './RecordForm'
 import { VaccineEditor, VisitEditor } from './ClinicalEditors'
+import WalkInRegistration from './WalkInRegistration'
+
+function FollowUpArrival({ pet, visit, onSaved, onClose }) {
+  const { services, profiles, owners, queueEntries, today, execute } = useClinicData()
+  const scheduledDate = visit.followUpScheduledDate || visit.followUpDate
+  const checkups = services.filter((service) => service.workflow === 'checkup')
+  const initialService = checkups.find((service) => service.name === 'Follow-up') || checkups.find((service) => service.name === visit.type) || checkups[0]
+  const initialStaff = profiles.find((profile) => profile.id === visit.veterinarianId && profile.is_active)
+  return <RecordEditor title={`Patient arrived · ${pet.name}`} description="Create a new clinical record and add this follow-up to today's queue. Enter the current complaint and measured weight; the previous clinical record is preserved."
+    initial={{ serviceId: initialService?.id || '', veterinarianId: initialStaff?.id || '', complaint: 'Scheduled follow-up checkup', notes: `Follow-up scheduled for ${scheduledDate}` }}
+    submitLabel="Create checkup & add to queue" onClose={onClose} onSave={async (values) => {
+      if (scheduledDate !== today) throw new Error('This follow-up is not scheduled for today. Close this dialog and reschedule it before recording arrival.')
+      if (pet.status !== 'Active' || !owners.some((owner) => owner.id === pet.ownerId && owner.isActive)) throw new Error('Select an active patient with an active owner before recording an arrival.')
+      if (queueEntries.some((entry) => entry.petId === pet.id && entry.category === 'checkup' && ['waiting', 'in_progress'].includes(entry.status))) throw new Error('This patient is already in the checkup queue. Open their existing queue entry.')
+      const saved = await execute('arrive_follow_up', { ...values, visitId: visit.id, petId: pet.id, expectedDate: scheduledDate })
+      onSaved?.(saved)
+      return saved
+    }} fields={[
+      { name: 'serviceId', label: 'Service', type: 'select', required: true, options: [{ value: '', label: 'Select checkup service' }, ...checkups.map((service) => ({ value: service.id, label: service.name }))] },
+      { name: 'veterinarianId', label: 'Assigned veterinarian / staff', type: 'select', required: true, options: [{ value: '', label: 'Select staff' }, ...profiles.filter((profile) => profile.is_active).map((profile) => ({ value: profile.id, label: profile.full_name || 'Clinic staff' }))] },
+      { name: 'complaint', label: 'Chief complaint', type: 'textarea', required: true, maxLength: 10000, span: true },
+      { name: 'weightKg', label: 'Current weight (kg)', type: 'number', required: true, min: '0.01', step: '0.01', hint: 'Enter a newly measured weight for this checkup.' },
+      { name: 'notes', label: 'Arrival notes', type: 'textarea', maxLength: 10000, span: true },
+    ]} />
+}
 
 function MaintenanceEditor({ entry, pet, onClose }) {
   const { execute } = useClinicData()
@@ -23,19 +48,25 @@ export function ServiceNotesEditor({ entry, onClose }) {
     fields={[{ name: 'notes', label: 'Arrival notes', type: 'textarea', maxLength: 10000, span: true }, { name: 'serviceNotes', label: 'Work performed / service notes', type: 'textarea', maxLength: 10000, required: entry.status === 'completed', span: true }]} />
 }
 
-export function QueueDialog({ modal, onClose }) {
-  const { pets, owners, profiles, appointments, queueEntries, visits, vaccinations, today, execute, getPet, services } = useClinicData()
+export function QueueDialog({ modal, onSaved, onClose }) {
+  const { owners, profiles, appointments, queueEntries, visits, vaccinations, today, execute, getPet } = useClinicData()
   const { user } = useAuth()
   const staff = profiles.filter((profile) => profile.is_active).map((profile) => ({ value: profile.id, label: profile.full_name || 'Clinic staff' }))
   const patientLabel = (pet) => `${pet?.name || 'Patient'} — ${owners.find((owner) => owner.id === pet?.ownerId)?.fullName || ''}`
   if (!modal) return null
-  if (modal.type === 'walkin') return <RecordEditor title="Add walk-in" description="Register an arrival for a clinic service." onClose={onClose}
-    initial={{ serviceId: services.find((service) => service.name === 'Wellness check')?.id || services[0]?.id }} submitLabel="Add to queue" onSave={(values) => execute('add_queue_entry', values)} fields={[
-      { name: 'petId', label: 'Patient', type: 'select', required: true, span: true, options: [{ value: '', label: 'Select an active patient' }, ...pets.filter((pet) => pet.status === 'Active').map((pet) => ({ value: pet.id, label: patientLabel(pet) }))] },
-      { name: 'serviceId', label: 'Service', type: 'select', required: true, options: [{ value: '', label: 'Select service' }, ...services.map((service) => ({ value: service.id, label: service.name }))] },
-      { name: 'veterinarianId', label: 'Assigned veterinarian / staff', type: 'select', options: [{ value: '', label: 'Unassigned' }, ...staff] },
-      { name: 'notes', label: 'Arrival notes', type: 'textarea', span: true },
-    ]} />
+  if (['followup-arrival', 'reschedule-followup'].includes(modal.type)) {
+    const pet = getPet(modal.petId)
+    const visit = visits.find((item) => item.id === modal.visitId && item.petId === modal.petId)
+    if (!pet || !visit?.followUpDate) return null
+    const scheduledDate = visit.followUpScheduledDate || visit.followUpDate
+    if (modal.type === 'reschedule-followup') return <RecordEditor title="Reschedule follow-up" description={`Choose a new follow-up date for ${pet.name}. The previous clinical notes stay unchanged.`}
+      initial={{ date: scheduledDate }} fields={[{ name: 'date', label: 'Follow-up date', type: 'date', min: today, required: true }]}
+      onSave={(values) => execute('reschedule_follow_up', { visitId: visit.id, expectedDate: scheduledDate, date: values.date })} onClose={onClose} submitLabel="Save follow-up date" />
+    if (scheduledDate !== today) return <ActionDialog title="This follow-up is not scheduled for today" description={`${pet.name}'s follow-up is scheduled for ${scheduledDate}. Today is ${today}. Reschedule it to today before recording arrival. No queue entry or clinical record has been created.`}
+      action="reschedule_follow_up" data={{ visitId: visit.id, expectedDate: scheduledDate, date: today }} submitLabel="Reschedule to today" onClose={onClose} />
+    return <FollowUpArrival pet={pet} visit={visit} onSaved={onSaved} onClose={onClose} />
+  }
+  if (modal.type === 'walkin') return <WalkInRegistration onClose={onClose} />
   if (modal.type === 'checkin') {
     const eligible = appointments.filter((appointment) => appointment.date === today && ['Pending', 'Confirmed'].includes(appointment.status)
       && getPet(appointment.petId)?.status === 'Active' && !queueEntries.some((entry) => entry.appointmentId === appointment.id))

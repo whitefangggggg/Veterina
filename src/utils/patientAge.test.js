@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { birthDateFromAge, visibleQueueEntries } from './clinicRules'
+import { birthDateFromAge, formatPatientAge, visibleQueueEntries } from './clinicRules'
 import { clinicDate, normalizeClinicData } from '../lib/clinicRepository'
+
+describe('patient age display', () => {
+  it.each([
+    ['2026-10-16', '2026-10-20', '0 years, 0 months'],
+    ['2025-09-20', '2026-10-20', '1 year, 1 month'],
+    ['2024-07-21', '2026-10-20', '2 years, 2 months'],
+    ['2024-07-20', '2026-10-20', '2 years, 3 months'],
+    ['2024-02-29', '2025-02-28', '1 year, 0 months'],
+    ['2026-01-31', '2026-02-28', '0 years, 1 month'],
+    ['2026-10-21', '2026-10-20', ''],
+    ['', '2026-10-20', ''],
+    ['invalid', '2026-10-20', ''],
+  ])('formats %s on %s', (birthDate, today, expected) => {
+    expect(formatPatientAge(birthDate, today)).toBe(expected)
+  })
+})
 
 describe('patient age entry', () => {
   it.each([
@@ -25,6 +41,10 @@ describe('patient age entry', () => {
 })
 
 describe('clinical and service snapshots', () => {
+  it('loads patient environments and leaves legacy patients unclassified', () => {
+    const data = normalizeClinicData({ pets: [{ id: 'indoor', environment: 'Indoor' }, { id: 'both', environment: 'Indoor & outdoor' }, { id: 'legacy' }] })
+    expect(data.pets.map((pet) => pet.environment)).toEqual(['Indoor', 'Indoor & outdoor', ''])
+  })
   it('preserves old scores, estimated dates, brands and archived services', () => {
     const data = normalizeClinicData({
       pets: [{ id: 'pet', birth_date: '2020-01-01', birth_date_estimated: true, diet: 'Renal diet' }],

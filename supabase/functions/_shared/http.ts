@@ -12,12 +12,14 @@ export async function staff(req:Request,owner=false){
   if(error || !data.user)throw new Error('UNAUTHENTICATED');
   const profile=checked(await client.from('profiles').select('id,role,is_active').eq('id',data.user.id).maybeSingle());
   if(!profile?.is_active || (owner && profile.role!=='owner'))throw new Error('FORBIDDEN');
+  const access=checked(await client.rpc('account_access'));
+  if(access?.subscription?.status!=='active')throw new Error('SUBSCRIPTION_EXPIRED');
   return {client,user:data.user,profile,authorization};
 }
 export function failure(error:unknown){
   const message=error instanceof Error?error.message:typeof error==='object'&&error&&'message' in error?String(error.message):'REQUEST_FAILED';
-  const code=['UNAUTHENTICATED','FORBIDDEN','AI_DISABLED','AI_RATE_LIMITED','NOT_FOUND','PROVIDER_NOT_CONFIGURED','VALIDATION_FAILED'].find((c)=>message.includes(c)) || 'REQUEST_FAILED';
-  return json({error:code},code==='UNAUTHENTICATED'?401:code==='FORBIDDEN'?403:code==='AI_RATE_LIMITED'?429:code==='AI_DISABLED'||code==='PROVIDER_NOT_CONFIGURED'?503:code==='NOT_FOUND'?404:400);
+  const code=['UNAUTHENTICATED','FORBIDDEN','SUBSCRIPTION_EXPIRED','AI_DISABLED','AI_RATE_LIMITED','NOT_FOUND','PROVIDER_NOT_CONFIGURED','VALIDATION_FAILED'].find((c)=>message.includes(c)) || 'REQUEST_FAILED';
+  return json({error:code},code==='UNAUTHENTICATED'?401:code==='FORBIDDEN'||code==='SUBSCRIPTION_EXPIRED'?403:code==='AI_RATE_LIMITED'?429:code==='AI_DISABLED'||code==='PROVIDER_NOT_CONFIGURED'?503:code==='NOT_FOUND'?404:400);
 }
 export async function body(req:Request){
   if(req.method!=='POST')throw new Error('VALIDATION_FAILED');

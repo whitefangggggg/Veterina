@@ -1,4 +1,4 @@
-const clinicPath = /^\/(dashboard|queue|patients|appointments|reminders|inventory|suppliers|reports|settings|knowledge)(\/|$)/
+const clinicPath = /^\/(dashboard|queue|patients|appointments|reminders|inventory|suppliers|reports|settings|knowledge|clinic-setup|subscription)(\/|$)/
 
 // Only return to known clinic routes. Reject protocol-relative and encoded URLs.
 export function safeReturnTo(value) {
@@ -13,11 +13,22 @@ export function safeReturnTo(value) {
   }
 }
 
-export function getAccessState({ loading, error, user, profile }) {
+export function safeAuthReturnTo(value) {
+  if (value === '/admin') return '/admin'
+  return safeReturnTo(value)
+}
+
+export function getAccessState({ loading, error, user, profile, needsRegistration, accountAccess }) {
   if (loading) return 'loading'
   if (error) return 'error'
   if (!user) return 'signed-out'
-  if (profile?.id === user.id && profile.is_active === true && ['owner', 'clinical_staff'].includes(profile.role)) return 'approved'
+  if (profile?.id === user.id && profile.is_active === true && ['owner', 'clinical_staff'].includes(profile.role)) {
+    if (accountAccess?.subscription?.status === 'expired') return 'expired'
+    if (accountAccess?.subscription?.status === 'disabled') return 'pending'
+    return 'approved'
+  }
+  if (accountAccess?.isPlatformAdmin) return 'platform-admin'
+  if (needsRegistration) return 'onboarding'
   return 'pending'
 }
 
@@ -27,6 +38,9 @@ export function authErrorMessage(error) {
   switch (error?.code) {
     case 'invalid_credentials': return 'The email or password is incorrect. Please try again.'
     case 'email_not_confirmed': return 'Please confirm your email before signing in.'
+    case 'email_address_not_authorized': return 'Email delivery is not available for this address yet. Please contact the app administrator.'
+    case 'email_address_invalid': return 'Please enter a valid email address.'
+    case 'email_provider_disabled': return 'Email sign-in is currently unavailable. Please contact the app administrator.'
     case 'user_already_exists': return 'An account with this email already exists. Please sign in.'
     case 'over_request_rate_limit':
     case 'over_email_send_rate_limit': return 'Too many attempts. Please wait a few minutes and try again.'

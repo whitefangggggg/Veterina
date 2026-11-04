@@ -1,17 +1,20 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { DeleteRecordDialog, RecordEditor } from './RecordForm'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { Field } from './ui'
 import { birthDateFromAge } from '../utils/clinicRules'
+import Combobox from './Combobox'
+import PetPhotoField from './PetPhotoField'
+import { petPhotoRequest } from '../lib/petPhotos'
 
-export function OwnerEditor({ record, onClose }) {
+export function OwnerEditor({ record, onClose, embedded = false, onSaved }) {
   const { execute, owners } = useClinicData()
   const [phone, setPhone] = useState(record?.phone || '')
   const normalized = phone.replace(/[^0-9]/g, '').replace(/^63/, '0')
   const duplicate = normalized.length > 7 ? owners.find((owner) => owner.id !== record?.id && (owner.normalizedPhone || owner.phone).replace(/[^0-9]/g, '').replace(/^63/, '0') === normalized) : null
-  return <RecordEditor title={record ? 'Edit pet owner' : 'Add pet owner'} onClose={onClose} initial={record}
-    onSave={(values) => execute(record ? 'update_owner' : 'create_owner', { ...values, ...(record ? { id: record.id } : {}) })}
+  return <RecordEditor title={record ? 'Edit pet owner' : 'Add pet owner'} onClose={onClose} initial={record} embedded={embedded}
+    onSave={async (values) => { const saved = await execute(record ? 'update_owner' : 'create_owner', { ...values, ...(record ? { id: record.id } : {}) }); onSaved?.(saved); return saved }}
     submitLabel="Save owner" fields={[
       { name: 'fullName', label: 'Full name', required: true, maxLength: 120, span: true },
       { name: 'phone', label: 'Mobile number', required: true, type: 'tel', placeholder: '09XX XXX XXXX or +63...', onChange: (event) => setPhone(event.target.value), hint: duplicate ? `An existing owner shares this phone: ${duplicate.fullName}. Check the owner directory before creating another record.` : 'Use a Philippine mobile number or an international number starting with +.' },
@@ -23,19 +26,36 @@ export function OwnerEditor({ record, onClose }) {
     ]} />
 }
 
-export function PetEditor({ record, onClose }) {
-  const { owners, execute, today } = useClinicData()
+export function PetEditor({ record, onClose, initialOwnerId = '', embedded = false, onSaved, lockOwner = false }) {
+  const { owners, execute, today, reload } = useClinicData()
+  const [ownerId, setOwnerId] = useState(record?.ownerId || initialOwnerId)
+  const [photo, setPhoto] = useState({ file: null, remove: false, requestId: crypto.randomUUID() })
+  const savedRecord = useRef(null)
+  const [registered, setRegistered] = useState(false)
   const [birthMode, setBirthMode] = useState(record?.birthDateEstimated ? 'preserve' : 'date')
   const [birthDate, setBirthDate] = useState(record?.birthDate || '')
   const [ageYears, setAgeYears] = useState('')
   const [ageMonths, setAgeMonths] = useState('')
   const estimated = birthDateFromAge(today, ageYears, ageMonths)
-  return <RecordEditor title={record ? 'Edit patient' : 'Register a new patient'} onClose={onClose}
-    initial={record ? { ...record, latestWeight: record.baseline_weight } : { ownerId: owners.find((owner) => owner.isActive)?.id, species: 'Dog', sex: '', reproductiveStatus: 'Unknown' }}
-    onSave={(values) => execute(record ? 'update_pet' : 'create_pet', { ...values, ...(record ? { id: record.id } : {}) })}
-    submitLabel={record ? 'Save patient' : 'Register patient'} fields={[
+  return <RecordEditor title={record ? 'Edit patient' : 'Register a new patient'} onClose={onClose} embedded={embedded}
+    initial={record ? { ...record, latestWeight: record.baseline_weight } : { ownerId, species: 'Dog', sex: '', reproductiveStatus: 'Unknown' }}
+    onSave={async (values) => {
+      if (!savedRecord.current) {
+        savedRecord.current = await execute(record ? 'update_pet' : 'create_pet', { ...values, ownerId, ...(record ? { id: record.id } : {}) })
+        setRegistered(true)
+      }
+      if (photo.file) await petPhotoRequest({ petId: savedRecord.current.id, requestId: photo.requestId, expectedRevision: record?.photo_revision || 0 }, photo.file)
+      else if (photo.remove) await petPhotoRequest({ action: 'remove', petId: savedRecord.current.id, expectedRevision: record?.photo_revision || 0 })
+      await reload()
+      onSaved?.(savedRecord.current)
+      return savedRecord.current
+    }}
+    submitLabel={registered ? 'Retry photo' : record ? 'Save patient' : 'Register patient'} fields={[
+      { name: 'photo', render: () => <PetPhotoField pet={record} value={photo} onChange={setPhoto} disabled={registered} /> },
+      ...(registered ? [{ name: 'photoRecovery', render: () => <div className="field-span auth-message" role="status">The patient record is saved. Retry the photo or continue without changing it. <button type="button" className="text-link" onClick={async () => { await reload(); onSaved?.(savedRecord.current); onClose?.() }}>Continue without photo</button></div> }] : []),
       { name: 'name', label: 'Pet name', required: true, maxLength: 120 },
-      { name: 'ownerId', label: 'Owner', type: 'select', required: true, options: [{ value: '', label: 'Choose owner' }, ...owners.filter((owner) => owner.isActive || owner.id === record?.ownerId).map((owner) => ({ value: owner.id, label: owner.fullName }))] },
+      { name: 'ownerId', render: () => <Field label="Owner" required><Combobox name="ownerId" label="Owner" value={ownerId} onChange={setOwnerId} required disabled={registered || lockOwner}
+        options={owners.filter((owner) => owner.isActive || owner.id === record?.ownerId).map((owner) => ({ value: owner.id, label: owner.fullName, detail: [owner.phone, owner.email].filter(Boolean).join(' · ') }))} placeholder="Search owner name, phone or email" /></Field> },
       { name: 'species', label: 'Species', type: 'select', options: ['Dog', 'Cat', 'Bird', 'Rabbit', 'Other'] },
       { name: 'breed', label: 'Breed', required: true },
       { name: 'sex', label: 'Sex', type: 'select', required: true, options: [{ value: '', label: record?.sex === 'Unknown' ? 'Previously Unknown — select sex' : 'Select sex' }, 'Male', 'Female'] },
@@ -57,7 +77,7 @@ export function PetEditor({ record, onClose }) {
       { name: 'diet', label: 'Diet / feeding notes', type: 'textarea', span: true },
       { name: 'microchip', label: 'Microchip number', pattern: '[0-9]{15}', hint: '15 digits, or leave blank.' },
       ...(record ? [{ name: 'status', label: 'Patient status', type: 'select', options: ['Active', 'Inactive', 'Deceased'] }] : [{ name: 'allergies', label: 'Known allergies', span: true }]),
-    ]} />
+    ].map((field) => field.render ? field : { ...field, disabled: registered })} />
 }
 
 export function OwnerDirectory() {

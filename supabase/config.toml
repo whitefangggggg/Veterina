@@ -1,13 +1,27 @@
 project_id = "veterina"
 [auth]
-enable_signup = false
+enable_signup = true
 [auth.email]
-enable_signup = false
+enable_signup = true
+enable_confirmations = true
+[auth.mfa.totp]
+enroll_enabled = false
+verify_enabled = false
 [functions.assistant-query]
 verify_jwt = false
 [functions.embed-worker]
 verify_jwt = false
 [functions.admin-staff]
 verify_jwt = false
+[functions.google-registration]
+verify_jwt = false
+[functions.platform-admin]
+verify_jwt = false
+[functions.clinic-activation]
+verify_jwt = false
 [functions.export-report]
+verify_jwt = false
+[functions.pet-photo]
+verify_jwt = false
+[functions.pet-photo-cleanup]
 verify_jwt = false

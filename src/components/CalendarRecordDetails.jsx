@@ -6,6 +6,7 @@ import { prescriptionMedications } from '../lib/prescriptions'
 import { Badge } from './ui'
 import { useAuth } from '../context/AuthContext'
 import { calendarEditActions } from '../lib/calendarRecordEditing'
+import PrescriptionActions from './PrescriptionActions'
 
 const statusName = (value) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' })[value] || value
 const dayLabel = (value, timezone) => { const date = dateInClinic(value, timezone); return date ? format(parseISO(date), 'd MMM yyyy') : 'Not recorded' }
@@ -18,9 +19,11 @@ function Fields({ rows }) {
 }
 
 function PrescriptionDetails({ prescription, visit, onEdit }) {
+  const data = useClinicData()
+  const pet = data.getPet(visit.petId)
   return <section className="calendar-preview-section"><h4>Prescription</h4><ol className="prescription-items">{prescriptionMedications(prescription).map((medication, index) => <li key={index}>
-    <strong>{medication.medicationName}</strong><p>{[medication.dose, medication.frequency, medication.duration].filter(Boolean).join(' · ')}</p>{medication.instructions && <p>{medication.instructions}</p>}
-  </li>)}</ol>{onEdit && !visit.finalizedAt && <button type="button" className="text-link" onClick={() => onEdit({ type: 'prescription', label: 'Edit prescription', record: prescription, petId: visit.petId })}>Edit prescription</button>}</section>
+    <strong>{medication.medicationName}</strong><p>{[medication.dose, `Route: ${medication.route || 'Not recorded'}`, medication.frequency, medication.duration].filter(Boolean).join(' · ')}</p>{medication.instructions && <p>{medication.instructions}</p>}
+  </li>)}</ol>{pet && <PrescriptionActions context={{ prescription, pet, visit, clinic: data.settings, profiles: data.profiles, owner: data.getOwner(pet.ownerId) }} />}{onEdit && !visit.finalizedAt && <button type="button" className="text-link" onClick={() => onEdit({ type: 'prescription', label: 'Edit prescription', record: prescription, petId: visit.petId })}>Edit prescription</button>}</section>
 }
 
 function CheckupDetails({ visit, data, onEdit }) {
@@ -35,6 +38,7 @@ function CheckupDetails({ visit, data, onEdit }) {
       ['Follow-up date', visit.followUpDate ? dayLabel(visit.followUpDate, data.timezone) : 'Not scheduled'],
     ]} />
     <div className="soap-grid">{[['S · Subjective', visit.subjective], ['O · Objective', visit.objective], ['A · Assessment', visit.assessment], ['P · Plan', visit.plan]].map(([label, value]) => <div key={label}><strong>{label}</strong><p>{display(value)}</p></div>)}</div>
+    {visit.clinicalNotes && <div className="service-notes"><strong>Clinical notes</strong><p>{visit.clinicalNotes}</p></div>}
     {(visit.prescriptions || []).map((prescription) => <PrescriptionDetails key={prescription.id} prescription={prescription} visit={visit} onEdit={onEdit} />)}
     {(visit.corrections || []).map((correction) => <section className="calendar-preview-section" key={correction.id}><h4>Correction · {correction.reason}</h4><p>{correction.correction}</p>{correction.created_at && <small>{timeLabel(correction.created_at, data.timezone)}</small>}</section>)}
   </>
@@ -52,7 +56,7 @@ function VaccineDetails({ vaccine, data }) {
 function QueueDetails({ entry, data, onEdit }) {
   const visit = data.visits.find((visit) => visit.id === entry.visit_id)
   const vaccine = data.vaccinations.find((vaccine) => vaccine.id === entry.vaccination_id)
-  const draftLabels = { complaint: 'Chief complaint', diagnosis: 'Diagnosis', subjective: 'Subjective', objective: 'Objective', assessment: 'Assessment', plan: 'Plan',
+  const draftLabels = { clinicalNotes: 'Clinical notes', complaint: 'Chief complaint', diagnosis: 'Diagnosis', subjective: 'Subjective', objective: 'Objective', assessment: 'Assessment', plan: 'Plan',
     weightKg: 'Weight (kg)', temperatureC: 'Temperature (°C)', heartRate: 'Heart rate (bpm)', respiratoryRate: 'Respiratory rate (rpm)', bodyConditionScore: 'Body condition', hydration: 'Hydration',
     followUpDate: 'Follow-up date', serviceNotes: 'Service notes', dose: 'Dose', administeredAt: 'Vaccination date', nextDueAt: 'Next due date' }
   const draft = Object.entries(entry.careDraft || {}).filter(([key, value]) => draftLabels[key] && value != null && value !== '').map(([key, value]) => [draftLabels[key], value])

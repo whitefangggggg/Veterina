@@ -4,6 +4,7 @@ import { ClinicDataProvider } from '../context/ClinicDataContext'
 import { safeReturnTo } from '../lib/authAccess'
 import AppShell from './AppShell'
 import { AuthAccessError, AuthLoading } from './AuthStatus'
+import OwnerOnboardingGate from './OwnerOnboardingGate'
 
 export default function ProtectedWorkspace() {
   const { access, user } = useAuth()
@@ -12,6 +13,9 @@ export default function ProtectedWorkspace() {
   if (access === 'loading') return <AuthLoading />
   if (access === 'error') return <AuthAccessError />
   if (access === 'signed-out') return <Navigate to={`/sign-in?next=${encodeURIComponent(returnTo)}`} replace />
+  if (access === 'onboarding') return <Navigate to={`/complete-account?next=${encodeURIComponent(returnTo)}`} replace />
+  if (access === 'expired') return <Navigate to="/subscription" replace />
+  if (access === 'platform-admin') return <Navigate to="/admin" replace />
   if (access !== 'approved') return <Navigate to={`/access-pending?next=${encodeURIComponent(returnTo)}`} replace />
-  return <ClinicDataProvider key={user.id}><AppShell /></ClinicDataProvider>
+  return <ClinicDataProvider key={user.id}><OwnerOnboardingGate><AppShell /></OwnerOnboardingGate></ClinicDataProvider>
 }
