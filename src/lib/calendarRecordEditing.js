@@ -4,6 +4,7 @@ const correction = (visit, role) => role === 'owner' ? [action('correct', 'Appen
 export function calendarEditActions(kind, record, data, role) {
   if (kind === 'checkup') return record.finalizedAt ? correction(record, role) : [action('visit', 'Edit checkup', record)]
   if (kind === 'vaccination') return [action('vaccine', 'Edit vaccination', record)]
+  if (kind === 'service' && record.recordingPurpose === 'record_only') return [action('historical-service', 'Edit service record', record)]
   if (kind === 'service') return [action('service-notes', 'Edit service notes', record)]
   if (kind !== 'timeline') return []
   const id = record.sourceId
@@ -14,6 +15,10 @@ export function calendarEditActions(kind, record, data, role) {
     if (record.kind === 'Correction' || visit.finalizedAt) return correction(visit, role)
     if (record.kind === 'Prescription') return [action('prescription', 'Edit prescription', visit.prescriptions.find((prescription) => prescription.id === id), visit.petId)]
     return calendarEditActions('checkup', visit, data, role)
+  }
+  if (record.kind === 'Service') {
+    const service = (data.serviceRecords || []).find((entry) => entry.id === id)
+    return service ? calendarEditActions('service', service, data, role) : []
   }
   if (record.kind === 'Vaccination') {
     const vaccine = data.vaccinations.find((vaccine) => vaccine.id === id)

@@ -129,7 +129,7 @@ export default function Landing() {
                     </header>
                     <ul>
                       <li>
-                        <span className="landing-hero-avatar" style={{ '--tone': '#78a99a' }}><Dog weight="duotone" /></span>
+                        <span className="landing-hero-avatar"><Dog weight="duotone" /></span>
                         <div>
                           <strong>Bella</strong>
                           <span>Golden Retriever · Exam room 1</span>
@@ -137,7 +137,7 @@ export default function Landing() {
                         <em>Active</em>
                       </li>
                       <li>
-                        <span className="landing-hero-avatar" style={{ '--tone': '#8aa7c4' }}><Cat weight="duotone" /></span>
+                        <span className="landing-hero-avatar"><Cat weight="duotone" /></span>
                         <div>
                           <strong>Mochi</strong>
                           <span>Domestic Shorthair · Vaccine due</span>
@@ -145,7 +145,7 @@ export default function Landing() {
                         <em className="warn">Due</em>
                       </li>
                       <li>
-                        <span className="landing-hero-avatar" style={{ '--tone': '#c4a57a' }}><Rabbit weight="duotone" /></span>
+                        <span className="landing-hero-avatar"><Rabbit weight="duotone" /></span>
                         <div>
                           <strong>Coco</strong>
                           <span>Holland Lop · Follow-up</span>

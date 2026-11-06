@@ -1,13 +1,13 @@
 import { dateInClinic, isClinicDate } from './dailyWorkflow'
 
 const normalize = (value) => String(value ?? '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
-const statusName = (status) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' })[status] || status
+const statusName = (status) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled', record_only: 'Record only' })[status] || status
 const entry = (record, date, facets, text) => ({ id: record.id, record, date, facets, search: [date, ...Object.values(facets), ...text].filter(Boolean).join(' ') })
 
 export function vaccinationHistoryRecords(vaccinations, profiles, timezone) {
   return vaccinations.map((vaccine) => entry(vaccine, dateInClinic(vaccine.administeredAt, timezone), {
-    vaccine: vaccine.vaccine, brand: vaccine.brand || 'Not recorded', status: vaccine.careStatus || 'Recorded',
-    due: vaccine.nextDoseStatus, veterinarian: vaccine.administered_by_name || profiles.find((profile) => profile.id === vaccine.veterinarianId)?.full_name || 'Clinic staff',
+    vaccine: vaccine.vaccine, brand: vaccine.brand || 'Not recorded', status: vaccine.recordingPurpose === 'record_only' ? 'Record only' : vaccine.careStatus || 'Recorded',
+    due: vaccine.nextDoseStatus, veterinarian: vaccine.administered_by_name || profiles.find((profile) => profile.id === vaccine.veterinarianId)?.full_name || 'Not recorded',
   }, [vaccine.dose, vaccine.lotNumber, vaccine.nextDueAt, vaccine.careQueue?.queueNumber]))
     .sort((a, b) => b.date.localeCompare(a.date))
 }

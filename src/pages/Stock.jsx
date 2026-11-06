@@ -19,7 +19,8 @@ const activeField = { name: 'isActive', label: 'Status', type: 'select', options
 function ItemEditor({ record, onClose }) {
   const { suppliers, execute } = useClinicData()
   const [category, setCategory] = useState(record?.category || 'Medicine')
-  return <RecordEditor title={record ? 'Edit inventory item' : 'New inventory item'} initial={record || { category: 'Medicine', minimumStock: 0, unit: 'unit', allowsFraction: 'false' }} onClose={onClose}
+  const [allowsFraction, setAllowsFraction] = useState(record?.allowsFraction || false)
+  return <RecordEditor title={record ? 'Edit inventory item' : 'New inventory item'} initial={record || { category: 'Medicine', minimumStock: 0, unit: 'unit', allowsFraction: 'false', initialQuantity: 0 }} onClose={onClose}
     onSave={(values) => execute(record ? 'update_inventory_item' : 'create_inventory_item', { ...values, ...(record ? { id: record.id } : {}) })}
     fields={[
       { name: 'name', label: 'Item name', required: true }, { name: 'sku', label: 'SKU', disabled: true, placeholder: 'Generated on save', hint: record ? 'Assigned automatically.' : 'Assigned automatically when you save the item.' },
@@ -29,7 +30,8 @@ function ItemEditor({ record, onClose }) {
       { name: 'supplierId', label: 'Preferred supplier', type: 'select', options: [{ value: '', label: 'No preferred supplier' }, ...suppliers.filter((supplier) => supplier.isActive || supplier.id === record?.supplierId).map((supplier) => ({ value: supplier.id, label: supplier.name }))] },
       { name: 'notes', label: 'Notes', type: 'textarea', span: true, placeholder: 'Storage instructions, handling reminders or other item details' },
       ...(record ? [activeField] : [
-        { name: 'allowsFraction', label: 'Allow fractional quantities', type: 'select', options: [{ value: 'false', label: 'Whole units only' }, { value: 'true', label: 'Fractional units allowed' }] },
+        { name: 'allowsFraction', label: 'Allow fractional quantities', type: 'select', options: [{ value: 'false', label: 'Whole units only' }, { value: 'true', label: 'Fractional units allowed' }], onChange: (event) => setAllowsFraction(event.target.value === 'true') },
+        { name: 'initialQuantity', label: 'Initial stock quantity', type: 'number', min: '0', max: '9999999999.99', step: allowsFraction ? '0.01' : '1', required: true, hint: allowsFraction ? 'Enter the stock you already have, including decimals such as 2.5. Use 0 to add stock later.' : 'Enter the whole units you already have. Use 0 to add stock later.' },
         { name: 'lotNumber', label: 'Initial batch / lot number' }, { name: 'expirationDate', label: 'Initial batch expiry', type: 'date' },
       ]),
     ]} />
@@ -123,7 +125,7 @@ export function Inventory() {
         {!item.movements.length && <p>No stock movements yet. Record stock in after creating the item.</p>}
       </details>
     </SectionCard>)}</div>
-    {!filtered.length && <EmptyState icon={Package} title="No inventory items" description="Create an item, add its batches, then record stock in." />}
+    {!filtered.length && <EmptyState icon={Package} title="No inventory items" description="Create an item with its initial stock, or add stock later." />}
     <p className="inventory-rule-note">Stock balances come from the movement ledger. Items with stock history can be archived; their ledger is retained.</p>
     {modal?.type === 'item' && <ItemEditor record={selectedItem} onClose={() => setModal(null)} />}
     {modal?.type === 'batch' && <BatchEditor item={selectedItem} record={modal.record} onClose={() => setModal(null)} />}

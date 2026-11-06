@@ -1,3 +1,4 @@
+import { openNewVisit } from './helpers/new-visit.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Browser UI checks use intercepted API responses; portal_workflows.sql covers
 // persistence, validation, atomicity and finalized-record guards on Postgres.
@@ -22,6 +23,7 @@ const raw = {
   owners: [{ id: ownerId, full_name: 'Test owner', phone: '09171234567', is_active: true }],
   visits: [{ id: visitId, pet_id: petId, visit_type: 'Wellness check', chief_complaint: 'Recorded complaint', diagnosis_summary: 'Recorded diagnosis', visited_at: '2026-10-17T04:00:00Z', attending_veterinarian_id: userId }],
   visit_vitals: [{ id: 'vitals', visit_id: visitId, weight_kg: 3.5, measured_at: '2026-10-17T04:00:00Z' }],
+  service_types: [{ id: 'checkup', name: 'Wellness check', workflow: 'checkup', is_active: true }],
   prescriptions: [],
   inventory_items: [
     { id: '50000000-0000-4000-8000-000000000001', name: 'Stock medicine', sku: 'SKU-ALPHA', brand: 'Alpha', category: 'Medicine', unit: 'tablet', minimum_stock: 0, is_active: true, allows_fraction: false, notes: 'Inventory context only' },
@@ -131,14 +133,30 @@ try {
   console.log('PASS shop logo upload validation, resize, preview, cancel, save failure/retry, persisted reload and mobile layout')
   await page.goto(`${origin}/patients/${petId}`)
   await expect(page.getByRole('heading', { name: 'Mochi', exact: true })).toBeVisible()
+  await openNewVisit(page)
+  await page.getByRole('button', { name: /Queue processing/ }).click()
+  await expect(page.getByLabel('Attending veterinarian', { exact: true })).toHaveValue('Dr. Alex Rivera')
+  await expect(page.getByLabel('Attending veterinarian', { exact: true })).not.toHaveAttribute('aria-invalid', 'true')
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await page.getByRole('button', { name: 'Add prescription', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByLabel('Open encounter', { exact: true })).toHaveValue(visitId)
   await dialog.getByLabel('Medication name 1', { exact: true }).fill('Medicine A')
   await dialog.getByLabel('Dose 1', { exact: true }).fill('Recorded dose A')
-  await dialog.getByLabel('Frequency 1', { exact: true }).fill('Recorded frequency A')
+  const frequency = dialog.getByRole('combobox', { name: 'Frequency 1', exact: true })
+  const duration = dialog.getByRole('combobox', { name: 'Duration 1', exact: true })
+  await expect(frequency).toHaveValue('')
+  await expect(duration).toHaveValue('')
+  await frequency.focus()
+  await expect(dialog.getByRole('listbox', { name: 'Frequency 1 options', exact: true }).getByRole('option')).toHaveText(['Once a day', 'Twice a day', 'Every 4 hours'])
+  await frequency.press('ArrowDown')
+  await frequency.press('Enter')
+  await expect(frequency).toHaveValue('Twice a day')
   await dialog.getByRole('combobox', { name: 'Route 1', exact: true }).fill('Oral')
-  await dialog.getByLabel('Duration 1', { exact: true }).fill('7 days')
+  await duration.focus()
+  await expect(dialog.getByRole('listbox', { name: 'Duration 1 options', exact: true }).getByRole('option')).toHaveText(['3 days', '5 days', '7 days', '14 days', '1 month'])
+  await dialog.getByRole('option', { name: '7 days', exact: true }).click()
+  await expect(duration).toHaveValue('7 days')
   await dialog.getByLabel('Instructions 1', { exact: true }).fill('First instructions')
   await dialog.getByRole('button', { name: 'Add medication', exact: true }).click()
   await dialog.getByRole('button', { name: 'Save prescription', exact: true }).click()
@@ -149,7 +167,13 @@ try {
   await dialog.getByRole('button', { name: 'Save prescription', exact: true }).click()
   assert.equal(calls.length, 0, 'Missing route reached the server')
   await dialog.getByRole('combobox', { name: 'Route 2', exact: true }).fill('Custom route')
-  await dialog.getByLabel('Duration 2', { exact: true }).fill('3 days')
+  await dialog.getByLabel('Frequency 2', { exact: true }).fill('')
+  await dialog.getByRole('button', { name: 'Save prescription', exact: true }).click()
+  assert.equal(calls.length, 0, 'Missing frequency reached the server')
+  await dialog.getByLabel('Frequency 2', { exact: true }).fill('Recorded frequency B')
+  await dialog.getByLabel('Duration 2', { exact: true }).fill('10 days')
+  await expect(frequency).toHaveValue('Twice a day')
+  await expect(duration).toHaveValue('7 days')
   await dialog.getByLabel('Instructions 2', { exact: true }).fill('With food & water')
   await dialog.getByRole('button', { name: 'Add medication', exact: true }).click()
   await dialog.getByRole('button', { name: 'Remove medication 3', exact: true }).click()
@@ -165,6 +189,10 @@ try {
   await expect(dialog).toHaveCount(0)
   assert.equal(calls[0].key, calls[1].key, 'Retry changed its idempotency key')
   assert.equal(calls[1].payload.medications.length, 2)
+  assert.equal(calls[1].payload.medications[0].frequency, 'Twice a day')
+  assert.equal(calls[1].payload.medications[0].duration, '7 days')
+  assert.equal(calls[1].payload.medications[1].frequency, 'Recorded frequency B')
+  assert.equal(calls[1].payload.medications[1].duration, '10 days')
   await expect(page.locator('.prescription-row')).toContainText('Medicine B')
   await page.evaluate(() => {
     const createElement = document.createElement.bind(document)
@@ -182,6 +210,7 @@ try {
   await expect(printFrame.getByAltText('Veterina Animal Clinic logo')).toHaveAttribute('src', preparedLogo)
   assert.equal(await printFrame.locator('.shop-logo').evaluate((image) => image.complete && image.naturalWidth > 0), true)
   for (const text of ['Medicine A', 'Medicine B', 'Route: Oral', 'Route: Custom route', 'Dr. Alex Rivera', '123456', 'PTR-2026', 'Recorded diagnosis', '3.5 kg', '24 Garden Street', 'Veterina Animal Clinic']) await expect(printFrame.locator('body')).toContainText(text)
+  for (const text of ['Twice a day', '7 days', 'Recorded frequency B', '10 days']) await expect(printFrame.locator('body')).toContainText(text)
   const html = await printFrame.locator('html').evaluate((element) => element.outerHTML)
   const preview = await context.newPage()
   await preview.setContent(html)
@@ -220,9 +249,15 @@ try {
   await expect(page.getByRole('alert')).toHaveCount(0)
   assert.equal(calls.length, beforeImage, 'Downloading an image must not write or dispense again')
   await page.getByRole('button', { name: 'Edit prescription', exact: true }).click()
+  await expect(frequency).toHaveValue('Twice a day')
+  await expect(duration).toHaveValue('7 days')
+  await expect(dialog.getByLabel('Frequency 2', { exact: true })).toHaveValue('Recorded frequency B')
+  await expect(dialog.getByLabel('Duration 2', { exact: true })).toHaveValue('10 days')
   await expect(dialog.getByLabel('Medication name 2', { exact: true })).toHaveValue('Medicine B')
   await dialog.getByRole('button', { name: 'Remove medication 1', exact: true }).click()
   await expect(dialog.getByLabel('Medication name 1', { exact: true })).toHaveValue('Medicine B')
+  await expect(frequency).toHaveValue('Recorded frequency B')
+  await expect(duration).toHaveValue('10 days')
   await dialog.getByLabel('Duration 1', { exact: true }).fill('5 days')
   await dialog.getByRole('button', { name: 'Save prescription', exact: true }).click()
   await expect(dialog).toHaveCount(0)

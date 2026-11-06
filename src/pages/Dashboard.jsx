@@ -5,6 +5,7 @@ import {
   CalendarDots,
   ChartBar,
   FirstAidKit,
+  FileText,
   MagnifyingGlass,
   Package,
   PawPrint,
@@ -21,6 +22,7 @@ import DailyWorklist from '../components/DailyWorklist'
 const spaces = [
   { to: '/queue', title: 'In-site queue', description: 'Walk-ins, check-ins, checkups and vaccinations.', icon: FirstAidKit, color: 'amber' },
   { to: '/patients', title: 'Patient records', description: 'Owners, pets, checkups and complete clinical histories.', icon: PawPrint, color: 'sage' },
+  { to: '/travel-certificates', title: 'Travel Certificates', description: 'Review vaccinations and issue pet-specific travel documents.', icon: FileText, color: 'sage' },
   { to: '/appointments', title: 'Appointments', description: 'A calm monthly calendar and focused daily agenda.', icon: CalendarDots, color: 'mint' },
   { to: '/reminders', title: 'Reminder center', description: 'Today’s calls, follow-ups and upcoming vaccines.', icon: BellRinging, color: 'blue' },
   { to: '/inventory', title: 'Inventory', description: 'Quantities, stock movements, batches and expirations.', icon: Package, color: 'blue' },

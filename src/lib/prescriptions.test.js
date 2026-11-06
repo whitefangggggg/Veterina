@@ -7,6 +7,13 @@ const medications = [
 ]
 
 describe('prescriptions', () => {
+  it('prints a partial historical prescription without attributing it to the recorder', () => {
+    const html = prescriptionHtml({ prescription: { is_historical: true, recorded_by: 'recorder', prescribed_by: null, prescribed_by_name: 'Dok Máya <Bukid>', prescribed_at: '2020-01-02T03:00:00Z', medications: [{ medicationName: 'Tambal' }] },
+      pet: { name: 'Ming' }, visit: {}, clinic: { timezone: 'Asia/Manila' }, profiles: [{ id: 'recorder', full_name: 'Recorder', prc_license_number: 'RECORDER-LICENSE' }] })
+    for (const text of ['Historical prescription record', 'Dok Máya &lt;Bukid&gt;', '2020-01-02', 'Tambal', 'Recorded prescriber']) expect(html).toContain(text)
+    expect(html).not.toContain('RECORDER-LICENSE')
+    expect(html).not.toContain('<small>Signature</small>')
+  })
   it('embeds the saved shop logo and keeps the default symbol when no valid logo exists', () => {
     const context = { prescription: { prescribed_at: '2026-10-17T04:00:00Z' }, pet: { name: 'Mochi' }, visit: {}, clinic: { clinic_name: 'Clinic & Co', logo_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==' } }
     const html = prescriptionHtml(context)

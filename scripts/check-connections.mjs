@@ -81,7 +81,7 @@ try {
   page.on('requestfailed', (request) => failedRequests.push(`${request.url()}: ${request.failure()?.errorText}`))
   await page.clock.install({ time: now })
   if (!process.argv.includes('--daily-only')) {
-  const routes = ['/dashboard', '/queue', '/patients', `/patients/${petId}`, '/appointments', '/reminders', '/inventory', '/suppliers', '/reports', '/settings', '/knowledge']
+  const routes = ['/dashboard', '/queue', '/patients', `/patients/${petId}`, '/appointments', '/reminders', '/travel-certificates', '/inventory', '/suppliers', '/reports', '/settings', '/knowledge']
   for (const role of ['clinical_staff', 'owner']) {
     profile.role = role
     for (const route of routes) {

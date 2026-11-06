@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 
-export default function Combobox({ label, name, value = '', onChange, options, required = false, allowCustom = false, disabled = false, placeholder }) {
+export default function Combobox({ label, name, value = '', onChange, options, required = false, allowCustom = false, disabled = false, placeholder, inputProps = {} }) {
   const id = useId()
   const input = useRef(null)
   const list = useRef(null)
@@ -18,20 +18,20 @@ export default function Combobox({ label, name, value = '', onChange, options, r
   useEffect(() => { input.current?.setCustomValidity(required && !allowCustom && !selected ? 'Select an existing record from the list.' : '') }, [required, allowCustom, selected])
   useEffect(() => { if (open) list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }) }, [active, open])
   const matches = options.filter((option) => `${option.label} ${option.detail || ''} ${option.searchText || ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
-  const choices = allowCustom && query.trim() && !matches.some((option) => option.value === query.trim()) ? [...matches, { value: query.trim(), label: `Use: ${query.trim()}` }] : matches
+  const choices = allowCustom && query.trim() && !matches.some((option) => option.value === query.trim()) ? [...matches, { value: query.trim(), label: `Use: ${query.trim()}`, custom: true }] : matches
   const select = (option) => {
     if (!option) return
     lastValue.current = option.value
     setQuery(options.find((entry) => entry.value === option.value)?.label || option.value)
-    onChange(option.value); setOpen(false)
+    onChange(option.value, { option: option.custom ? null : option }); setOpen(false)
   }
   return <div className="medication-combobox">
     {name && <input type="hidden" name={name} value={value} />}
-    <input ref={input} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open} aria-controls={id}
+    <input {...inputProps} ref={input} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open} aria-controls={id}
       aria-activedescendant={open && choices.length ? `${id}-${Math.min(active, choices.length - 1)}` : undefined}
       autoComplete="off" placeholder={placeholder} value={query} required={required} disabled={disabled}
       onFocus={() => { setActive(0); setOpen(true) }} onBlur={() => setOpen(false)}
-      onChange={(event) => { const next = allowCustom ? event.target.value : ''; lastValue.current = next; setQuery(event.target.value); onChange(next); setActive(0); setOpen(true) }}
+      onChange={(event) => { const next = allowCustom ? event.target.value : ''; lastValue.current = next; setQuery(event.target.value); onChange(next, { option: null }); setActive(0); setOpen(true) }}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); setOpen(false) }
         if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {

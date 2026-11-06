@@ -9,7 +9,7 @@ export function appointmentPatientSource(appointment) {
 export function upcomingFollowUps(visits, pets, today) {
   const activePets = new Set(pets.filter((pet) => pet.status === 'Active').map((pet) => pet.id))
   return visits.map((visit) => ({ ...visit, scheduledDate: visit.followUpScheduledDate || visit.followUpDate })).filter((visit) => activePets.has(visit.petId)
-    && visit.careStatus !== 'Cancelled'
+    && visit.careStatus !== 'Cancelled' && visit.recordingPurpose !== 'record_only'
     && !visit.followUpArrivedAt && isClinicDate(visit.scheduledDate) && visit.scheduledDate >= today)
     .map((visit) => ({
       id: `follow-up-${visit.id}`, visitId: visit.id, petId: visit.petId,

@@ -3,6 +3,7 @@ import { VisitEditor, VaccineEditor, PrescriptionEditor } from './ClinicalEditor
 import { AppointmentEditor, ReminderEditor } from './OperationEditors'
 import { QueueDialog, ServiceNotesEditor } from './QueueEditors'
 import { ActionDialog } from './RecordForm'
+import { ServiceVisitEditor } from './NewVisitDialog'
 import { Modal } from './ui'
 
 export default function CalendarRecordEditor({ action, onClose }) {
@@ -21,6 +22,7 @@ export default function CalendarRecordEditor({ action, onClose }) {
     return <VaccineEditor pet={pet} record={vaccine} onClose={onClose} />
   }
   if (action.type === 'prescription') return <PrescriptionEditor pet={pet} record={record} onClose={onClose} />
+  if (action.type === 'historical-service') return <ServiceVisitEditor pet={pet} purpose="record_only" record={record} service={{ id: record.serviceTypeId, name: record.service }} onClose={onClose} />
   if (action.type === 'service-notes') return <ServiceNotesEditor entry={queueEntries.find((entry) => entry.id === record.id) || record} onClose={onClose} />
   if (action.type === 'queue-care' || action.type === 'queue-start') return <QueueDialog modal={{ type: action.type === 'queue-start' ? 'start' : 'care', entry: record }} onClose={onClose} />
   if (action.type === 'appointment') return <AppointmentEditor record={appointments.find((appointment) => appointment.id === record.id) || record} onClose={onClose} />

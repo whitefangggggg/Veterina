@@ -42,7 +42,7 @@ export function EmptyState({ icon: Icon, title, description, action }) {
   )
 }
 
-export function Modal({ title, description, children, onClose, wide = false }) {
+export function Modal({ title, description, children, onClose, wide = false, className = '' }) {
   const dialogRef = useRef(null)
   useEffect(() => {
     const previousFocus = document.activeElement
@@ -75,7 +75,7 @@ export function Modal({ title, description, children, onClose, wide = false }) {
       <section
         ref={dialogRef}
         onKeyDown={onKeyDown}
-        className={`modal ${wide ? 'modal-wide' : ''}`}
+        className={`modal ${wide ? 'modal-wide' : ''} ${className}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}

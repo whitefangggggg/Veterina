@@ -18,6 +18,14 @@ describe('clinic dates and persisted record projection', () => {
     const snapshot = normalizeClinicData({ visits: [{ id: 'visit', visited_at: '2026-10-01' }], vaccinations: [{ id: 'vaccine', administered_at: '2026-10-01' }] })
     for (const record of [snapshot.visits[0], snapshot.vaccinations[0]]) expect(record).toMatchObject({ careStatus: 'Recorded', careQueue: null })
   })
+  it('keeps historical vaccine dates and clinician names without live due status', () => {
+    const snapshot = normalizeClinicData({ vaccinations: [
+      { id: 'historical', administered_at: '2020-01-02', next_due_at: '2021-01-02', recording_purpose: 'record_only', administered_by_name: 'Dok Máya' },
+      { id: 'unknown', administered_at: '2019-01-02', recording_purpose: 'record_only' },
+    ] })
+    expect(snapshot.vaccinations[0]).toMatchObject({ recordingPurpose: 'record_only', careStatus: 'Recorded', careQueue: null, nextDueAt: '2021-01-02', nextDoseStatus: 'Historical record', veterinarianName: 'Dok Máya' })
+    expect(snapshot.vaccinations[1].veterinarianName).toBe('')
+  })
   it('formats assigned tickets without changing their saved clinic date at midnight', () => {
     const raw = { queue_entries: [
       { id: 'early', arrived_at: '2026-10-16T15:30:00Z', queue_date: '2026-10-16', queue_number: 1 },
@@ -85,6 +93,12 @@ describe('clinic dates and persisted record projection', () => {
     })
     expect(snapshot.visits[0].veterinarian).toBe('Original clinician')
     expect(snapshot.vaccinations.map((row) => row.id)).toEqual(['new', 'old'])
+  })
+
+  it('preserves unknown historical measurements and clinicians without substituting staff or baseline weight', () => {
+    const snapshot = normalizeClinicData({ pets: [{ id: 'pet', baseline_weight: 5 }], visits: [{ id: 'historic', pet_id: 'pet', visited_at: '2020-01-01', recording_purpose: 'record_only', attending_veterinarian_id: null }] })
+    expect(snapshot.visits[0]).toMatchObject({ recordingPurpose: 'record_only', veterinarian: 'Not recorded', weightKg: null, careQueue: null })
+    expect(snapshot.pets[0].latestWeight).toBe(5)
   })
 
   it('computes reminder display state from the clinic date and keeps terminal states', () => {

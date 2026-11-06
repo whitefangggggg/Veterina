@@ -1,3 +1,4 @@
+import { openNewVisit } from './helpers/new-visit.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 import assert from 'node:assert/strict'
 import { expect } from '@playwright/test'
@@ -6,8 +7,9 @@ import { mockAccessToken } from './helpers/mock-auth.mjs'
 
 const api = new URL(frontendEnvironment().VITE_SUPABASE_URL)
 const actor = '10000000-0000-4000-8000-000000000001', patient = '20000000-0000-4000-8000-000000000001'
+const assignedVeterinarian = '10000000-0000-4000-8000-000000000002'
 const raw = {
-  profiles: [{ id: actor, full_name: 'Completion clinician', role: 'clinical_staff', is_active: true }],
+  profiles: [{ id: actor, full_name: 'Completion clinician', role: 'clinical_staff', is_active: true }, { id: assignedVeterinarian, full_name: 'Assigned veterinarian', role: 'clinical_staff', is_active: true }],
   clinic_settings: [{ id: 'settings', clinic_name: 'Completion clinic', timezone: 'Asia/Manila' }],
   owners: [{ id: 'household', full_name: 'Test household', phone: '09171234567', is_active: true }],
   pets: [{ id: patient, owner_id: 'household', name: 'Indo', record_number: 'VET-1', species: 'Dog', breed: 'Mixed', status: 'Active', baseline_weight: 3 }],
@@ -26,6 +28,7 @@ try {
     const url = new URL(route.request().url()), request = route.request()
     const reply = (value, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
     if (url.pathname === '/rest/v1/rpc/account_access') return reply(mockAccountAccess(raw.profiles[0]))
+    if (url.pathname === '/rest/v1/profiles' && url.searchParams.has('id')) return reply(raw.profiles.filter((profile) => `eq.${profile.id}` === url.searchParams.get('id')))
     if (url.pathname === '/auth/v1/user') return reply(session.user)
     if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
     if (url.pathname === '/rest/v1/rpc/portal_mutation') {
@@ -50,11 +53,28 @@ try {
   })
   const page = await context.newPage(); page.on('pageerror', (failure) => errors.push(failure.message))
   await page.goto(`${app.origin}/patients/${patient}`)
-  await page.getByRole('button', { name: 'Record checkup', exact: true }).click()
+  await openNewVisit(page)
+  await page.getByRole('button', { name: /Queue processing/ }).click()
+  const veterinarian = page.getByLabel('Attending veterinarian', { exact: true })
+  await expect(veterinarian).toHaveValue('')
+  await expect(veterinarian).toHaveAttribute('aria-invalid', 'true')
+  await expect(veterinarian).toHaveCSS('border-top-color', 'rgb(199, 71, 71)')
+  await expect(page.getByText('Select an attending veterinarian or enter a name', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Clinical observations', includeHidden: true })).toBeHidden()
   await expect(page.getByRole('heading', { name: 'Diagnosis & follow-up', includeHidden: true })).toBeHidden()
   await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
   assert.equal(calls.length, 0, 'Invalid care was persisted')
+  await page.getByLabel('Chief complaint').fill('Required veterinarian check')
+  await page.getByRole('button', { name: 'Save clinical entry', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveAccessibleName('Record checkup for Indo')
+  await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveAccessibleName('Record checkup for Indo')
+  assert.equal(calls.length, 0, 'Missing veterinarian reached the server')
+  await veterinarian.fill('Completion clinician')
+  await page.getByRole('option', { name: 'Completion clinician', exact: true }).click()
+  await expect(veterinarian).not.toHaveAttribute('aria-invalid', 'true')
+  await expect(veterinarian).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await expect(page.getByText('Select an attending veterinarian or enter a name', { exact: true })).toHaveCount(0)
   await page.getByLabel('Chief complaint').fill('Today’s checkup')
   await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveAccessibleName('Complete this checkup?')
@@ -86,12 +106,17 @@ try {
   assert.equal(raw.prescriptions[0].visit_id, visitId)
   assert.equal(raw.queue_entries.length, 1)
   assert.equal(raw.queue_entries[0].status, 'completed')
+  assert.equal(calls[0].data.veterinarianId, actor)
   await page.locator('.visit-card').filter({ hasText: 'Today’s checkup' }).getByRole('button', { name: 'Edit checkup', exact: true }).click()
+  await expect(veterinarian).toHaveValue('Completion clinician')
   await expect(page.getByRole('heading', { name: 'Clinical observations', includeHidden: true })).toBeHidden()
   await expect(page.getByRole('heading', { name: 'Diagnosis & follow-up', includeHidden: true })).toBeHidden()
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
-  await page.getByRole('button', { name: 'Record checkup', exact: true }).click()
+  await openNewVisit(page)
+  await page.getByRole('button', { name: /Queue processing/ }).click()
   await page.getByLabel('Chief complaint').fill('Complete without prescription')
+  await veterinarian.fill('Completion clinician')
+  await page.getByRole('option', { name: 'Completion clinician', exact: true }).click()
   await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
   await page.setViewportSize({ width: 375, height: 812 })
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
@@ -99,8 +124,11 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0)
   assert.equal(raw.queue_entries.length, 2)
   assert.equal(raw.prescriptions.length, 1)
-  await page.getByRole('button', { name: 'Record checkup', exact: true }).click()
+  await openNewVisit(page)
+  await page.getByRole('button', { name: /Queue processing/ }).click()
   await page.getByLabel('Chief complaint').fill('Leave prescription unfinished')
+  await veterinarian.fill('Completion clinician')
+  await page.getByRole('option', { name: 'Completion clinician', exact: true }).click()
   await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
   await page.getByRole('button', { name: 'Add Prescription', exact: true }).click()
   await expect(page.getByLabel('Open encounter', { exact: false })).toBeDisabled()
@@ -114,6 +142,31 @@ try {
   await expect(page.getByRole('heading', { name: 'Clinical observations' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Diagnosis & follow-up' })).toBeVisible()
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  raw.visits[0].attending_veterinarian_id = assignedVeterinarian
+  await page.reload()
+  await page.locator('.visit-card').filter({ hasText: 'Older visit' }).first().getByRole('button', { name: 'Edit checkup', exact: true }).click()
+  await expect(page.getByLabel('Reason for Checkup')).toHaveValue('Wellness check')
+  await expect(veterinarian).toHaveValue('Assigned veterinarian')
+  await expect(veterinarian).not.toHaveAttribute('aria-invalid', 'true')
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  Object.assign(raw.queue_entries.at(-1), { veterinarian_id: assignedVeterinarian, care_draft: { veterinarianId: assignedVeterinarian, complaint: 'Saved checkup draft' }, draft_saved_at: new Date().toISOString() })
+  await page.goto(`${app.origin}/queue`)
+  await page.getByRole('button', { name: 'Resume checkup', exact: true }).click()
+  await expect(veterinarian).toHaveValue('Assigned veterinarian')
+  await expect(veterinarian).toBeDisabled()
+  await expect(page.getByLabel('Chief complaint')).toHaveValue('Saved checkup draft')
+  await page.getByRole('button', { name: 'Edit Visit details', exact: true }).click()
+  await expect(veterinarian).toBeEnabled()
+  await veterinarian.fill('Dok sa Bukid')
+  await veterinarian.press('Tab')
+  await expect(veterinarian).toHaveValue('Dok sa Bukid')
+  await expect(page.locator('input[name=assignedStaffId]')).toHaveValue(assignedVeterinarian)
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.goto(`${app.origin}/patients/${patient}`)
+  await openNewVisit(page)
+  await page.getByRole('button', { name: /Queue processing/ }).click()
+  await expect(veterinarian).toHaveValue('Assigned veterinarian')
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   assert.deepEqual(errors, [])
-  console.log('PASS checkup confirmation, cancel/value retention, required fields, completion retry, current-visit prescription, prescription retry, completion without prescription and mobile layout')
+  console.log('PASS blank staff veterinarian, attention styling, required selection, saved/queue/draft assignment retention, checkup confirmation, retries, prescription completion and mobile layout')
 } finally { await app.close() }

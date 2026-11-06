@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ArrowRight, ClockCounterClockwise, Stethoscope, Syringe } from '@phosphor-icons/react'
 import { AsyncForm, RecordEditor } from './RecordForm'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
@@ -6,13 +7,35 @@ import { clinicDate, clinicTime, clinicTimestamp } from '../lib/clinicRepository
 import { Badge, Field, Modal } from './ui'
 import { prescriptionInventoryBatches, prescriptionMedications } from '../lib/prescriptions'
 import PrescriptionMedicationPicker from './PrescriptionMedicationPicker'
-import Combobox from './Combobox'
+import { checkupReasons, ClinicianField, emptyMedication, HistoricalPrescriptionFields, MedicationDetailsFields, medicationPayload } from './ClinicalFields'
 import DateWordsField from './DateWordsField'
 import { format, parseISO } from 'date-fns'
 
-const prescriptionRoutes = ['Oral', 'Topical', 'Subcutaneous', 'Intramuscular', 'Intravenous', 'Ophthalmic', 'Otic', 'Intranasal', 'Rectal', 'Inhalation'].map((route) => ({ value: route, label: route }))
-
 const staffOptions = (profiles) => profiles.filter((profile) => profile.is_active).map((profile) => ({ value: profile.id, label: profile.full_name || 'Clinic staff' }))
+
+export function VisitEditor(props) {
+  const [purpose, setPurpose] = useState(props.purpose || null)
+  if (props.record || props.queueEntry || purpose) return <CheckupEditor {...props} purpose={props.record?.recordingPurpose || purpose || 'queue'} />
+  return <RecordingPurpose pet={props.pet} kind="checkup" onSelect={setPurpose} onClose={props.onClose} />
+}
+
+export function RecordingPurpose({ pet, kind, onSelect, onClose, onBack }) {
+  return <Modal title={`Record ${kind} for ${pet.name}`} description={`Choose how to record this ${kind}.`} onClose={onClose}>
+    <div className="checkup-purpose-choices">
+      <button type="button" className="checkup-purpose-card" onClick={() => onSelect('queue')}>
+        <span className="checkup-purpose-icon" aria-hidden="true">{kind.toLowerCase() === 'vaccination' ? <Syringe size={26} weight="duotone" /> : <Stethoscope size={26} weight="duotone" />}</span>
+        <span className="checkup-purpose-copy"><strong>Queue processing</strong><span>For a patient receiving care at the clinic now.</span><small>Joins the care queue</small></span>
+        <ArrowRight className="checkup-purpose-arrow" size={20} aria-hidden="true" />
+      </button>
+      <button type="button" className="checkup-purpose-card checkup-purpose-history" onClick={() => onSelect('record_only')}>
+        <span className="checkup-purpose-icon" aria-hidden="true"><ClockCounterClockwise size={26} weight="duotone" /></span>
+        <span className="checkup-purpose-copy"><strong>Record-keeping only</strong><span>For previous care or records you’re migrating.</span><small>Saves to history · No queue or live reminders</small></span>
+        <ArrowRight className="checkup-purpose-arrow" size={20} aria-hidden="true" />
+      </button>
+    </div>
+    {onBack && <button type="button" className="text-link walkin-back" onClick={onBack}>Change service</button>}
+  </Modal>
+}
 
 function BodyConditionField({ record, draft }) {
   const legacy = record?.bodyConditionScale === 9 && record.bodyConditionScore != null
@@ -27,9 +50,10 @@ function BodyConditionField({ record, draft }) {
   </div>
 }
 
-export function VisitEditor({ pet, record, queueEntry, onSaved, onClose }) {
-  const { execute, profiles, timezone, queueEntries, services } = useClinicData()
-  const { user } = useAuth()
+function CheckupEditor({ pet, record, queueEntry, onSaved, onClose, purpose, service }) {
+  const { execute, profiles, timezone, queueEntries } = useClinicData()
+  const recordOnly = purpose === 'record_only'
+  const { user, profile } = useAuth()
   const [careTime] = useState(() => record ? new Date(record.visitedAt) : new Date())
   const [draft] = useState(() => ({ values: queueEntry?.careDraft || {}, version: queueEntry?.draftVersion || 0 }))
   const [completion, setCompletion] = useState(null)
@@ -46,12 +70,19 @@ export function VisitEditor({ pet, record, queueEntry, onSaved, onClose }) {
     readOnly: !editingSections[name],
     onToggleEdit: () => setEditingSections((current) => ({ ...current, [name]: !current[name] })),
   } : {}
-  const canComplete = !record || ['waiting', 'in_progress'].includes(careQueue?.status)
+  const canComplete = !recordOnly && (!record || ['waiting', 'in_progress'].includes(careQueue?.status))
   const activeCheckup = queueEntries.find((entry) => entry.petId === pet.id && entry.category === 'checkup' && ['waiting', 'in_progress'].includes(entry.status))
-  const initial = { type: queueEntry?.service || 'Wellness check', hydration: 'Normal', weightKg: pet.latestWeight, veterinarianId: activeCheckup?.veterinarianId || user.id, ...record,
-    encounteredAt: clinicDate(careTime, timezone) + 'T' + clinicTime(careTime, timezone), ...draft.values,
-    ...(queueEntry ? { veterinarianId: queueEntry.veterinarianId } : {}) }
-  const payloadFor = (values) => ({ ...values, petId: pet.id, ...(record ? { id: record.id } : {}),
+  const initial = { type: service?.name === 'Follow-up' ? 'Follow-up Checkup' : ['Surgery', 'Sick visit'].includes(service?.name) ? 'Medical Concern' : 'Wellness Check', hydration: recordOnly ? '' : 'Normal', weightKg: recordOnly ? '' : pet.latestWeight,
+    veterinarianId: recordOnly ? '' : activeCheckup?.veterinarianId || (profile.role === 'clinical_staff' ? '' : user.id), ...record,
+    encounteredAt: clinicDate(careTime, timezone) + 'T' + clinicTime(careTime, timezone), ...draft.values }
+  const [clinician, setClinician] = useState(() => ({ id: initial.veterinarianId || '', name: initial.veterinarianName ?? record?.attending_veterinarian_name ?? '' }))
+  const [historicalMedications, setHistoricalMedications] = useState([])
+  const [selectedCareTime, setSelectedCareTime] = useState(initial.encounteredAt)
+  const assignedStaffId = careQueue?.veterinarianId || (!recordOnly && activeCheckup?.veterinarianId) || clinician.id || user.id
+  const payloadFor = (values) => ({ ...values, petId: pet.id, ...(service ? { serviceId: service.id } : {}), recordingPurpose: purpose, ...(record ? { id: record.id } : {}),
+    ...(recordOnly && historicalMedications.length ? { prescription: { medications: historicalMedications.map(medicationPayload),
+      prescribedAt: clinicTimestamp(values.historicalPrescribedAt.slice(0, 10), values.historicalPrescribedAt.slice(11, 16), timezone),
+      prescribedById: values.historicalPrescribedById, prescribedByName: values.historicalPrescribedByName } } : {}),
     encounteredAt: clinicTimestamp(values.encounteredAt.slice(0, 10), values.encounteredAt.slice(11, 16), timezone) })
   const complete = async (withPrescription) => {
     if (completing) return
@@ -67,42 +98,47 @@ export function VisitEditor({ pet, record, queueEntry, onSaved, onClose }) {
     finally { setCompleting(false) }
   }
   if (prescriptionCheckup) return <PrescriptionEditor pet={pet} visitId={prescriptionCheckup.id} completingCheckup={prescriptionCheckup} onClose={onClose} />
-  return <Modal wide={!completion} title={completion ? 'Complete this checkup?' : record ? `Edit checkup for ${pet.name}` : `Record checkup for ${pet.name}`} description={completion ? `Finish ${pet.name}'s checkup with or without a prescription. Care stays in progress until you save the prescription or choose Complete Checkup.` : queueEntry ? `${queueEntry.queueNumber} · ${format(parseISO(queueEntry.queueDate), 'MMMM d, yyyy')}. Save unfinished care as a draft, or complete this checkup.` : record ? 'Clinical notes, vitals and any follow-up reminder are saved together.' : 'Save this checkup to add the patient to the queue, or complete the checkup now.'}
+  return <Modal wide={!completion} title={completion ? 'Complete this checkup?' : record ? `Edit checkup for ${pet.name}` : `Record checkup for ${pet.name}`} description={completion ? `Finish ${pet.name}'s checkup with or without a prescription. Care stays in progress until you save the prescription or choose Complete Checkup.` : recordOnly ? 'Record-keeping only. Save previous care without joining the queue or creating live reminders.' : queueEntry ? `${queueEntry.queueNumber} · ${format(parseISO(queueEntry.queueDate), 'MMMM d, yyyy')}. Save unfinished care as a draft, or complete this checkup.` : record ? 'Clinical notes, vitals and any follow-up reminder are saved together.' : 'Save this checkup to add the patient to the queue, or complete the checkup now.'}
     onClose={() => { if (completion) { setCompletion(null); setCompletionError('') } else onClose() }}>
     <div hidden={Boolean(completion)}><RecordEditor embedded className="checkup-form"
-    onClose={onClose} initial={initial} submitLabel={queueEntry ? 'Complete Checkup' : 'Save clinical entry'}
+    onClose={onClose} initial={initial} submitLabel={recordOnly ? 'Save historical checkup' : queueEntry ? 'Complete Checkup' : 'Save clinical entry'}
     submitActions={canComplete && !queueEntry ? [{ value: 'complete', label: 'Complete Checkup' }] : []}
     onSaveDraft={queueEntry ? (values) => execute('save_queue_draft', { id: queueEntry.id, record: values, draftVersion: draft.version }) : undefined}
     onSave={async (values, { intent }) => {
       if (queueEntry || intent === 'complete') { setCompletion(values); setCompletionError(''); return false }
       const payload = payloadFor(values)
-      const saved = await execute(queueEntry ? 'complete_queue_entry' : record ? 'update_encounter' : 'create_queued_encounter', queueEntry ? { id: queueEntry.id, record: payload, draftVersion: draft.version } : payload)
+      const saved = await execute(queueEntry ? 'complete_queue_entry' : record ? 'update_encounter' : recordOnly ? 'create_record_only_checkup' : 'create_queued_encounter', queueEntry ? { id: queueEntry.id, record: payload, draftVersion: draft.version } : payload)
       onSaved?.(saved)
       return saved
     }}
     fields={[
       { name: 'visit', title: 'Visit details', description: 'When the care took place, who is attending, and the reason for the visit.', ...sectionEditing('visit'), fields: [
-      { name: 'type', label: 'Visit type', type: 'select', options: [...new Set(['Wellness check', 'Sick visit', 'Follow-up', 'Emergency', 'Procedure', ...services.filter((service) => service.workflow === 'checkup').map((service) => service.name), initial.type])] },
-      { name: 'veterinarianId', label: 'Attending veterinarian', type: 'select', required: true, options: staffOptions(profiles).filter((option) => !queueEntry || option.value === queueEntry.veterinarianId) },
-      { name: 'encounteredAt', render: () => <DateWordsField name="encounteredAt" label={`Time of care (${timezone})`} initial={initial.encounteredAt} includeTime required /> },
+      ...(service ? [{ name: 'service', render: () => <Field label="Service"><input aria-label="Service" readOnly value={service.name} /></Field> }] : []),
+      { name: 'type', label: 'Reason for Checkup', type: 'select', required: true, options: [...checkupReasons, ...(record && !checkupReasons.includes(initial.type) ? [initial.type] : [])] },
+      { name: 'veterinarianId', render: () => <ClinicianField value={clinician} onChange={setClinician} profiles={profiles} required={!recordOnly} /> },
+      ...(!recordOnly ? [{ name: 'assignedStaffId', render: () => <Field label="Assigned staff" hint="Queue responsibility is assigned to this staff account."><input aria-label="Assigned staff" readOnly value={profiles.find((entry) => entry.id === assignedStaffId)?.full_name || 'Clinic staff'} /><input type="hidden" name="assignedStaffId" value={assignedStaffId} /></Field> }] : []),
+      { name: 'encounteredAt', render: () => <DateWordsField name="encounteredAt" label={`Time of care (${timezone})`} initial={initial.encounteredAt} includeTime required onChange={setSelectedCareTime} /> },
       { name: 'complaint', label: 'Chief complaint', type: 'textarea', required: true, span: true },
       ] },
       { name: 'vitals', title: 'Vitals & condition', description: 'Record measurements taken during this checkup.', ...sectionEditing('vitals'), fields: [
-      { name: 'weightKg', label: 'Weight (kg)', type: 'number', min: '0.01', step: '0.01', required: true },
+      { name: 'weightKg', label: 'Weight (kg)', type: 'number', min: '0.01', step: '0.01', required: !recordOnly },
       { name: 'temperatureC', label: 'Temperature (°C)', type: 'number', min: '30', max: '45', step: '0.1' },
       { name: 'heartRate', label: 'Heart rate (bpm)', type: 'number', min: '1', step: '1' },
       { name: 'respiratoryRate', label: 'Respiratory rate', type: 'number', min: '1', step: '1' },
       { name: 'bodyConditionScore', render: () => <BodyConditionField record={record} draft={draft.values} /> },
-      { name: 'hydration', label: 'Hydration', type: 'select', options: ['Normal', 'Mild dehydration', 'Moderate dehydration', 'Severe dehydration'] },
+      { name: 'hydration', label: 'Hydration', type: 'select', options: [...(recordOnly ? [''] : []), 'Normal', 'Mild dehydration', 'Moderate dehydration', 'Severe dehydration'] },
       ] },
-      { name: 'soap', title: 'Clinical observations', description: 'Subjective history, objective findings, assessment, and care plan.', hidden: careQueue?.status !== 'in_progress', fields: [
+      { name: 'soap', title: 'Clinical observations', description: 'Subjective history, objective findings, assessment, and care plan.', hidden: !recordOnly && careQueue?.status !== 'in_progress', fields: [
       ...['subjective', 'objective', 'assessment', 'plan'].map((name) => ({ name, label: name.charAt(0).toUpperCase() + name.slice(1), type: 'textarea' })),
       { name: 'clinicalNotes', label: 'Clinical notes', type: 'textarea', maxLength: 10000, span: true },
       ] },
-      { name: 'followup', title: 'Diagnosis & follow-up', description: 'Save the diagnosis and arrange any next checkup.', hidden: careQueue?.status !== 'in_progress', fields: [
+      { name: 'followup', title: 'Diagnosis & follow-up', description: recordOnly ? 'Record the original diagnosis and follow-up plan.' : 'Save the diagnosis and arrange any next checkup.', hidden: !recordOnly && careQueue?.status !== 'in_progress', fields: [
       { name: 'diagnosis', label: 'Diagnosis', span: true },
-      { name: 'followUpDate', render: () => <DateWordsField name="followUpDate" label="Follow-up date" initial={initial.followUpDate || ''} hint="Optional. This date appears in the appointment calendar." /> },
+      { name: 'followUpDate', render: () => <DateWordsField name="followUpDate" label="Follow-up date" initial={initial.followUpDate || ''} hint={recordOnly ? 'Historical information only. No live reminder is created.' : 'Optional. This date appears in the appointment calendar.'} /> },
       ] },
+      ...(recordOnly && !record ? [{ name: 'historicalPrescription', title: 'Historical prescription', description: 'Optionally record medicines from the original checkup.', fields: [
+        { name: 'historicalMedications', render: () => historicalMedications.length ? <div className="field-span"><HistoricalPrescriptionFields medications={historicalMedications} setMedications={setHistoricalMedications} clinician={clinician} profiles={profiles} careTime={selectedCareTime} prefix="historical" /><button type="button" className="text-link danger-text" onClick={() => setHistoricalMedications([])}>Remove historical prescription</button></div> : <button type="button" className="button button-secondary" onClick={() => setHistoricalMedications([emptyMedication()])}>Add historical prescription</button> },
+      ] }] : []),
     ]} /></div>
     {completion && <form aria-busy={completing} onSubmit={(event) => event.preventDefault()}>
       {completionError && <p className="auth-message auth-error" role="alert">{completionError}</p>}
@@ -116,7 +152,36 @@ export function VisitEditor({ pet, record, queueEntry, onSaved, onClose }) {
   </Modal>
 }
 
-export function VaccineEditor({ pet, record, queueEntry, onSaved, onClose }) {
+export function VaccineEditor(props) {
+  const [purpose, setPurpose] = useState(props.purpose || null)
+  const mode = props.record ? props.record.recordingPurpose || 'queue' : props.queueEntry ? 'queue' : purpose
+  if (!mode) return <RecordingPurpose pet={props.pet} kind="vaccination" onSelect={setPurpose} onClose={props.onClose} />
+  return mode === 'record_only' ? <HistoricalVaccinationEditor {...props} /> : <QueuedVaccinationEditor {...props} />
+}
+
+function HistoricalVaccinationEditor({ pet, record, onSaved, onClose }) {
+  const { execute, profiles, today } = useClinicData()
+  const [clinician, setClinician] = useState(() => ({ id: record?.veterinarianId || '', name: record?.administered_by_name || '' }))
+  return <RecordEditor title={record ? `Edit vaccination for ${pet.name}` : `Record vaccination for ${pet.name}`}
+    description="Record-keeping only. Save a previous vaccination directly to history without joining the queue, creating live reminders, or deducting stock."
+    initial={record || {}} onClose={onClose} submitLabel={record ? 'Save vaccination' : 'Save historical vaccination'}
+    onSave={async (values) => {
+      const saved = await execute(record ? 'update_vaccination' : 'create_record_only_vaccination', { ...values, petId: pet.id, recordingPurpose: 'record_only', ...(record ? { id: record.id } : {}) })
+      onSaved?.(saved)
+      return saved
+    }} fields={[
+      { name: 'vaccine', label: 'Vaccine name', required: true, maxLength: 300, span: true },
+      { name: 'brand', label: 'Brand', maxLength: 300 },
+      { name: 'lotNumber', label: 'Batch / lot number', maxLength: 200 },
+      { name: 'administeredAt', label: 'Date administered', type: 'date', required: true, max: today },
+      { name: 'nextDueAt', label: 'Next due date', type: 'date', hint: 'Historical information only; no live reminder. Must be after administration.' },
+      { name: 'dose', label: 'Dose', maxLength: 300 },
+      { name: 'veterinarianId', render: () => <ClinicianField label="Veterinarian" value={clinician} onChange={setClinician} profiles={profiles} /> },
+      { name: 'careStatus', render: () => <Field label="Care status"><Badge>Record only</Badge></Field> },
+    ]} />
+}
+
+function QueuedVaccinationEditor({ pet, record, queueEntry, onSaved, onClose, service }) {
   const { execute, profiles, today, queueEntries, inventory } = useClinicData()
   const { user } = useAuth()
   const [draft] = useState(() => ({ values: queueEntry?.careDraft || {}, version: queueEntry?.draftVersion || 0 }))
@@ -131,7 +196,7 @@ export function VaccineEditor({ pet, record, queueEntry, onSaved, onClose }) {
     onClose={onClose} initial={{ administeredAt: today, veterinarianId: activeVaccination?.veterinarianId || user.id, ...record, ...draft.values, ...(queueEntry ? { veterinarianId: queueEntry.veterinarianId } : {}) }} submitLabel="Save vaccination"
     onSaveDraft={queueEntry ? (values) => execute('save_queue_draft', { id: queueEntry.id, record: values, draftVersion: draft.version }) : undefined}
     onSave={async (values) => {
-      const payload = { ...values, petId: pet.id, ...(record ? { id: record.id } : {}) }
+      const payload = { ...values, petId: pet.id, ...(service ? { serviceId: service.id } : {}), ...(record ? { id: record.id } : {}) }
       const saved = await execute(queueEntry ? 'complete_queue_entry' : record ? 'update_vaccination' : 'create_queued_vaccination', queueEntry ? { id: queueEntry.id, record: payload, draftVersion: draft.version } : payload)
       onSaved?.(saved)
       return saved
@@ -156,12 +221,15 @@ export function VaccineEditor({ pet, record, queueEntry, onSaved, onClose }) {
 }
 
 export function PrescriptionEditor({ pet, record, visitId, completingCheckup, onClose }) {
-  const { visits, execute, timezone, inventory, today } = useClinicData()
-  const emptyMedication = () => ({ key: crypto.randomUUID(), medicationId: crypto.randomUUID(), medicationName: '', dose: '', route: '', frequency: '', duration: '', instructions: '' })
+  const { visits, execute, timezone, inventory, today, profiles } = useClinicData()
   const [medications, setMedications] = useState(() => record ? prescriptionMedications(record).map((medication) => ({ ...emptyMedication(), ...medication })) : [emptyMedication()])
   const changeMedication = (key, values) => setMedications((current) => current.map((item) => item.key === key ? { ...item, ...values } : item))
   const dispensedIds = new Set(record ? prescriptionMedications(record).filter((item) => item.inventoryItemId).map((item) => item.medicationId) : [])
   const openVisits = visits.filter((visit) => visit.petId === pet.id && !visit.finalizedAt)
+  const [selectedVisitId, setSelectedVisitId] = useState(record?.visit_id || visitId || (openVisits.length === 1 ? openVisits[0].id : ''))
+  const selectedVisit = visits.find((visit) => visit.id === selectedVisitId)
+  const historical = selectedVisit?.recordingPurpose === 'record_only' || record?.is_historical === true
+  const historicalClinician = { id: record ? record.prescribed_by || '' : selectedVisit?.veterinarianId || '', name: record ? record.prescribed_by_name || '' : selectedVisit?.attending_veterinarian_name || '' }
   return <Modal title={record ? 'Edit prescription' : `Add prescription for ${pet.name}`} description="Add all medications to one prescription. Printed documents use your clinic settings and the prescriber's professional details." wide onClose={onClose}>
     <AsyncForm onClose={onClose} submitLabel="Save prescription" onSave={(values) => {
       const items = medications.map((medication) => Object.fromEntries(['medicationName', 'dose', 'route', 'frequency', 'duration', 'instructions'].map((field) => [field, field === 'medicationName' && medication.inventoryItemId ? medication[field] : (medication[field] || '').trim()])))
@@ -170,14 +238,16 @@ export function PrescriptionEditor({ pet, record, visitId, completingCheckup, on
         item.medicationId = medication.medicationId
         if (medication.inventoryItemId) Object.assign(item, { inventoryItemId: medication.inventoryItemId, batchId: medication.batchId, dispenseQuantity: Number(medication.dispenseQuantity), dispenseUnit: medication.dispenseUnit })
       })
+      if (historical) Object.assign(values, { prescribedAt: clinicTimestamp(values.prescribedAt.slice(0, 10), values.prescribedAt.slice(11, 16), timezone) })
       return execute(completingCheckup ? 'prescribe_and_complete_checkup' : record ? 'update_prescription' : 'create_prescription', { ...values, ...items[0], medications: items, ...(visitId ? { visitId } : {}), ...(record ? { id: record.id } : {}), ...(completingCheckup ? { checkup: completingCheckup } : {}) })
     }}>
-      {!record && <Field label="Open encounter" required><select name="visitId" required disabled={Boolean(visitId)} defaultValue={visitId || (openVisits.length === 1 ? openVisits[0].id : '')}>
+      {!record && <Field label="Open encounter" required><select name="visitId" required disabled={Boolean(visitId)} value={selectedVisitId} onChange={(event) => { const next = event.target.value; if (historical !== (visits.find((visit) => visit.id === next)?.recordingPurpose === 'record_only')) setMedications([emptyMedication()]); setSelectedVisitId(next) }}>
         {visitId && !openVisits.some((visit) => visit.id === visitId) && <option value={visitId}>Current checkup for {pet.name}</option>}
         <option value="">Select an open encounter</option>{openVisits.map((visit) => <option key={visit.id} value={visit.id}>{visit.type} · {clinicDate(new Date(visit.visitedAt), timezone)}</option>)}
       </select></Field>}
       {completingCheckup && <p className="auth-message">Saving this prescription completes the checkup. Cancel to leave care In progress.</p>}
       {!record && !visitId && !openVisits.length && <p className="auth-message">Record an open checkup before adding a prescription.</p>}
+      {historical ? <HistoricalPrescriptionFields medications={medications} setMedications={setMedications} clinician={historicalClinician} profiles={profiles} careTime={record ? clinicDate(new Date(record.prescribed_at), timezone) + 'T' + clinicTime(record.prescribed_at, timezone) : selectedVisit?.visitedAt ? clinicDate(new Date(selectedVisit.visitedAt), timezone) + 'T' + clinicTime(selectedVisit.visitedAt, timezone) : ''} /> : <>
       <div className="prescription-medications">{medications.map((medication, index) => {
         const locked = dispensedIds.has(medication.medicationId)
         const item = inventory.find((item) => item.id === medication.inventoryItemId)
@@ -187,7 +257,6 @@ export function PrescriptionEditor({ pet, record, visitId, completingCheckup, on
         <legend>Medication {index + 1}</legend>
         <div className="form-grid">
           <PrescriptionMedicationPicker medication={medication} index={index} inventory={inventory} today={today} locked={locked} onChange={(values) => changeMedication(medication.key, values)} />
-          <Field label="Route" required><Combobox label={`Route ${index + 1}`} value={medication.route || ''} options={prescriptionRoutes} allowCustom required onChange={(route) => changeMedication(medication.key, { route })} placeholder="Select or enter route" /></Field>
           {medication.inventoryItemId && <>
             <Field label="Stock batch" required>
               <select aria-label={`Stock batch ${index + 1}`} value={medication.batchId || ''} required disabled={locked} onChange={(event) => changeMedication(medication.key, { batchId: event.target.value })}>
@@ -201,18 +270,10 @@ export function PrescriptionEditor({ pet, record, visitId, completingCheckup, on
             {!locked && !batches.length && <p className="auth-message field-span">No available, unexpired batches. Choose another item or use a custom medication.</p>}
             {item?.notes && <p className="inventory-item-notes field-span">Inventory notes: {item.notes}</p>}
           </>}
-          {[
-          { name: 'dose', label: 'Dose', required: true },
-          { name: 'frequency', label: 'Frequency', required: true },
-          { name: 'duration', label: 'Duration', placeholder: 'e.g. 7 days' },
-          { name: 'instructions', label: 'Instructions', textarea: true, span: true },
-        ].map(({ name, label, required, span, textarea, placeholder }) => {
-          const props = { value: medication[name], required, placeholder, 'aria-label': `${label} ${index + 1}`, onChange: (event) => setMedications((current) => current.map((item) => item.key === medication.key ? { ...item, [name]: event.target.value } : item)) }
-          return <Field key={name} label={label} required={required} span={span}>{textarea ? <textarea {...props} rows={2} /> : <input {...props} />}</Field>
-        })}</div>
+          <MedicationDetailsFields medication={medication} index={index} onChange={(values) => changeMedication(medication.key, values)} /></div>
         {medications.length > 1 && !locked && <button type="button" className="text-link danger-text" aria-label={`Remove medication ${index + 1}`} onClick={() => setMedications((current) => current.filter((item) => item.key !== medication.key))}>Remove medication</button>}
       </fieldset>})}</div>
-      <button type="button" className="button button-secondary" onClick={() => setMedications((current) => [...current, emptyMedication()])}>Add medication</button>
+      <button type="button" className="button button-secondary" onClick={() => setMedications((current) => [...current, emptyMedication()])}>Add medication</button></>}
     </AsyncForm>
   </Modal>
 }

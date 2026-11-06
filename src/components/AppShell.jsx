@@ -6,6 +6,7 @@ import {
   CaretDown,
   ChartBar,
   FirstAidKit,
+  FileText,
   Gear,
   MagnifyingGlass,
   Package,
@@ -22,13 +23,13 @@ import { useAuth } from '../context/AuthContext'
 import { authErrorMessage } from '../lib/authAccess'
 import PetSticker from './PetSticker'
 import { isClinicLogoDataUrl } from '../lib/clinicLogo'
-import { clinicThemeStyle } from '../lib/clinicPersonalization'
 import SubscriptionTimer from './SubscriptionTimer'
 import '../pages/PlatformAdmin.css'
 
 const workspaces = [
   { to: '/queue', label: 'In-site queue', detail: 'Arrivals and care in progress', icon: FirstAidKit, color: 'amber' },
   { to: '/patients', label: 'Patients', detail: 'Owners and clinical records', icon: PawPrint, color: 'sage' },
+  { to: '/travel-certificates', label: 'Travel Certificates', detail: 'Pet vaccination and travel documents', icon: FileText, color: 'sage' },
   { to: '/appointments', label: 'Appointments', detail: 'Calendar and daily agenda', icon: CalendarDots, color: 'mint' },
   { to: '/reminders', label: 'Reminders', detail: 'Calls, vaccines and follow-ups', icon: BellRinging, color: 'blue' },
   { to: '/inventory', label: 'Inventory', detail: 'Stock, batches and expirations', icon: Package, color: 'blue' },
@@ -133,7 +134,7 @@ function GlobalSearch({ onClose }) {
 export default function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
-  const { reminders, reload, refreshing, settings } = useClinicData()
+  const { reminders, reload, refreshing } = useClinicData()
   const { profile, user, signOut, accountAccess } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
@@ -169,7 +170,7 @@ export default function AppShell() {
   }, [overlayOpen])
 
   return (
-    <div className="app-shell spacious-shell" style={clinicThemeStyle(settings?.brand_color)}>
+    <div className="app-shell spacious-shell">
       <header className="workspace-header">
         <div className="workspace-header-inner">
           <Brand />

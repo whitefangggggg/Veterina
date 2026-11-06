@@ -21,7 +21,7 @@ function Fields({ rows }) {
 function PrescriptionDetails({ prescription, visit, onEdit }) {
   const data = useClinicData()
   const pet = data.getPet(visit.petId)
-  return <section className="calendar-preview-section"><h4>Prescription</h4><ol className="prescription-items">{prescriptionMedications(prescription).map((medication, index) => <li key={index}>
+  return <section className="calendar-preview-section"><h4>{prescription.is_historical ? 'Historical prescription record' : 'Prescription'}</h4><ol className="prescription-items">{prescriptionMedications(prescription).map((medication, index) => <li key={index}>
     <strong>{medication.medicationName}</strong><p>{[medication.dose, `Route: ${medication.route || 'Not recorded'}`, medication.frequency, medication.duration].filter(Boolean).join(' · ')}</p>{medication.instructions && <p>{medication.instructions}</p>}
   </li>)}</ol>{pet && <PrescriptionActions context={{ prescription, pet, visit, clinic: data.settings, profiles: data.profiles, owner: data.getOwner(pet.ownerId) }} />}{onEdit && !visit.finalizedAt && <button type="button" className="text-link" onClick={() => onEdit({ type: 'prescription', label: 'Edit prescription', record: prescription, petId: visit.petId })}>Edit prescription</button>}</section>
 }
@@ -29,10 +29,10 @@ function PrescriptionDetails({ prescription, visit, onEdit }) {
 function CheckupDetails({ visit, data, onEdit }) {
   return <>
     <Fields rows={[
-      ['Checkup', visit.type], ['Veterinarian', visit.veterinarian], ['Date and time', timeLabel(visit.visitedAt, data.timezone)],
-      ['Care status', visit.careStatus || 'Recorded'], ['Record status', visit.finalizedAt ? 'Finalized' : 'Unfinalized'],
+      ['Service', visit.serviceName], ['Checkup', visit.type], ['Veterinarian', visit.veterinarian], ['Date and time', timeLabel(visit.visitedAt, data.timezone)],
+      ['Care status', visit.recordingPurpose === 'record_only' ? 'Record only' : visit.careStatus || 'Recorded'], ['Record status', visit.finalizedAt ? 'Finalized' : 'Unfinalized'],
       ['Queue', visit.careQueue?.queueNumber], ['Chief complaint', visit.complaint], ['Diagnosis', visit.diagnosis],
-      ['Weight', visit.weightKg != null ? `${visit.weightKg} kg` : ''], ['Temperature', visit.temperatureC != null ? `${visit.temperatureC} °C` : ''],
+      ['Weight', visit.weightKg != null ? `${visit.weightKg} kg` : 'Not recorded'], ['Temperature', visit.temperatureC != null ? `${visit.temperatureC} °C` : ''],
       ['Heart rate', visit.heartRate != null ? `${visit.heartRate} bpm` : ''], ['Respiratory rate', visit.respiratoryRate != null ? `${visit.respiratoryRate} rpm` : ''],
       ['Body condition', visit.bodyConditionScore != null ? `${visit.bodyConditionScore}/${visit.bodyConditionScale}` : ''], ['Hydration', visit.hydration],
       ['Follow-up date', visit.followUpDate ? dayLabel(visit.followUpDate, data.timezone) : 'Not scheduled'],
@@ -45,15 +45,19 @@ function CheckupDetails({ visit, data, onEdit }) {
 }
 
 function VaccineDetails({ vaccine, data }) {
-  const veterinarian = vaccine.administered_by_name || data.profiles.find((profile) => profile.id === vaccine.veterinarianId)?.full_name || 'Clinic staff'
+  const veterinarian = vaccine.administered_by_name || data.profiles.find((profile) => profile.id === vaccine.veterinarianId)?.full_name || 'Not recorded'
   return <Fields rows={[
-    ['Vaccine', vaccine.vaccine], ['Recorded date', dayLabel(vaccine.administeredAt, data.timezone)], ['Brand', vaccine.brand], ['Dose', vaccine.dose],
+    ['Recording purpose', vaccine.recordingPurpose === 'record_only' ? 'Record only' : 'Queue processing'], ['Vaccine', vaccine.vaccine], ['Recorded date', dayLabel(vaccine.administeredAt, data.timezone)], ['Brand', vaccine.brand], ['Dose', vaccine.dose],
     ['Historical lot', vaccine.lotNumber], ['Veterinarian', veterinarian], ['Care status', vaccine.careStatus || 'Recorded'], ['Queue', vaccine.careQueue?.queueNumber],
     ['Next due', vaccine.nextDueAt ? dayLabel(vaccine.nextDueAt, data.timezone) : 'Not scheduled'], ['Next dose status', vaccine.nextDoseStatus],
   ]} />
 }
 
 function QueueDetails({ entry, data, onEdit }) {
+  if (entry.recordingPurpose === 'record_only') return <Fields rows={[
+    ['Service', entry.service], ['Recording purpose', 'Record only'], ['Service date', timeLabel(entry.arrivedAt, data.timezone)],
+    ['Performed by', entry.veterinarian], ['Service notes', entry.serviceNotes],
+  ]} />
   const visit = data.visits.find((visit) => visit.id === entry.visit_id)
   const vaccine = data.vaccinations.find((vaccine) => vaccine.id === entry.vaccination_id)
   const draftLabels = { clinicalNotes: 'Clinical notes', complaint: 'Chief complaint', diagnosis: 'Diagnosis', subjective: 'Subjective', objective: 'Objective', assessment: 'Assessment', plan: 'Plan',
@@ -97,6 +101,10 @@ function TimelineDetails({ event, data, onEdit }) {
   if (['Arrival', 'Care draft', 'Queue outcome'].includes(event.kind)) {
     const entry = data.queueEntries.find((entry) => entry.id === id)
     if (entry) return <QueueDetails entry={entry} data={data} onEdit={onEdit} />
+  }
+  if (event.kind === 'Service') {
+    const service = (data.serviceRecords || []).find((entry) => entry.id === id)
+    if (service) return <QueueDetails entry={service} data={data} onEdit={onEdit} />
   }
   if (event.kind === 'Appointment') {
     const appointment = data.appointments.find((appointment) => appointment.id === id)

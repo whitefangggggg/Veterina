@@ -1,3 +1,4 @@
+import { openNewVisit } from './helpers/new-visit.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 import { saveCheckup } from './helpers/checkup.mjs'
 // Browser acceptance uses intercepted API responses; real database behavior is
@@ -244,7 +245,7 @@ try {
   const visitSection = page.getByRole('group', { name: 'Visit details', exact: true })
   const vitalsSection = page.getByRole('group', { name: 'Vitals & condition', exact: true })
   await expect(page.getByLabel('Chief complaint')).toBeDisabled()
-  await expect(page.getByLabel('Visit type')).toBeDisabled()
+  await expect(page.getByLabel('Reason for Checkup')).toBeDisabled()
   await expect(page.getByLabel('Attending veterinarian')).toBeDisabled()
   await expect(page.getByLabel('Weight (kg)')).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Open care calendar', exact: true })).toBeDisabled()
@@ -349,13 +350,16 @@ try {
   await page.setViewportSize({ width: 320, height: 900 })
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Vaccination history overflows on mobile')
   await page.setViewportSize({ width: 1440, height: 1000 })
-  await page.getByRole('button', { name: 'Record checkup', exact: true }).click()
+  await openNewVisit(page)
+  await page.getByRole('button', { name: /Queue processing/ }).click()
+  await page.getByLabel('Attending veterinarian', { exact: true }).fill('Queue clinician')
+  await page.getByRole('option', { name: 'Queue clinician', exact: true }).click()
   await page.getByLabel('Chief complaint').fill('Patient-page checkup')
   await expect(page.getByLabel('Body condition (1–5)', { exact: true })).toHaveAttribute('max', '5')
   await page.getByLabel('Body condition (1–5)', { exact: true }).fill('5')
   await saveCheckup(page)
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  await expect(page.getByRole('status').filter({ hasText: 'Checkup saved in queue' })).toContainText('Q-004')
+  await expect(page.getByRole('status').filter({ hasText: 'Visit saved in queue' })).toContainText('Q-004')
   await page.getByRole('button', { name: 'Clinical history', exact: true }).click()
   await expect(page.locator('.visit-card')).toHaveCount(1)
   // The picker stays reachable above the card's full-area edit trigger.
@@ -430,6 +434,7 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByRole('button', { name: 'Vaccinations', exact: true }).click()
   await page.getByRole('button', { name: 'Add vaccine', exact: true }).click()
+  await page.getByRole('button', { name: /Queue processing/ }).click()
   await page.getByLabel('Vaccine type', { exact: true }).selectOption('Patient-page vaccine')
   await page.getByLabel('Next due date').fill('2027-10-17')
   await page.getByRole('button', { name: 'Save vaccination', exact: true }).click()
@@ -459,6 +464,7 @@ try {
   await expect(patientVaccine).toContainText('Updated dose')
   await expect(patientVaccine.getByText('Up to date', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Add vaccine', exact: true }).click()
+  await page.getByRole('button', { name: /Queue processing/ }).click()
   await page.getByLabel('Vaccine type', { exact: true }).selectOption('Cancelled queued vaccine')
   await page.getByRole('button', { name: 'Save vaccination', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -508,7 +514,7 @@ try {
   await page.getByRole('button', { name: 'Start care', exact: true }).click()
   await page.getByRole('button', { name: 'Confirm', exact: true }).click()
   await page.getByRole('button', { name: 'Record checkup', exact: true }).click()
-  await expect(page.getByLabel('Visit type')).toHaveValue('Surgery')
+  await expect(page.getByLabel('Reason for Checkup')).toHaveValue('Wellness Check')
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await page.getByRole('button', { name: 'Confirm', exact: true }).click()

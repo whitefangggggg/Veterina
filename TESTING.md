@@ -1,5 +1,67 @@
 # Testing Veterina
 
+Initial inventory stock: `20261106131107_inventory_initial_stock.sql` is applied to
+Development. New items accept whole-unit or fractional opening quantities, up to
+two decimal places when fractional quantities are enabled. Zero or omitted stock
+creates no movement. The item, initial batch and opening ledger movement save in
+one transaction using the existing authenticated mutation and retry receipts.
+`test:inventory` covers quantity validation, owner/staff creation, retained inputs,
+lost acknowledgements, whole/fractional/zero balances and mobile layouts.
+`portal_workflows.sql` checks server validation, rollback after a batch failure,
+retry safety and that item edits cannot rewrite stock. `test:database` also verifies
+a real fractional opening balance after a lost save acknowledgement and reload.
+
+`npm run test:travel-certificates` covers workspace navigation, pet selection,
+vaccination eligibility, preview, lost-save acknowledgement retries, saved history,
+immutable reprints, print retry, branding, credentials, owner voiding and mobile
+layouts using intercepted APIs. It also produces a multipage A4 PDF under
+`test-artifacts.local/`. Unit tests verify date boundaries, missing details,
+estimated ages and print escaping. `travel_certificates.sql` tests clinic and
+subscription isolation, server eligibility, immutable snapshots, source deletion,
+void permissions and idempotency with rolled-back fixtures.
+`npm run test:travel-certificate-concurrency` verifies reference allocation and
+simultaneous retry safety using independent local Postgres sessions. It refuses
+hosted databases and requires the empty synthetic clinic. These checks are included
+in `test:all` and `test:database`; the latter also issues, reloads and voids a
+certificate through the real browser/Auth/PostgREST workflow.
+
+Travel certificate rollout: `20261106052056_pet_travel_certificates.sql` is applied
+to Development. The authenticated dispatcher, clinic RLS and browser write denial
+were verified after deployment; security advisor findings are unchanged. Deploy
+this migration before the matching frontend in other environments. Certificates
+are clinic-issued records; government shipping-permit applications remain separate.
+
+Patient photos: `20261106054843_travel_certificate_patient_photos.sql` and the
+matching `pet-photo` Edge Function are deployed to Development. The service reads
+the private patient image and prepares bytes for its current revision; issuance
+copies those bytes into the certificate snapshot. Reprints retain the original
+photo after profile changes or deletion. Existing issued snapshots stay immutable.
+Browser checks cover photo loading/retry, preview and print; SQL verifies revision
+conflicts, missing prepared images, caller-supplied image rejection and clinic
+isolation. Unit tests cover image encoding and rejection of unsafe print sources.
+
+Certificate QR sharing: `20261106060854_travel_certificate_public_sharing.sql` and
+the `travel-certificate` Edge Function are deployed to Development. Certificates
+default to private. Active clinic staff can publish or revoke public viewing through
+the audited mutation interface, during issuance or from the saved document. QR codes
+use a random 256-bit token in the URL fragment. Anonymous reads return one explicitly
+shared snapshot only, with no-store headers and clinic/subscription checks; private,
+unknown and revoked links return the same unavailable response. Direct anonymous
+table/RPC access remains denied. Public voided certificates display their status.
+Browser tests decode the generated QR, check anonymous viewing/revocation, mobile
+layout, visibility retries and printed QR output. The real database acceptance flow
+also exercises public/private transitions through Auth, PostgREST and Edge Functions.
+SQL tests cover private defaults, public issuance, invalid visibility values, tenant
+isolation, immutable tokens, retry receipts and snapshot-preserving public reads.
+
+`npm run test:historical-checkups` covers the purpose chooser, record-only entry,
+missing measurements, Unicode clinician names, partial historical prescriptions,
+prescription dates, retry/edit/reload, owner/staff defaults, and mobile layouts.
+`historical_checkups.sql` verifies atomic saves, queue/reminder/stock isolation,
+custom clinicians with separate queue responsibility, tenant isolation, anonymous
+denial, and finalized-record guards. Its fixtures roll back. Both checks are
+included in the corresponding aggregate suites.
+
 `npm run test:subscriptions` covers admin OAuth return paths, owner/staff denial,
 clinic search and filters, history, independent code durations, generation and
 revocation, extension retries, expired owner/staff notices, renewal, verified
@@ -310,3 +372,99 @@ is required before photo controls are enabled. This separately verifies the pres
 signed authenticated upload/read and denied unsigned delivery. Confirm HTTPS camera
 permissions on target desktop/mobile devices and check the hourly cleanup schedule
 before release. Never copy Cloudinary secrets into browser test fixtures or logs.
+
+
+### Historical vaccinations
+
+`npm run test:historical-vaccinations` checks the shared purpose chooser, keyboard
+selection/cancellation, unchanged queue inventory controls, required historical
+fields, custom Unicode clinician names, optional details, preserved input after a
+failed save, retry keys, editing without another chooser, both roles, and mobile
+layouts. These UI checks intercept APIs.
+
+`supabase/tests/historical_vaccinations.sql` verifies real authenticated creation
+and editing, retry receipts, recorder attribution, missing clinicians, original
+dates, date validation, cross-clinic isolation, inventory/dispensing rejection,
+immutable purpose, helper grants, and server rejection of historical queue and
+reminder links. It runs with active checkup and vaccination queues and confirms
+that historical entry leaves operational records unchanged. Fixtures roll back.
+The database suite includes this as its nineteenth SQL suite and separately tests
+a real browser save whose acknowledgement is lost after commit: retry must leave
+one historical vaccination without changing queue counters, reminders,
+appointments, or inventory movements.
+
+Validation on 6 November 2026: 215 unit tests, lint, production build, historical
+vaccination/checkup, queue, clinical-history, appointment and travel-certificate
+browser checks, nineteen isolated SQL suites, four concurrency suites, and the
+real Auth/Edge/browser database suite passed. Synthetic database fixtures were
+removed afterward. Migration `20261106133210_historical_vaccinations.sql` was
+applied to Development (`yerrtkosxksacqxznrhk`); verified existing vaccinations
+remain in queue mode, RLS remains enabled, and historical helpers are private.
+Security advisors have no new findings relative to the existing baseline. Apply
+this migration before releasing the frontend to any other environment.
+
+
+### Unified New visit flow
+
+`npm run test:new-visits` checks the patient header's single New visit action,
+required service selection, the separate queue/record-only choice, changing a
+service, and matching forms for Vaccination, Follow-up, Grooming, Wellness check,
+Surgery and Sick visit in both modes. It covers keyboard selection, cancellation,
+320/375px layouts, historical service save failures/retries/reloads/edits, custom
+staff names and unknown performers. The patient opens the relevant history tab
+after saving. Existing queue dialogs and record editors keep their direct entry.
+
+`supabase/tests/unified_patient_visits.sql` verifies historical service writes,
+idempotency, dates, clinic isolation, private helpers, rejected dispensing,
+unchanged operational records and history exports. It also verifies the selected
+clinical service survives independently of the checkup reason, and that grooming
+cannot be submitted as a clinical checkup. This is the twentieth SQL suite in
+`test:database`. The real database/browser suite now covers New visit -> live
+grooming queue -> historical grooming, including lost acknowledgement recovery,
+reload, editing and no historical changes to queue counters, appointments,
+reminders or stock.
+
+Validation on 6 November 2026: 217 unit tests, app lint, production build, New
+visit, checkup completion, historical checkup/vaccination, queue, clinical history
+and prescription browser checks passed. All twenty isolated SQL suites, four
+concurrency suites and the real Auth/Edge/browser database suite passed; synthetic
+fixtures were cleaned. Migration `20261106140152_unified_patient_visits.sql` was
+applied to Development (`yerrtkosxksacqxznrhk`). Verified scoped reads, denied
+anonymous reads/direct writes, private helpers, queue service retention and
+historical services in history exports. Security advisors match the previous
+baseline. Apply this migration before releasing the frontend elsewhere.
+
+
+The New visit service picker uses native radio cards with service icons,
+descriptions, a theme-colored selected state, and Continue disabled until selection.
+`test:new-visits` covers Space/arrow-key selection, a single selected card,
+selection retention when returning from the purpose chooser, and 320/375px
+layouts. Desktop/mobile screenshots are saved in `test-artifacts.local` as
+`new-visit-picker-desktop.png` and `new-visit-picker-mobile.png`. The reference
+layout was reviewed against these captures. UI-only update: no database changes.
+
+
+### Clinic color consistency
+
+`npm run test:theme` checks every clinic workspace route with Coastal green and
+Ocean blue, then checks shared controls under all six supported palettes. It
+verifies buttons, icons, selected cards/radios, hover/active/focus/disabled states,
+normal text contrast (including pixels sampled from the rendered hero metric
+panels), hero gradients, patient chart strokes, and preserved
+red/amber semantic colors. The suite also checks global Install controls and
+installation dialogs, theme refresh without navigation, local onboarding
+previews, sign-out cleanup, account changes, and navigation to public pages
+without a document reload. Public/auth/account/subscription/platform pages use
+the default primary when no clinic theme is loaded.
+
+Desktop/mobile dashboard and patient screenshots and 320/375px picker captures
+are stored as `theme-*.png` under ignored `test-artifacts.local`. APIs are
+intercepted; this suite never writes real clinic data. Theme publication uses
+the existing allowed palette and cleans document-level overrides when the clinic
+provider unmounts. Error/warning/status colors, logos/photos, user-selected record
+colors, categorical calendar colors and document snapshots remain separate.
+
+Validation on 6 November 2026: 217 unit tests, lint and production build passed,
+along with theme, Add Record, onboarding, clinical-history, checkup-completion,
+appointment, inventory, public/auth frontend and production PWA browser checks.
+No database migration or API change is required.

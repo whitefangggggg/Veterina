@@ -1,7 +1,7 @@
 import { vaccinationStatus } from '../utils/clinicRules'
 
 const tableNames = ['owners', 'pets', 'pet_alerts', 'visits', 'visit_vitals', 'vaccinations', 'appointments', 'queue_entries',
-  'reminder_worklist', 'reminder_activity', 'inventory_items', 'inventory_batches', 'inventory_movements',
+  'patient_service_records', 'reminder_worklist', 'reminder_activity', 'inventory_items', 'inventory_batches', 'inventory_movements',
   'item_suppliers', 'suppliers', 'service_types', 'clinic_settings', 'profiles', 'prescriptions', 'visit_corrections', 'kb_documents']
 
 export function unwrap({ data, error }) {
@@ -48,10 +48,10 @@ export function normalizeClinicData(raw, now = new Date()) {
   const visits = get('visits').map((row) => {
     const vital = get('visit_vitals').filter((entry) => entry.visit_id === row.id).sort((a, b) => b.measured_at.localeCompare(a.measured_at))[0] || {}
     return { ...row, ...careMetadata('visit_id', row.id), petId: row.pet_id, type: row.visit_type, complaint: row.chief_complaint, diagnosis: row.diagnosis_summary, clinicalNotes: row.clinical_notes || '',
-      visitedAt: row.visited_at, cardColor: /^#[0-9a-f]{6}$/i.test(row.card_color) ? row.card_color.toLowerCase() : null, followUpDate: row.follow_up_date,
+      visitedAt: row.visited_at, serviceName: row.service_name || '', serviceTypeId: row.service_type_id || '', cardColor: /^#[0-9a-f]{6}$/i.test(row.card_color) ? row.card_color.toLowerCase() : null, followUpDate: row.follow_up_date,
       followUpScheduledDate: row.follow_up_scheduled_date, followUpArrivedAt: row.follow_up_arrived_at, followUpVisitId: row.follow_up_visit_id, followUpQueueId: row.follow_up_queue_id,
-      veterinarianId: row.attending_veterinarian_id,
-      veterinarian: row.attending_veterinarian_name || staffName(row.attending_veterinarian_id), weightKg: number(vital.weight_kg), temperatureC: number(vital.temperature_c),
+      recordingPurpose: row.recording_purpose || 'queue', veterinarianId: row.attending_veterinarian_id,
+      veterinarian: row.attending_veterinarian_name || (row.attending_veterinarian_id ? staffName(row.attending_veterinarian_id) : 'Not recorded'), weightKg: number(vital.weight_kg), temperatureC: number(vital.temperature_c),
       heartRate: number(vital.heart_rate_bpm), respiratoryRate: number(vital.respiratory_rate_rpm), bodyConditionScore: vital.body_condition_score, bodyConditionScale: vital.body_condition_scale || 9,
       hydration: vital.hydration, finalizedAt: row.finalized_at,
       prescriptions: get('prescriptions').filter((entry) => entry.visit_id === row.id),
@@ -88,10 +88,14 @@ export function normalizeClinicData(raw, now = new Date()) {
   })
   return { owners, pets, visits, inventory, reminders, settings, profiles, today, timezone, kbDocuments: get('kb_documents'),
     queueEntries,
+    serviceRecords: get('patient_service_records').map((row) => ({ ...row, petId: row.pet_id, recordingPurpose: 'record_only', category: 'maintenance',
+      service: row.service_name, serviceTypeId: row.service_type_id, serviceNotes: row.service_notes || '', status: 'record_only',
+      veterinarianId: row.performed_by || '', veterinarian: row.performed_by_name || 'Not recorded', arrivedAt: row.performed_at,
+      queueDate: clinicDate(new Date(row.performed_at), timezone), queueNumber: '', localPerformedAt: clinicDate(new Date(row.performed_at), timezone) + 'T' + clinicTime(row.performed_at, timezone) })),
     alerts: get('pet_alerts'), allServices: get('service_types'), services: get('service_types').filter((row) => row.is_active),
     suppliers: get('suppliers').map((row) => ({ ...row, contactPerson: row.contact_person || '', notes: row.ordering_notes, isActive: row.is_active })),
     vaccinations: get('vaccinations').map((row) => ({ ...row, ...careMetadata('vaccination_id', row.id), petId: row.pet_id, vaccine: row.vaccine_name, inventoryItemId: row.inventory_item_id || '', brand: row.brand || '', lotNumber: row.lot_number,
-      administeredAt: row.administered_at, nextDueAt: row.next_due_at, nextDoseStatus: vaccinationStatus(row.next_due_at, today), veterinarianId: row.administered_by })).sort((a, b) => b.administeredAt.localeCompare(a.administeredAt)),
+      administeredAt: row.administered_at, nextDueAt: row.next_due_at, recordingPurpose: row.recording_purpose || 'queue', nextDoseStatus: row.recording_purpose === 'record_only' ? 'Historical record' : vaccinationStatus(row.next_due_at, today), veterinarianId: row.administered_by, veterinarianName: row.administered_by_name || (row.administered_by ? staffName(row.administered_by) : '') })).sort((a, b) => b.administeredAt.localeCompare(a.administeredAt)),
     appointments: get('appointments').map((row) => ({ ...row, petId: row.pet_id, date: clinicDate(new Date(row.starts_at), timezone),
       time: clinicTime(row.starts_at, timezone), service: get('service_types').find((service) => service.id === row.service_type_id)?.name || 'Clinic visit',
       veterinarianId: row.veterinarian_id, veterinarian: staffName(row.veterinarian_id), status: title(row.status),

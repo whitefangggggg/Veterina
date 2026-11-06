@@ -22,6 +22,13 @@ export function photoFormat(bytes: Uint8Array): string | null {
   if (bytes.length >= 12 && new TextDecoder().decode(bytes.slice(0,4)) === 'RIFF' && new TextDecoder().decode(bytes.slice(8,12)) === 'WEBP') return 'webp';
   return null;
 }
+export function photoDataUrl(bytes: Uint8Array): string {
+  const format=photoFormat(bytes);
+  if(!format||bytes.byteLength>MAX_PHOTO_BYTES)throw new Error('PHOTO_INVALID_FORMAT');
+  let binary='';
+  for(let offset=0;offset<bytes.length;offset+=32768)binary+=String.fromCharCode(...bytes.subarray(offset,offset+32768));
+  return `data:image/${format==='jpg'?'jpeg':format};base64,${btoa(binary)}`;
+}
 export async function sha256(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as BufferSource))).map((n) => n.toString(16).padStart(2,'0')).join('');
 }

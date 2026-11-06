@@ -248,6 +248,51 @@ begin
   if exists(select 1 from public.visits v where v.id=visit_id) or exists(select 1 from public.pets p where p.id=pet_id) then raise exception 'TEST: delete did not remove dependent clinical rows'; end if;
 end $$;
 reset role;
+set local role authenticated;
+do $$ declare data jsonb; result jsonb; item uuid; key_id uuid:=gen_random_uuid(); invalid text;
+  item_count integer; batch_count integer; movement_count integer; begin
+  data:=jsonb_build_object('name','Opening stock fixture','category','Medicine','unit','ml','minimumStock',0,'allowsFraction',true,'initialQuantity',2.5,'lotNumber','INITIAL-PARTIAL');
+  select count(*) into item_count from public.inventory_items;
+  select count(*) into batch_count from public.inventory_batches;
+  select count(*) into movement_count from public.inventory_movements;
+  -- A late batch failure must roll back the item and both retry receipts.
+  begin
+    perform public.portal_mutation('create_inventory_item',data||'{"expirationDate":"invalid-date"}',key_id);
+    raise exception 'TEST: invalid batch date accepted';
+  exception when invalid_datetime_format or datetime_field_overflow then null;
+  end;
+  if (select count(*) from public.inventory_items)<>item_count or (select count(*) from public.inventory_batches)<>batch_count
+    or (select count(*) from public.inventory_movements)<>movement_count or exists(select 1 from public.idempotency_keys where key=key_id) then raise exception 'TEST: initial stock failure left partial records'; end if;
+  result:=public.portal_mutation('create_inventory_item',data,key_id); item:=(result->>'id')::uuid;
+  if public.portal_mutation('create_inventory_item',data,key_id)<>result then raise exception 'TEST: opening stock retry changed result'; end if;
+  if (select count(*) from public.inventory_batches where item_id=item)<>1 or (select count(*) from public.inventory_movements where item_id=item)<>1
+    or (select sum(quantity_delta) from public.inventory_movements where item_id=item)<>2.5
+    or not exists(select 1 from public.inventory_movements where item_id=item and reason='Initial stock' and movement_type='stock_in' and performed_by=auth.uid()) then raise exception 'TEST: opening stock missing, duplicated or incorrectly attributed'; end if;
+  perform public.portal_mutation('update_inventory_item',data||jsonb_build_object('id',item,'initialQuantity',500),gen_random_uuid());
+  if (select sum(quantity_delta) from public.inventory_movements where item_id=item)<>2.5 then raise exception 'TEST: item edit changed opening stock'; end if;
+  foreach invalid in array array['-1','NaN','Infinity','-Infinity','0.001','10000000000','not-a-number'] loop
+    begin
+      perform public.portal_mutation('create_inventory_item',data||jsonb_build_object('initialQuantity',invalid),gen_random_uuid());
+      raise exception 'TEST: invalid opening stock accepted: %',invalid;
+    exception when others then if sqlerrm not like 'VALIDATION_FAILED%' then raise; end if;
+    end;
+  end loop;
+  begin
+    perform public.portal_mutation('create_inventory_item',data||'{"allowsFraction":false,"initialQuantity":0.5}',gen_random_uuid());
+    raise exception 'TEST: whole-unit item accepted fractional opening stock';
+  exception when others then if sqlerrm not like 'VALIDATION_FAILED%' then raise; end if;
+  end;
+  if (select count(*) from public.inventory_items)<>item_count+1 or (select count(*) from public.inventory_batches)<>batch_count+1 or (select count(*) from public.inventory_movements)<>movement_count+1 then raise exception 'TEST: invalid opening quantities left records'; end if;
+  item:=(public.portal_mutation('create_inventory_item',data-'initialQuantity',gen_random_uuid())->>'id')::uuid;
+  if exists(select 1 from public.inventory_movements where item_id=item) then raise exception 'TEST: omitted opening stock created a movement'; end if;
+  item:=(public.portal_mutation('create_inventory_item',data||'{"initialQuantity":0}',gen_random_uuid())->>'id')::uuid;
+  if exists(select 1 from public.inventory_movements where item_id=item) then raise exception 'TEST: zero opening stock created a movement'; end if;
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('veterina_test.staff'),'role','authenticated')::text,true);
+  item:=(public.portal_mutation('create_inventory_item',data||'{"allowsFraction":false,"initialQuantity":12}',gen_random_uuid())->>'id')::uuid;
+  if not exists(select 1 from public.inventory_movements where item_id=item and quantity_delta=12 and performed_by=auth.uid()) then raise exception 'TEST: staff opening stock missing'; end if;
+end $$;
+reset role;
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('veterina_test.owner'),'role','authenticated')::text,true);
 update public.profiles set is_active=false where id=current_setting('veterina_test.staff')::uuid;
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('veterina_test.staff'),'role','authenticated')::text,true);
 set local role authenticated;

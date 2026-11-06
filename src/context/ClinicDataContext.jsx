@@ -1,9 +1,10 @@
 /* oxlint-disable react/only-export-components */
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { clinicErrorMessage, createMutationRunner, fetchClinicData, normalizeClinicData } from '../lib/clinicRepository'
 import { useAuth } from './AuthContext'
 import { ClinicDataContext } from './ClinicContext'
+import { clinicThemeStyle } from '../lib/clinicPersonalization'
 
 export function ClinicDataProvider({ children }) {
   const { user, refreshAccess, signOut } = useAuth()
@@ -57,6 +58,16 @@ export function ClinicDataProvider({ children }) {
     }
   }
   const data = useMemo(() => normalizeClinicData(raw || {}, clock), [raw, clock])
+  const themeColor = data.settings?.brand_color
+  const themeReady = raw !== null
+  useLayoutEffect(() => {
+    if (!themeReady) return
+    // Global controls (including PWA prompts and portals) share the active clinic.
+    const theme = clinicThemeStyle(themeColor)
+    const root = document.documentElement.style
+    Object.entries(theme).forEach(([name, value]) => root.setProperty(name, value))
+    return () => Object.keys(theme).forEach((name) => root.removeProperty(name))
+  }, [themeColor, themeReady])
   const value = { ...data, execute, reload, refreshing,
     manageKb: async (payload) => {
       const { data: result, error } = await supabase.rpc('manage_kb', { p_data: payload })

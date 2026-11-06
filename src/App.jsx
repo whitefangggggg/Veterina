@@ -15,6 +15,8 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Queue = lazy(() => import('./pages/Queue'))
 const Patients = lazy(() => import('./pages/Patients'))
 const PetDetail = lazy(() => import('./pages/PetDetail'))
+const TravelCertificates = lazy(() => import('./pages/TravelCertificates'))
+const PublicTravelCertificate = lazy(() => import('./pages/PublicTravelCertificate'))
 const Appointments = lazy(() => import('./pages/Operations').then((module) => ({ default: module.Appointments })))
 const Reminders = lazy(() => import('./pages/Operations').then((module) => ({ default: module.Reminders })))
 const Inventory = lazy(() => import('./pages/Stock').then((module) => ({ default: module.Inventory })))
@@ -48,6 +50,7 @@ const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
     element: load(<Landing />),
   },
   { path: '/sign-in', element: load(<Auth key="sign-in" />) },
+  { path: '/travel-certificate', element: load(<PublicTravelCertificate />) },
   { path: '/admin/sign-in', element: load(<Auth key="admin-sign-in" mode="admin" />) },
   { path: '/admin', element: load(<PlatformAdmin />) },
   { path: '/subscription', element: load(<Subscription />) },
@@ -65,6 +68,7 @@ const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
       { path: '/queue', element: load(<Queue />) },
       { path: '/patients', element: load(<Patients />) },
       { path: '/patients/:petId', element: load(<PetDetail />) },
+      { path: '/travel-certificates', element: load(<TravelCertificates />) },
       { path: '/appointments', element: load(<Appointments />) },
       { path: '/reminders', element: load(<Reminders />) },
       { path: '/inventory', element: load(<Inventory />) },

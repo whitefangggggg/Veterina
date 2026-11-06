@@ -11,6 +11,9 @@ describe('appointment navigation', () => {
 })
 
 describe('follow-up calendar sync', () => {
+  it('keeps historical follow-up dates out of live scheduling', () => {
+    expect(upcomingFollowUps([{ ...visit, recordingPurpose: 'record_only' }], pets, '2026-10-25')).toEqual([])
+  })
   it('uses the rescheduled date and removes an arrived plan without altering its clinical date', () => {
     const planned = { ...visit, followUpScheduledDate: '2026-10-25' }
     expect(upcomingFollowUps([planned], pets, '2026-10-25')).toMatchObject([{ date: '2026-10-25' }])
