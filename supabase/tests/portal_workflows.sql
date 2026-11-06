@@ -203,6 +203,7 @@ begin
     'retentionYears',c.record_retention_years,'reminderLeadDays',c.reminder_lead_days,'aiEnabled',c.ai_enabled,'fullName','Renamed rollback owner')
     into data from public.clinic_settings c limit 1;
   perform public.portal_mutation('save_settings',data,gen_random_uuid());
+  perform public.portal_mutation('save_veterinarian_details',jsonb_build_object('id',auth.uid(),'fullName','Renamed rollback owner','isVeterinarian',false),gen_random_uuid());
   if (select attending_veterinarian_name from public.visits where id=visit_id)<>'Rollback owner' or (select recorded_by_name from public.visits where id=visit_id)<>'Rollback owner' then raise exception 'TEST: historical clinician attribution changed'; end if;
   if (select administered_by_name from public.vaccinations where id=vaccine_id)<>'Rollback owner' then raise exception 'TEST: vaccination clinician attribution changed'; end if;
 

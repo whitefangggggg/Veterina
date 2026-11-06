@@ -5,7 +5,7 @@ import { Field } from './ui'
 const optionsFor = (visits, field) => [...new Set(visits.map((visit) => visit[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b))
 
 export default function ClinicalHistoryFilters({ visits, filters, onChange, onClear, count, timezone, view, onViewChange,
-  label = 'Clinical history', itemName = 'checkup', itemPlural = 'checkups', advancedFields, dateLabel = 'Visit date', placeholder = 'Search clinical details…' }) {
+  label = 'Clinical history', itemName = 'checkup', itemPlural = 'checkups', advancedFields, combined = false, dateLabel = 'Visit date', placeholder = 'Search clinical details…' }) {
   const [expanded, setExpanded] = useState(false)
   const panelId = useId()
   const active = Object.values(filters).some(Boolean)
@@ -24,10 +24,11 @@ export default function ClinicalHistoryFilters({ visits, filters, onChange, onCl
     <div id={panelId} hidden={!expanded}>
     <div className="clinical-history-filter-grid">
       {advancedFields ? advancedFields.map((field) => <Field key={field.name} label={field.label}><select aria-label={field.ariaLabel || `Filter ${field.label.toLowerCase()}`} value={filters[field.name]} onChange={update(field.name)}><option value="">{field.allLabel || 'All'}</option>{field.options.map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>) : <>
-      <Field label="Visit type"><select aria-label="Filter visit type" value={filters.type} onChange={update('type')}><option value="">All visit types</option>{optionsFor(visits, 'type').map((type) => <option key={type}>{type}</option>)}</select></Field>
-      <Field label="Care status"><select aria-label="Filter care status" value={filters.status} onChange={update('status')}><option value="">All care statuses</option>{['Recorded', 'Waiting', 'In progress', 'Completed', 'Cancelled'].map((status) => <option key={status}>{status}</option>)}</select></Field>
+      {combined && <Field label="Record type"><select aria-label="Filter record type" value={filters.kind} onChange={update('kind')}><option value="">All</option><option value="checkup">Checkups</option><option value="service">Services</option></select></Field>}
+      <Field label={combined ? 'Reason / service' : 'Visit type'}><select aria-label={combined ? 'Filter reason or service' : 'Filter visit type'} value={filters.type} onChange={update('type')}><option value="">{combined ? 'All reasons and services' : 'All visit types'}</option>{optionsFor(visits, 'type').map((type) => <option key={type}>{type}</option>)}</select></Field>
+      <Field label="Care status"><select aria-label="Filter care status" value={filters.status} onChange={update('status')}><option value="">All care statuses</option>{['Recorded', ...(combined ? ['Record only'] : []), 'Waiting', 'In progress', 'Completed', 'Cancelled'].map((status) => <option key={status}>{status}</option>)}</select></Field>
       <Field label="Veterinarian"><select aria-label="Filter veterinarian" value={filters.veterinarian} onChange={update('veterinarian')}><option value="">All veterinarians</option>{optionsFor(visits, 'veterinarian').map((name) => <option key={name}>{name}</option>)}</select></Field>
-      <Field label="Clinical details"><select aria-label="Filter clinical details" value={filters.details} onChange={update('details')}><option value="">All records</option><option value="prescription">With prescriptions</option><option value="follow-up">With follow-up date</option><option value="correction">With corrections</option><option value="finalized">Finalized checkups</option><option value="open">Unfinalized checkups</option></select></Field>
+      <Field label="Clinical details"><select aria-label="Filter clinical details" value={filters.details} onChange={update('details')}><option value="">All records</option><option value="prescription">With prescriptions</option><option value="follow-up">With follow-up date</option><option value="correction">With corrections</option><option value="finalized">Finalized checkups</option><option value="open">Unfinalized checkups</option>{combined && <><option value="service-notes">With service notes</option><option value="no-service-notes">Without service notes</option></>}</select></Field>
       </>}
       <Field label={`${dateLabel} from`}><input type="date" value={filters.from} max={filters.to || undefined} onChange={update('from')} aria-invalid={invalidRange ? true : undefined} /></Field>
       <Field label={`${dateLabel} to`}><input type="date" value={filters.to} min={filters.from || undefined} onChange={update('to')} aria-invalid={invalidRange ? true : undefined} /></Field>

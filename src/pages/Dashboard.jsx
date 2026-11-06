@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
-  BellRinging,
   CalendarDots,
   ChartBar,
   FirstAidKit,
@@ -23,8 +22,7 @@ const spaces = [
   { to: '/queue', title: 'In-site queue', description: 'Walk-ins, check-ins, checkups and vaccinations.', icon: FirstAidKit, color: 'amber' },
   { to: '/patients', title: 'Patient records', description: 'Owners, pets, checkups and complete clinical histories.', icon: PawPrint, color: 'sage' },
   { to: '/travel-certificates', title: 'Travel Certificates', description: 'Review vaccinations and issue pet-specific travel documents.', icon: FileText, color: 'sage' },
-  { to: '/appointments', title: 'Appointments', description: 'A calm monthly calendar and focused daily agenda.', icon: CalendarDots, color: 'mint' },
-  { to: '/reminders', title: 'Reminder center', description: 'Today’s calls, follow-ups and upcoming vaccines.', icon: BellRinging, color: 'blue' },
+  { to: '/appointments', title: 'Appointments', description: 'Bookings, care due dates, owner calls and follow-up tasks.', icon: CalendarDots, color: 'mint' },
   { to: '/inventory', title: 'Inventory', description: 'Quantities, stock movements, batches and expirations.', icon: Package, color: 'blue' },
   { to: '/suppliers', title: 'Suppliers', description: 'Ordering contacts and linked clinic supplies.', icon: Truck, color: 'amber' },
   { to: '/reports', title: 'Reports', description: 'Patient histories, vaccine lists and clinic exports.', icon: ChartBar, color: 'mint' },

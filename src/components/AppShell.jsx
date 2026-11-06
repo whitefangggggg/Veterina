@@ -12,7 +12,6 @@ import {
   Package,
   PawPrint,
   SignOut,
-  ArrowsClockwise,
   SquaresFour,
   Stethoscope,
   Truck,
@@ -30,13 +29,13 @@ const workspaces = [
   { to: '/queue', label: 'In-site queue', detail: 'Arrivals and care in progress', icon: FirstAidKit, color: 'amber' },
   { to: '/patients', label: 'Patients', detail: 'Owners and clinical records', icon: PawPrint, color: 'sage' },
   { to: '/travel-certificates', label: 'Travel Certificates', detail: 'Pet vaccination and travel documents', icon: FileText, color: 'sage' },
-  { to: '/appointments', label: 'Appointments', detail: 'Calendar and daily agenda', icon: CalendarDots, color: 'mint' },
-  { to: '/reminders', label: 'Reminders', detail: 'Calls, vaccines and follow-ups', icon: BellRinging, color: 'blue' },
+  { to: '/appointments', label: 'Appointments', detail: 'Bookings, due care and owner follow-ups', icon: CalendarDots, color: 'mint' },
   { to: '/inventory', label: 'Inventory', detail: 'Stock, batches and expirations', icon: Package, color: 'blue' },
   { to: '/suppliers', label: 'Suppliers', detail: 'Ordering contacts', icon: Truck, color: 'amber' },
   { to: '/reports', label: 'Reports', detail: 'Clinic exports and summaries', icon: ChartBar, color: 'mint' },
   { to: '/settings', label: 'Settings', detail: 'Staff and clinic profile', icon: Gear, color: 'slate' },
-  { to: '/knowledge', label: 'Knowledge', detail: 'Approved documents and cited recall', icon: FirstAidKit, color: 'sage' },
+  // Paused until the Knowledge workspace is ready for release.
+  // { to: '/knowledge', label: 'Knowledge', detail: 'Approved documents and cited recall', icon: FirstAidKit, color: 'sage' },
 ]
 
 function Brand() {
@@ -134,7 +133,7 @@ function GlobalSearch({ onClose }) {
 export default function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
-  const { reminders, reload, refreshing } = useClinicData()
+  const { reminders } = useClinicData()
   const { profile, user, signOut, accountAccess } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
@@ -182,8 +181,7 @@ export default function AppShell() {
           </button>
           <div className="header-actions">
             {accountAccess?.isPlatformAdmin && <Link className="text-link" to="/admin">Platform admin</Link>}
-            <button className="icon-button header-refresh" onClick={reload} disabled={refreshing} aria-label="Refresh clinic records" title="Refresh clinic records"><ArrowsClockwise size={20} /></button>
-            <Link to="/reminders" className="notification-button icon-button" aria-label={`${dueCount} reminders due`}>
+            <Link to="/appointments?view=tasks" className="notification-button icon-button" aria-label={`${dueCount} follow-up tasks due`}>
               <BellRinging size={21} weight="duotone" />
               {dueCount > 0 && <span>{dueCount}</span>}
             </Link>

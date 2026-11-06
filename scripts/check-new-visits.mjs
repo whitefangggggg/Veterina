@@ -137,7 +137,7 @@ try {
   assert.equal(raw.patient_service_records.length, 1)
   assert.equal(raw.queue_entries.length, 1)
   await page.reload()
-  await page.getByRole('button', { name: 'Service history', exact: true }).click()
+  await page.getByRole('button', { name: 'Clinical history', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Edit service record', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Edit service record', exact: true }).click()
   await expect(page.getByLabel('Performed by', { exact: true })).toHaveValue('Dok M?ya sa Bukid')

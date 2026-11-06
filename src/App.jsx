@@ -18,12 +18,12 @@ const PetDetail = lazy(() => import('./pages/PetDetail'))
 const TravelCertificates = lazy(() => import('./pages/TravelCertificates'))
 const PublicTravelCertificate = lazy(() => import('./pages/PublicTravelCertificate'))
 const Appointments = lazy(() => import('./pages/Operations').then((module) => ({ default: module.Appointments })))
-const Reminders = lazy(() => import('./pages/Operations').then((module) => ({ default: module.Reminders })))
 const Inventory = lazy(() => import('./pages/Stock').then((module) => ({ default: module.Inventory })))
 const Suppliers = lazy(() => import('./pages/Stock').then((module) => ({ default: module.Suppliers })))
 const Reports = lazy(() => import('./pages/Admin').then((module) => ({ default: module.Reports })))
 const Settings = lazy(() => import('./pages/Admin').then((module) => ({ default: module.Settings })))
-const Knowledge = lazy(() => import('./pages/Knowledge'))
+// Knowledge workspace is paused; retain its implementation for a later release.
+// const Knowledge = lazy(() => import('./pages/Knowledge'))
 const Login = lazy(() => import('./pages/Login'))
 
 function PageLoader({ children }) {
@@ -41,6 +41,13 @@ function RecoveryRedirect() {
     return <Navigate to={`/reset-password?next=${encodeURIComponent(next)}`} replace />
   }
   return <Outlet />
+}
+
+function LegacyReminderRedirect() {
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  params.set('view', 'tasks')
+  return <Navigate to={{ pathname: '/appointments', search: `?${params}`, hash: location.hash }} replace />
 }
 
 const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
@@ -70,13 +77,13 @@ const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
       { path: '/patients/:petId', element: load(<PetDetail />) },
       { path: '/travel-certificates', element: load(<TravelCertificates />) },
       { path: '/appointments', element: load(<Appointments />) },
-      { path: '/reminders', element: load(<Reminders />) },
+      { path: '/reminders', element: <LegacyReminderRedirect /> },
       { path: '/inventory', element: load(<Inventory />) },
       { path: '/suppliers', element: load(<Suppliers />) },
       { path: '/reports', element: load(<Reports />) },
       { path: '/settings', element: load(<Settings />) },
       { path: '/clinic-setup', element: <Navigate to="/settings" replace /> },
-      { path: '/knowledge', element: load(<Knowledge />) },
+      // { path: '/knowledge', element: load(<Knowledge />) },
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
   },

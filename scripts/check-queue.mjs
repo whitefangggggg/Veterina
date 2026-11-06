@@ -542,7 +542,7 @@ try {
   await page.getByRole('button', { name: 'Complete service', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.goto(origin + `/patients/${petId}`)
-  await page.getByRole('button', { name: 'Service history', exact: true }).click()
+  await page.getByRole('button', { name: 'Clinical history', exact: true }).click()
   await expect(page.getByText('Bath and nail trim', { exact: true })).toBeVisible()
 
   await page.goto(origin + '/settings')

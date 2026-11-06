@@ -46,8 +46,8 @@ const eventTime = (value, timezone) => !value || isClinicDate(value) || !dateInC
 
 export function clinicalCalendarEntries(visits, timezone) {
   return visits.map((visit) => ({
-    id: visit.id, date: dateInClinic(visit.visitedAt, timezone), time: eventTime(visit.visitedAt, timezone),
-    type: visit.type || 'Checkup', title: visit.diagnosis || visit.complaint || 'Checkup', color: visit.cardColor,
+    id: visit.historyKey || visit.id, date: dateInClinic(visit.visitedAt, timezone), time: eventTime(visit.visitedAt, timezone),
+    type: visit.type || 'Checkup', title: visit.historyKind === 'service' ? visit.serviceNotes || statusName(visit.status) : visit.diagnosis || visit.complaint || 'Checkup', color: visit.cardColor,
     timestamp: Date.parse(visit.visitedAt) || 0,
   }))
 }

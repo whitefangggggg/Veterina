@@ -22,7 +22,7 @@ describe('patient care timeline', () => {
   it('opens historical dates, completed reminders, correct tabs and prescription anchors', () => {
     const events = buildPatientTimeline(data, 'p')
     expect(events.find((event) => event.kind === 'Appointment').href).toBe('/appointments?date=2026-10-20#appointment-a')
-    expect(events.find((event) => event.kind === 'Reminder').href).toBe('/reminders?status=All#reminder-r')
+    expect(events.find((event) => event.kind === 'Reminder').href).toBe('/appointments?view=tasks&status=All#reminder-r')
     expect(events.find((event) => event.kind === 'Vaccination').href).toBe('/patients/p?tab=vaccines#vaccination-vac')
     expect(events.find((event) => event.kind === 'Prescription').href).toBe('/patients/p?tab=history#prescription-rx')
     expect(queueSource(data.queueEntries[0])).toBe('/queue?status=All&date=2026-10-20#queue-q')

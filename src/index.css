@@ -546,6 +546,11 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
 .visit-date strong { color: var(--ink); font-size: 26px; line-height: 1.1; }
 .visit-date small { color: var(--muted); font-size: 12px; }
 .visit-content { min-width: 0; padding-left: 18px; }
+.service-history-card .visit-heading { flex-wrap: wrap; }
+.service-history-card .visit-heading > span { white-space: normal; overflow-wrap: anywhere; }
+.service-history-notes { margin: 16px 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+.service-history-notes strong { color: var(--brand-dark); font-size: 11px; text-transform: uppercase; }
+.service-history-notes p { margin: 6px 0; color: var(--ink); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
 .visit-heading { display: flex; justify-content: space-between; gap: 12px; }
 .visit-heading h2 { margin: 7px 0 3px; color: var(--ink); font-size: 17px; font-weight: 650; }
 .visit-heading p { margin: 0; color: var(--muted); font-size: 13px; }
@@ -1238,7 +1243,7 @@ kbd { padding: 2px 6px; border: 1px solid #d0d8d2; border-radius: 5px; color: #6
 
 /* ===== Marketing landing (/) ===== */
 @media (max-width: 480px) {
-  .header-actions .header-refresh, .header-actions .notification-button { display: none; }
+  .header-actions .notification-button { display: none; }
 }
 @media (max-width: 360px) {
   .header-brand strong { display: none; }

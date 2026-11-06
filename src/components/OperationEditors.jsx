@@ -44,14 +44,16 @@ export function AppointmentEditor({ record, initialDate, initialPetId, onClose }
     ]} />
 }
 
-export function ReminderEditor({ record, onClose }) {
-  const { pets, profiles, execute, today } = useClinicData()
-  return <RecordEditor title={record ? 'Edit reminder' : 'Custom reminder'} initial={record ? { ...record, priority: record.priority, assignedTo: record.assigned_to || '' } : { dueDate: today, priority: 'normal' }} onClose={onClose}
+export function ReminderEditor({ record, initialDate, onClose }) {
+  const { pets, profiles, visits, execute, today } = useClinicData()
+  const visit = visits.find((visit) => visit.id === record?.visit_id && visit.petId === record?.petId)
+  const linkedFollowUp = record?.type === 'Follow-up' && (visit?.followUpScheduledDate || visit?.followUpDate) && !visit.followUpArrivedAt
+  return <RecordEditor title={record ? 'Edit follow-up task' : 'New follow-up task'} initial={record ? { ...record, priority: record.priority, assignedTo: record.assigned_to || '' } : { dueDate: initialDate || today, priority: 'normal' }} onClose={onClose}
     onSave={(values) => execute(record ? 'update_reminder' : 'create_reminder', { ...values, ...(record ? { id: record.id } : {}) })}
     fields={[
       ...(!record ? [{ name: 'petId', label: 'Patient', type: 'select', required: true, options: [{ value: '', label: 'Select patient' }, ...pets.map((pet) => ({ value: pet.id, label: pet.name + ' · ' + pet.recordNumber }))] },
         { name: 'reminderType', label: 'Type', type: 'select', options: [{ value: 'custom', label: 'Custom' }, { value: 'appointment', label: 'Checkup' }, { value: 'medication', label: 'Medication' }] }] : []),
-      { name: 'title', label: 'Title', required: true }, { name: 'dueDate', label: 'Due date', type: 'date', required: true },
+      { name: 'title', label: 'Title', required: true }, { name: 'dueDate', label: 'Due date', type: 'date', required: true, readOnly: Boolean(linkedFollowUp), hint: linkedFollowUp ? 'Use Reschedule follow-up to move the care date and its contact task together, or Snooze contact to change only the next call date.' : record ? 'This is the contact date. Bookings and clinical due dates are changed through their linked records.' : undefined },
       { name: 'priority', label: 'Priority', type: 'select', options: ['normal', 'high', 'urgent'] },
       { name: 'assignedTo', label: 'Assigned to', type: 'select', options: [{ value: '', label: 'Unassigned' }, ...profiles.filter((profile) => profile.is_active).map((profile) => ({ value: profile.id, label: profile.full_name || 'Clinic staff' }))] },
       { name: 'notes', label: 'Notes', type: 'textarea', span: true },

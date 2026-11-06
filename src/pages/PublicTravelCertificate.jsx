@@ -37,7 +37,7 @@ export default function PublicTravelCertificate() {
   }, [token, retry])
   const certificate = result.certificate
   return <main className="public-travel-certificate">
-    <header className="public-certificate-header"><div><span className="eyebrow">Clinic-issued document</span><h1>{result.status === 'unavailable' ? 'Certificate not available' : 'Pet Travel Certificate'}</h1>{certificate && <p>{certificate.reference_number} · {certificate.status === 'void' ? 'Void certificate' : 'Public certificate'}</p>}</div>
+    <header className="public-certificate-header"><div><span className="eyebrow">Clinic-issued document</span><h1>{result.status === 'unavailable' ? 'Certificate not available' : 'Pet Travel Certificate'}</h1>{certificate && <p>{certificate.snapshot.controlNumber && <>Control No. {certificate.snapshot.controlNumber} · </>}{certificate.reference_number} · {certificate.status === 'void' ? 'Void certificate' : 'Public certificate'}</p>}</div>
       {certificate && <button className="button button-primary" disabled={printing} onClick={async () => {
         setPrinting(true); setPrintError('')
         try {
