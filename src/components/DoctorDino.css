@@ -1,0 +1,13 @@
+.vt-dino-lane{position:relative;height:123px;width:min(680px,75%);margin:0 auto;z-index:1}.vt-dino-track{position:absolute;left:0;right:0;bottom:9px;height:110px;overflow:hidden;border-bottom:1px solid #d4e8bf26}.vt-dino-traveller{width:100%;height:110px;transform:translateX(calc(50% - 48px))}.vt-dino-facing{width:96px;height:110px}.vt-doctor-dino{display:block;width:96px;height:96px;margin-top:12px;image-rendering:pixelated}.vt-dino-legs-b{visibility:hidden}.vt-dino-toggle{position:absolute;bottom:-15px;right:0;border:0;background:transparent;color:#cee2d3;font:inherit;font-size:10px;padding:4px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}.vt-dino-toggle:focus-visible{outline:2px solid #e1f0de;outline-offset:4px}.vt-hero-inner{padding-bottom:28px}.vt-hero-index{margin-top:24px}
+/* User-initiated play also works when the rest of the page reduces motion. */
+.vt-page .vt-dino-lane.is-playing .vt-dino-traveller{animation:vet-dino-stroll 28s linear infinite!important;will-change:transform}
+.vt-page .vt-dino-lane.is-playing .vt-dino-facing{animation:vet-dino-turn 28s steps(1,end) infinite!important}
+.vt-page .vt-dino-lane.is-playing .vt-dino-bob{animation:vet-dino-bob .64s steps(1,end) infinite!important}
+.vt-page .vt-dino-lane.is-playing .vt-dino-legs-a{animation:vet-dino-feet-a .64s steps(1,end) infinite!important}
+.vt-page .vt-dino-lane.is-playing .vt-dino-legs-b{animation:vet-dino-feet-b .64s steps(1,end) infinite!important}
+@keyframes vet-dino-stroll{0%,100%{transform:translateX(0)}46%,50%{transform:translateX(calc(100% - 96px))}96%{transform:translateX(0)}}
+@keyframes vet-dino-turn{0%,100%{transform:scaleX(1)}48%{transform:scaleX(-1)}98%{transform:scaleX(1)}}
+@keyframes vet-dino-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1px)}}
+@keyframes vet-dino-feet-a{0%,100%{visibility:visible}50%{visibility:hidden}}
+@keyframes vet-dino-feet-b{0%,100%{visibility:hidden}50%{visibility:visible}}
+@media(max-width:620px){.vt-dino-lane{width:70%;height:112px}.vt-hero-inner{padding-bottom:20px}.vt-dino-track,.vt-dino-traveller,.vt-dino-facing{height:98px}.vt-doctor-dino{margin-top:0}.vt-dino-toggle{font-size:9px}.vt-hero-index{margin-top:25px}}

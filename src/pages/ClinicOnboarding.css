@@ -14,7 +14,7 @@
 .onboarding-steps strong { display: block; font-size: 14px; font-weight: 600; }
 .onboarding-steps small { display: block; margin-top: 3px; font-size: 11px; }
 .onboarding-steps [aria-current="step"] { color: var(--brand); }
-.onboarding-steps [aria-current="step"] > span { border-color: var(--brand); background: var(--brand); color: #fff; box-shadow: 0 0 0 5px var(--brand-soft); }
+.onboarding-steps [aria-current="step"] > span { border-color: var(--brand); background: var(--brand-gradient); color: #fff; box-shadow: 0 0 0 5px var(--brand-soft); }
 .onboarding-progress-note { display: flex; gap: 10px; max-width: 280px; padding-top: 22px; border-top: 1px solid #dce3da; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .onboarding-progress-note svg { flex: none; color: var(--brand); margin-top: 2px; }
 .onboarding-card { padding: 36px; border: 1px solid #e0e7dd; border-radius: 24px; background: #fff; box-shadow: 0 16px 50px #263f2910; min-width: 0; }
