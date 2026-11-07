@@ -176,6 +176,7 @@ try {
   await expect(ownerPage).toHaveURL(app.origin + '/settings')
   await expect(ownerPage.getByRole('heading', { name: 'Verify your sign-in' })).toHaveCount(0)
   console.log('PASS enrolled authenticator no longer blocks password sign-in')
+  await ownerPage.getByRole('button', { name: 'Staff accounts', exact: true }).click()
   await expect(ownerPage.locator('.clinic-registration-code')).toHaveText(originalCode)
   const qrImage = ownerPage.getByAltText("Scan to register as staff with this shop's Veterina Code prefilled")
   await expect(qrImage).toBeVisible()

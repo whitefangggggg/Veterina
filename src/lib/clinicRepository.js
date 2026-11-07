@@ -51,7 +51,7 @@ export function normalizeClinicData(raw, now = new Date()) {
       visitedAt: row.visited_at, serviceName: row.service_name || '', serviceTypeId: row.service_type_id || '', cardColor: /^#[0-9a-f]{6}$/i.test(row.card_color) ? row.card_color.toLowerCase() : null, followUpDate: row.follow_up_date,
       followUpScheduledDate: row.follow_up_scheduled_date, followUpArrivedAt: row.follow_up_arrived_at, followUpVisitId: row.follow_up_visit_id, followUpQueueId: row.follow_up_queue_id,
       recordingPurpose: row.recording_purpose || 'queue', veterinarianId: row.attending_veterinarian_id,
-      veterinarian: row.attending_veterinarian_name || (row.attending_veterinarian_id ? staffName(row.attending_veterinarian_id) : 'Not recorded'), weightKg: number(vital.weight_kg), temperatureC: number(vital.temperature_c),
+      veterinarian: row.attending_veterinarian_name || (row.attending_veterinarian_id ? staffName(row.attending_veterinarian_id) : 'Not recorded'), weightKg: number(vital.weight_kg), weightMeasuredAt: vital.measured_at, temperatureC: number(vital.temperature_c),
       heartRate: number(vital.heart_rate_bpm), respiratoryRate: number(vital.respiratory_rate_rpm), bodyConditionScore: vital.body_condition_score, bodyConditionScale: vital.body_condition_scale || 9,
       hydration: vital.hydration, finalizedAt: row.finalized_at,
       prescriptions: get('prescriptions').filter((entry) => entry.visit_id === row.id),

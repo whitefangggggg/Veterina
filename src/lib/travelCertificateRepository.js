@@ -4,7 +4,7 @@ import { withTravelCertificateQr } from './travelCertificateSharing'
 
 export const CERTIFICATE_PAGE_SIZE = 25
 export async function fetchTravelCertificates({ query = '', page = 0, signal } = {}) {
-  let request = supabase.from('travel_certificates').select('id,reference_number,pet_name,owner_name,issuer_name,issued_on,issued_at,travel_date,destination,status,void_reason,is_public', { count: 'exact' })
+  let request = supabase.from('travel_certificates').select('id,reference_number,control_number,pet_name,owner_name,issuer_name,issued_on,issued_at,travel_date,destination,status,void_reason,is_public', { count: 'exact' })
     .order('issued_at', { ascending: false }).order('id', { ascending: false }).range(page * CERTIFICATE_PAGE_SIZE, (page + 1) * CERTIFICATE_PAGE_SIZE - 1)
   if (query.trim()) request = request.ilike('search_text', `%${query.trim().replace(/[\\%_]/g, '\\$&')}%`)
   if (signal) request = request.abortSignal(signal)

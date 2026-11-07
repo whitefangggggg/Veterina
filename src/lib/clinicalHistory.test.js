@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterClinicalHistory } from './clinicalHistory'
+import { combinedClinicalHistory, filterClinicalHistory, normalizePatientHistoryParams } from './clinicalHistory'
 
 const visits = [
   { id: 'recent', type: 'Follow-up', careStatus: 'In progress', veterinarian: 'Dr. José', visitedAt: '2026-10-17T17:10:00Z',
@@ -16,6 +16,37 @@ const visits = [
 const ids = (filters) => filterClinicalHistory(visits, filters, 'Asia/Manila').map((visit) => visit.id)
 
 describe('clinical history search and filters', () => {
+  const services = [
+    { id: 'recent', service: 'Grooming', arrivedAt: '2026-10-17T18:00:00Z', status: 'completed', veterinarian: 'Dr. Lee', serviceNotes: 'Bath and trim', notes: 'Gentle handling', queueNumber: 'Q-003' },
+    { id: 'historic', service: 'Nail trim', arrivedAt: '2026-10-17T17:10:00Z', status: 'record_only', recordingPurpose: 'record_only', veterinarian: 'Dok sa Bukid' },
+  ]
+  it('combines full timestamps, retains both record types with colliding IDs and deduplicates services', () => {
+    const records = combinedClinicalHistory(visits, [...services, services[0]])
+    expect(records.map((record) => record.historyKey)).toEqual(['service:recent', 'checkup:recent', 'service:historic', 'checkup:old', 'checkup:empty'])
+    expect(records[0].sourceRecord).toBe(services[0])
+    expect(records[1].sourceRecord).toBe(visits[0])
+    expect(services[0].visitedAt).toBeUndefined()
+    const offsets = combinedClinicalHistory([{ ...visits[0], visitedAt: '2026-10-18T02:00:00+08:00' }], [{ ...services[0], arrivedAt: '2026-10-17T19:00:00Z' }])
+    expect(offsets[0].historyKind).toBe('service')
+  })
+  it('shares search and facets while restricting clinical detail filters to their appropriate record type', () => {
+    const records = combinedClinicalHistory(visits, services)
+    const matching = (filters) => filterClinicalHistory(records, filters, 'Asia/Manila').map((record) => record.historyKey)
+    expect(matching({ query: 'bath gentle Q-003' })).toEqual(['service:recent'])
+    expect(matching({ kind: 'service', status: 'Completed', type: 'Grooming', from: '2026-10-18', to: '2026-10-18' })).toEqual(['service:recent'])
+    expect(matching({ status: 'Record only' })).toEqual(['service:historic'])
+    expect(matching({ details: 'open' })).toEqual(['checkup:recent', 'checkup:empty'])
+    expect(matching({ details: 'service-notes' })).toEqual(['service:recent'])
+    expect(matching({ details: 'no-service-notes' })).toEqual(['service:historic'])
+    expect(matching({ kind: 'checkup', details: 'service-notes' })).toEqual([])
+  })
+  it('translates removed service tabs and filters without overwriting explicit clinical filters', () => {
+    const params = new URLSearchParams('tab=services&serviceQuery=bath&serviceService=Grooming&serviceStatus=Completed&serviceNotes=With+service+notes&serviceView=calendar&serviceDay=2026-10-18&historySearch=trim&appointmentId=a')
+    const normalized = normalizePatientHistoryParams(params)
+    expect(Object.fromEntries(normalized)).toEqual({ tab: 'history', historySearch: 'trim', historyKind: 'service', historyType: 'Grooming', historyStatus: 'Completed', historyDetails: 'service-notes', historyView: 'calendar', historyDay: '2026-10-18', appointmentId: 'a' })
+    expect(Object.fromEntries(normalizePatientHistoryParams(new URLSearchParams('tab=timeline&timelineKind=Prescription&timelineView=calendar&historySearch=care')))).toEqual({ tab: 'history', historySearch: 'care' })
+    expect(normalizePatientHistoryParams(new URLSearchParams('tab=growth'))).toBeNull()
+  })
   it('searches across clinical fields with case, accent and whitespace normalization', () => {
     expect(ids({ query: '  VOMITING   clavamox JOSE ' })).toEqual(['recent'])
     for (const query of ['gastritis', 'appetite', 'abdomen', 'dehydration', 'bland diet', '250 mg q12h', 'with food', '34 kg', '38.5', 'BCS 3/5']) {

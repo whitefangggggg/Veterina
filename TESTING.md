@@ -1,5 +1,152 @@
 # Testing Veterina
 
+Clinic and veterinarian settings are separated. Settings > Clinic profile updates
+only clinic identity/preferences. Settings > Veterinarian Details lists approved
+accounts (including inactive ones), veterinarian designation, and per-person name,
+TIN, PRC, PTR and license expiry. Owners edit these through the audited/idempotent
+`save_veterinarian_details` action. Registration code/QR and pending approvals are
+under Staff accounts, reached by the Register a veterinarian shortcut. Designation
+does not change login role/status. Legacy `save_settings` professional fields are
+ignored, while `set_veterinarian_tin` remains available under its old restrictions.
+
+Migration `20261106171706_veterinarian_professional_details.sql` is applied to
+Development (`yerrtkosxksacqxznrhk`). `profiles.is_veterinarian` defaults false;
+existing nonblank PRC accounts were initially designated. Verified the backfill,
+unchanged credential fingerprints and issued snapshots, private helper access,
+clinic isolation and unchanged security advisor baseline. Apply this migration
+before the updated frontend in other environments.
+
+New certificates select only active designated veterinarians, defaulting to the
+logged-in account when eligible and otherwise blank. Missing PRC/expiry and expired
+licenses show nonblocking warnings; same-day expiry is current in clinic-local
+dates. The server independently rechecks designation/status/clinic and snapshots
+all credentials, including expiry in version 4. Version-1/2/3 documents retain
+their original rendering. Other clinical staff selectors are unchanged.
+
+Validation: 235 unit tests, Settings/certificate and clinic-access browser checks,
+22 rolled-back SQL suites, four concurrency suites, the real Auth/Edge/browser
+database workflow, lint and production build passed. Coverage includes separate
+saves, multiple veterinarians, role/clinic/inactive-account boundaries, optional
+credentials, invalid dates/text, designation removal, audit/retry safety, warning
+boundaries, profile-change reprints, public QR views and mobile/keyboard controls.
+Settings screenshots are `test-artifacts.local/veterinarian-details-*.png`.
+
+Earlier TIN-only rollout (superseded by Veterinarian Details above):
+Veterinarian TIN is managed in Settings, never entered on the certificate form.
+Owners save their own TIN under Clinic profile > Your professional details and
+other active veterinarians' TINs under Staff accounts > Veterinarian TINs.
+The issuance form displays the selected issuer's saved TIN alongside PRC/PTR.
+The server snapshots `profiles.tin_number` and ignores legacy issuance overrides;
+already issued certificates keep their original TIN. Missing TIN stays optional
+and prints as "Not recorded". Older settings clients preserve existing TINs.
+
+Migration `20261106165757_veterinarian_tin_settings.sql` is applied to Development
+(`yerrtkosxksacqxznrhk`). The existing audited, idempotent mutation interface now
+accepts owner-only `set_veterinarian_tin: { id, tinNumber }`; `save_settings` accepts
+optional `tinNumber`. Profile updates remain clinic-scoped, direct browser writes
+and private helper access remain denied, and existing snapshot fingerprints and
+security advisor findings are unchanged. Apply the migration before the frontend
+in other environments.
+
+Validation: 232 unit tests, certificate/Settings and clinic-access browser checks,
+21 rolled-back SQL suites, four concurrency suites, the real Auth/Edge/browser
+database workflow, lint and production build passed. Checks cover profile save
+and reload, selected issuer changes, missing/formatted TINs, spoofed certificate
+overrides, owner-only/cross-clinic/inactive-account enforcement, audit/retry safety
+and snapshot-preserving print/public viewing after profile changes.
+
+The Knowledge workspace menu entry, lazy import and route are commented out for
+now. Its implementation and data remain available for later work. Direct
+`/knowledge` URLs use the existing dashboard fallback. Connection checks verify
+the workspace is hidden for both roles and old links redirect safely.
+
+Travel certificate layout and owner edits: migration
+`20261106164152_travel_certificate_owner_details.sql` is applied to Development
+(`yerrtkosxksacqxznrhk`). New version-3 snapshots use a formal A4 letterhead,
+underlined owner/pet fields, patient photo, Anti-Rabies evidence, validity,
+veterinarian credentials/signature line and QR code, followed by vaccination
+history on continuation pages with repeating table headers. Version-1/2 snapshots
+keep their original renderer. Existing issued snapshot fingerprints were verified
+unchanged after migration; permissions remain private and security advisors match
+the existing baseline. Apply this migration before the frontend elsewhere.
+
+Owner name, address and contact number are required, prefilled, resettable and
+editable for this certificate only. `issue_travel_certificate` accepts optional
+`ownerDetails: { name, address, contactNumber }`; older callers use the registered
+owner's details. The server validates all three, records them in the immutable
+snapshot and owner search/display name, and never updates the clinic owner or pet
+ownership. Draft edits survive focus refresh, preview and failed-save retries;
+choosing a different pet loads that pet's owner details.
+
+Unit, browser and rolled-back SQL checks cover required fields, Unicode,
+formatted contacts, escaping, reset/pet switching/refresh, immutable owner edits,
+legacy layouts, saved search, public QR viewing, A4 sizing, long details,
+multipage PDFs and retry safety. The real isolated database suite verifies
+certificate edits leave the owner row unchanged and persist through source edits
+and reloading. Desktop/mobile form and certificate captures, plus standard and
+long-details PDFs, are saved under ignored `test-artifacts.local/`.
+
+Appointments now owns the calendar and Follow-ups & tasks view. Reminders is no
+longer a workspace menu/dashboard entry or page component. `/reminders` remains a
+protected compatibility redirect, retaining status/type filters and record
+fragments. Notification, dashboard, patient and assistant links use Appointments.
+Calendar entries combine only explicit same-pet, same-date source links; unrelated
+tasks and snoozed calls remain separate. Historical clinical sources are excluded
+from live scheduling. Task contact history, outcomes, edit/snooze/cancel actions,
+and owner-only deletion retain their existing authenticated mutation interfaces.
+
+`test:appointments` covers calendar/task pairing, linked follow-up rescheduling,
+contact acknowledgement retries, booking from a task, independent contact/care
+completion, custom tasks, snoozing without changing vaccine dates, source links,
+legacy redirect/reload/focus, roles and both calendar/task views at 320/375/1440px.
+Unit tests cover pairing, explicit source IDs, terminal history and historical
+exclusions. Connection checks assert the updated workspace menu. The original
+reminder data and APIs are retained; this integration needs no database migration.
+
+Patient history has three tabs: Clinical history, Vaccinations, and Weight & vitals.
+Clinical history combines checkups, queued maintenance services and historical
+service records, with shared search, record-type/detail filters and calendar
+previews. Old services/timeline URLs resolve to Clinical history; equivalent
+service filters and source fragments are retained. Checkup colors, clinical
+editors, historical service edits and queue actions use their existing interfaces.
+
+`test:clinical-history` covers mixed ordering, colliding source IDs, filters,
+legacy links, combined previews and permitted edits. It also checks dated weight
+points, partial vitals, BCS scales, baseline-only patients, visit links, keyboard
+focus and 320/375/1440px chart/table layouts, producing screenshots under
+`test-artifacts.local/`. Weight/vitals unit tests cover missing/single/equal/small
+weights and clinic-local year boundaries. The connections, new-visits, queue,
+checkup-completion, historical-checkups, theme and isolated database checks cover
+the affected navigation and clinical workflows. This UI change needs no migration
+or mutation API change.
+
+Travel certificate details: `20261106152738_travel_certificate_details.sql` is applied
+to Development. New certificates require a manually entered control number (text,
+preserving leading zeroes) and a certificate valid-until date. Control numbers are
+unique within the clinic and issuance year, including voided certificates; the
+generated system reference remains separate. Validity must cover issuance/travel
+and cannot exceed the selected Anti-Rabies record's next-dose date. The server
+records actual issuance date/time in the clinic timezone.
+
+Version-2 snapshots include owner address/contact, pet color, sex, birth date,
+recorded weight and microchip, plus optional certificate-specific veterinarian TIN
+and vaccine product expiration copied from documentary evidence. These optional
+fields do not update staff profiles or vaccination records. Product expiration
+cannot precede vaccination and is separate from immunity/next-dose validity. Pet
+weight uses the latest nonfuture recorded measurement, falling back to baseline
+weight. Missing details print as "Not recorded". Existing snapshots are retained.
+Search includes the manual control number; preview, print and public QR viewing
+use the same saved details. Public-sharing controls explain that owner contact
+details and veterinarian credentials are included.
+
+The travel unit/browser/SQL suites cover these fields, escaping, retained inputs,
+historical source changes, inclusive date boundaries and server validation.
+Concurrency checks verify duplicate manual controls cannot create two documents
+or consume a system reference. The full isolated database suite covers real
+authenticated issuance, public QR access/revocation, reload and voiding. Migration
+permissions and RLS were verified in Development; security advisor findings are
+unchanged. Apply this migration before the updated frontend in other environments.
+
 Initial inventory stock: `20261106131107_inventory_initial_stock.sql` is applied to
 Development. New items accept whole-unit or fractional opening quantities, up to
 two decimal places when fractional quantities are enabled. Zero or omitted stock

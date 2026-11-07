@@ -19,3 +19,23 @@ export function upcomingFollowUps(visits, pets, today) {
     }))
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
 }
+
+export const openScheduleTask = (task) => !['Completed', 'Cancelled'].includes(task.status)
+
+// Pair only explicit source links on the same date. A snoozed contact task can
+// have a different date from its care plan and must retain that distinction.
+export function appointmentCareSchedule({ appointments, reminders, visits, vaccinations, pets, today }) {
+  const historicalVisits = new Set(visits.filter((visit) => visit.recordingPurpose === 'record_only').map((visit) => visit.id))
+  const historicalVaccines = new Set(vaccinations.filter((vaccine) => vaccine.recordingPurpose === 'record_only').map((vaccine) => vaccine.id))
+  const tasks = reminders.filter((task) => isClinicDate(task.dueDate) && !historicalVisits.has(task.visit_id) && !historicalVaccines.has(task.vaccination_id))
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.id.localeCompare(b.id))
+  const openTasks = tasks.filter(openScheduleTask)
+  const followUps = upcomingFollowUps(visits, pets, today).map((entry) => ({ ...entry,
+    tasks: openTasks.filter((task) => task.visit_id === entry.visitId && task.petId === entry.petId && task.type === 'Follow-up' && task.dueDate === entry.date),
+  }))
+  const attached = new Set(followUps.flatMap((entry) => entry.tasks.map((task) => task.id)))
+  const appointmentTasks = new Map(appointments.map((appointment) => [appointment.id, openTasks.filter((task) => ['Pending', 'Confirmed', 'Arrived', 'In Progress'].includes(appointment.status) && task.appointment_id === appointment.id
+    && task.petId === appointment.petId && task.dueDate === appointment.date && !attached.has(task.id))]))
+  appointmentTasks.forEach((linked) => linked.forEach((task) => attached.add(task.id)))
+  return { tasks, openTasks, followUps, appointmentTasks, calendarTasks: openTasks.filter((task) => !attached.has(task.id)) }
+}

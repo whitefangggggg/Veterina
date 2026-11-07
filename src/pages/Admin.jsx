@@ -4,6 +4,7 @@ import { ClipboardText, ClockCountdown, FileText, PawPrint, ShieldCheck, Syringe
 import { PageHeader, SectionCard } from '../components/ui'
 import { AsyncForm } from '../components/RecordForm'
 import StaffAdmin from '../components/StaffAdmin'
+import VeterinarianDetailsSettings from '../components/VeterinarianDetailsSettings'
 import ClinicJoinCode from '../components/ClinicJoinCode'
 import ClinicLogoSettings from '../components/ClinicLogoSettings'
 import ServiceSettings from '../components/ServiceSettings'
@@ -72,16 +73,15 @@ export function Reports() {
 }
 
 export function Settings() {
-  const { settings, profiles, execute } = useClinicData()
-  const { user, profile, refreshAccess } = useAuth()
+  const { settings, execute } = useClinicData()
+  const { profile, refreshAccess } = useAuth()
   const [tab, setTab] = useState('profile')
   const [saved, setSaved] = useState(false)
-  const ownProfile = profiles.find((entry) => entry.id === user.id)
   if (profile.role !== 'owner') return <div className="page"><PageHeader title="Clinic settings" description="Clinic settings and staff administration are managed by the clinic owner." /><SectionCard title={settings?.clinic_name}><div className="directory-card"><p>{settings?.address}</p><p>{settings?.phone}</p><p>{settings?.email}</p><p>Clinic timezone: {settings?.timezone}</p></div></SectionCard></div>
   return <div className="page">
-    <PageHeader eyebrow="Owner access" title="Clinic settings" description="Persisted clinic identity, professional details, privacy settings and staff access." actions={<Link className="button button-secondary" to="/clinic-setup?next=%2Fsettings">Personalize clinic</Link>} />
-    <div className="tabs"><button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'staff' ? 'active' : ''} onClick={() => setTab('staff')}>Staff accounts</button><button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Services</button></div>
-    {tab === 'services' ? <ServiceSettings /> : tab === 'staff' ? <SectionCard className="settings-panel"><StaffAdmin /></SectionCard> : <><ClinicJoinCode /><ClinicLogoSettings /><SectionCard title="Clinic profile">
+    <PageHeader eyebrow="Owner access" title="Clinic settings" description="Manage your clinic profile, professional credentials, privacy settings and staff access." actions={<Link className="button button-secondary" to="/clinic-setup?next=%2Fsettings">Personalize clinic</Link>} />
+    <div className="tabs"><button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'veterinarians' ? 'active' : ''} onClick={() => setTab('veterinarians')}>Veterinarian Details</button><button className={tab === 'staff' ? 'active' : ''} onClick={() => setTab('staff')}>Staff accounts</button><button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Services</button></div>
+    {tab === 'services' ? <ServiceSettings /> : tab === 'veterinarians' ? <VeterinarianDetailsSettings onRegister={() => setTab('staff')} /> : tab === 'staff' ? <><ClinicJoinCode /><SectionCard className="settings-panel"><StaffAdmin /></SectionCard></> : <><ClinicLogoSettings /><SectionCard title="Clinic profile">
       <div className="settings-panel">
       {saved && <p className="auth-message" role="status">Clinic settings saved.</p>}
       <AsyncForm submitLabel="Save settings" onSave={async (values) => { setSaved(false); await execute('save_settings', { ...values, aiEnabled: values.aiEnabled === 'on' }); await refreshAccess(); setSaved(true) }}>
@@ -97,11 +97,6 @@ export function Settings() {
           <label className="field"><span>Retention (years) *</span><input name="retentionYears" type="number" min="1" max="50" required defaultValue={settings?.record_retention_years || 10} /></label>
           <label className="field"><span>Reminder lead days *</span><input name="reminderLeadDays" type="number" min="0" max="365" required defaultValue={settings?.reminder_lead_days ?? 3} /></label>
           <label className="field"><span>Record recall assistant</span><span><input name="aiEnabled" type="checkbox" defaultChecked={settings?.ai_enabled || false} /> Enable cited record recall</span></label>
-          <div className="form-divider full"><h3>Your professional details</h3><p>Printed with the clinic’s clinical documents.</p></div>
-          <label className="field"><span>Full name *</span><input name="fullName" required defaultValue={ownProfile.full_name} /></label>
-          <label className="field"><span>PRC license number</span><input name="prcLicenseNumber" defaultValue={ownProfile.prc_license_number || ''} /></label>
-          <label className="field"><span>PTR number</span><input name="ptrNumber" defaultValue={ownProfile.ptr_number || ''} /></label>
-          <label className="field"><span>License expiry</span><input name="licenseExpiresOn" type="date" defaultValue={ownProfile.license_expires_on || ''} /></label>
         </div>
       </AsyncForm>
       </div>

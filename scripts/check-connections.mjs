@@ -81,7 +81,7 @@ try {
   page.on('requestfailed', (request) => failedRequests.push(`${request.url()}: ${request.failure()?.errorText}`))
   await page.clock.install({ time: now })
   if (!process.argv.includes('--daily-only')) {
-  const routes = ['/dashboard', '/queue', '/patients', `/patients/${petId}`, '/appointments', '/reminders', '/travel-certificates', '/inventory', '/suppliers', '/reports', '/settings', '/knowledge']
+  const routes = ['/dashboard', '/queue', '/patients', `/patients/${petId}`, '/appointments', '/travel-certificates', '/inventory', '/suppliers', '/reports', '/settings']
   for (const role of ['clinical_staff', 'owner']) {
     profile.role = role
     for (const route of routes) {
@@ -104,6 +104,8 @@ try {
       await page.getByRole('button', { name: 'Open workspaces', exact: true }).click()
       const menu = page.getByRole('dialog', { name: 'Choose a workspace' })
       await expect(menu).toBeVisible()
+      await expect(menu.locator('a[href="/reminders"]')).toHaveCount(0)
+      await expect(menu.locator('a[href="/knowledge"]')).toHaveCount(0)
       assert.deepEqual((await menu.locator('a').evaluateAll((links) => links.map((link) => link.getAttribute('href')))).sort(), routes.filter((route) => route !== '/dashboard' && !route.startsWith('/patients/')).sort())
       await page.keyboard.press('Escape')
       if (role === 'clinical_staff' && route === '/reports') await expect(page.getByRole('button', { name: 'Prepare report' })).toHaveCount(0)
@@ -193,6 +195,8 @@ try {
   assert.equal((await downloadPromise).suggestedFilename(), 'veterina-inventory.csv')
   console.log('PASS supplier/inventory navigation, filter persistence, batch and ledger save/reload, dashboard reconciliation and report download')
 
+  // Paused Knowledge workspace coverage; restore when enabling its route again.
+  /*
   await page.goto(app.origin + '/knowledge')
   await page.getByLabel('Question').fill('Find the checklist')
   await page.getByRole('button', { name: 'Find evidence' }).click()
@@ -204,6 +208,12 @@ try {
   await expect(page.getByRole('alert')).toContainText('source document is unavailable')
   await page.goto(app.origin + '/knowledge#%E0%A4%A')
   await expect(page.getByRole('alert')).toContainText('source document is unavailable')
+  */
+  for (const suffix of ['', '#missing', '#%E0%A4%A']) {
+    await page.goto(app.origin + '/knowledge' + suffix)
+    await expect(page).toHaveURL(app.origin + '/dashboard')
+    await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible()
+  }
   } else {
     raw.appointments.push({ id: 'new-booking', pet_id: petId, service_type_id: 'service', veterinarian_id: userId, status: 'confirmed', starts_at: '2026-10-17T05:00:00Z', ends_at: '2026-10-17T05:30:00Z' })
     raw.inventory_batches.push({ id: 'initial', item_id: 'item-a', is_active: true, lot_number: 'INITIAL' })
@@ -256,48 +266,36 @@ try {
   await page.getByLabel('Stock attention', { exact: true }).selectOption('expiring')
   await expect(page.locator('#inventory-item-a')).toBeVisible()
 
-  const timelineUrl = app.origin + `/patients/${petId}?tab=timeline`
-  await page.goto(timelineUrl)
-  await expect(page.getByRole('heading', { name: 'Care timeline', exact: true })).toBeVisible()
-  await page.locator('.record-main').screenshot({ path: 'test-artifacts.local/patient-care-timeline.png' })
+  await page.goto(app.origin + `/patients/${petId}?tab=timeline&timelineKind=Prescription`)
+  await expect(page).toHaveURL(/tab=history/)
+  await expect(page.getByRole('button', { name: 'Care timeline', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Service history', exact: true })).toHaveCount(0)
+  await page.locator('.record-main').screenshot({ path: 'test-artifacts.local/patient-combined-history.png' })
   for (const width of [320, 375, 1440]) {
     await page.setViewportSize({ width, height: 900 })
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Care timeline overflows at ${width}`)
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Clinical history overflows at ${width}`)
   }
-  await page.getByRole('button', { name: /^Advanced/ }).click()
-  await page.getByLabel('Timeline activity').selectOption('Prescription')
-  await expect(page.locator('.care-event')).toHaveCount(1)
-  await page.locator('.care-event').getByRole('link', { name: 'View source', exact: true }).click()
-  await expect(page.locator('#prescription-timeline-rx')).toBeFocused()
-  await page.reload()
-  await expect(page.locator('#prescription-timeline-rx')).toBeFocused()
-  for (const [fragment, target] of [
-    ['/appointments?date=2026-09-15', '#appointment-historical'],
-    ['tab=vaccines', '#vaccination-timeline-vaccine'],
-    ['reminder-closed-reminder', '#reminder-closed-reminder'],
-    ['queue-historical', '#queue-historical'],
+  for (const [path, target] of [
+    [`/patients/${petId}?tab=history#prescription-timeline-rx`, '#prescription-timeline-rx'],
+    ['/appointments?date=2026-09-15#appointment-historical', '#appointment-historical'],
+    [`/patients/${petId}?tab=vaccines#vaccination-timeline-vaccine`, '#vaccination-timeline-vaccine'],
+    ['/reminders?status=All#reminder-closed-reminder', '#reminder-closed-reminder'],
+    ['/queue?status=All&date=2026-09-15#queue-historical', '#queue-historical'],
   ]) {
-    await page.goto(timelineUrl)
-    await page.locator(`.care-event a[href*="${fragment}"]`).first().click()
+    await page.goto(app.origin + path)
     await expect(page.locator(target)).toBeFocused()
     await page.reload()
     await expect(page.locator(target)).toBeFocused()
   }
-  // Paging limits large histories while retaining every source record.
-  for (let i = 0; i < 30; i++) raw.reminder_worklist.push({ id: `past-${i}`, pet_id: petId, title: `Past reminder ${i}`, reminder_type: 'custom', status: 'completed', due_at: '2026-09-01T04:00:00Z' })
-  await page.goto(timelineUrl)
-  await expect(page.locator('.care-event')).toHaveCount(25)
-  await page.getByRole('button', { name: 'Show more activity' }).click()
-  assert.ok(await page.locator('.care-event').count() > 25)
   await page.goto(app.origin + '/patients/inactive-pet?tab=timeline')
-  await expect(page.getByRole('heading', { name: 'No care activity yet' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No clinical records yet' })).toBeVisible()
   await page.goto(app.origin + '/dashboard')
   await expect(page.getByRole('heading', { name: 'Care at the clinic (2)', exact: true })).toBeVisible()
   raw.queue_entries[0].status = 'cancelled'
   raw.queue_entries[0].finished_at = now.toISOString()
   await page.clock.fastForward(30001)
   await expect(page.getByRole('heading', { name: 'Care at the clinic (1)', exact: true })).toBeVisible()
-  console.log('PASS daily action board, overnight arrivals, stock watch and filters, unified timeline, paging, mobile layout and historical source navigation/reload')
+  console.log('PASS daily action board, overnight arrivals, stock watch and filters, combined history and removed-tab redirects, mobile layout and historical source navigation/reload')
 
   failRead = true
   await page.goto(app.origin + '/patients')

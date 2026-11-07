@@ -10,6 +10,7 @@ insert into public.profiles(id,full_name,role,is_active) values
   (current_setting('travel.staff')::uuid,'Travel clinician','clinical_staff',true),
   (current_setting('travel.owner')::uuid,'Travel owner','owner',true),
   (current_setting('travel.inactive')::uuid,'Inactive issuer','clinical_staff',false);
+update public.profiles set tin_number='736-954-286',is_veterinarian=true,license_expires_on='2027-01-01' where id=current_setting('travel.staff')::uuid;
 select set_config('travel.clinic',(select clinic_id::text from public.profiles where id=current_setting('travel.staff')::uuid),true);
 select set_config('travel.foreign_clinic',public.provision_vetshop(current_setting('travel.foreign')::uuid,'Travel foreign clinic','Foreign issuer')::text,true);
 insert into private.clinic_subscriptions(clinic_id,expires_at) values(current_setting('travel.foreign_clinic')::uuid,now()+interval '30 days');
@@ -20,7 +21,7 @@ select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting(
 set local role authenticated;
 do $$ declare person uuid; patient uuid; result jsonb; payload jsonb; vaccine uuid; other_pet uuid; before_queue integer; before_reminders integer; begin
   person:=(public.portal_mutation('create_owner','{"fullName":"José & Ana","phone":"09171234567","address":"Test"}',gen_random_uuid())->>'id')::uuid;
-  patient:=(public.portal_mutation('create_pet',jsonb_build_object('ownerId',person,'name','Ming','species','Cat','breed','Mixed','sex','Female','reproductiveStatus','Unknown','birthDate','2020-01-01'),gen_random_uuid())->>'id')::uuid;
+  patient:=(public.portal_mutation('create_pet',jsonb_build_object('ownerId',person,'name','Ming','species','Cat','breed','Mixed','sex','Female','reproductiveStatus','Unknown','birthDate','2020-01-01','color','Tri-Color','latestWeight','7.5','microchip','900123456789012'),gen_random_uuid())->>'id')::uuid;
   other_pet:=(public.portal_mutation('create_pet',jsonb_build_object('ownerId',person,'name','Other pet','species','Dog','breed','Mixed','sex','Male','reproductiveStatus','Unknown'),gen_random_uuid())->>'id')::uuid;
   perform set_config('travel.pet',patient::text,true); perform set_config('travel.other_pet',other_pet::text,true); perform set_config('travel.person',person::text,true);
 end $$;
@@ -48,7 +49,7 @@ select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting(
 set local role authenticated;
 do $$ declare payload jsonb; result jsonb; key uuid:=gen_random_uuid(); before_queue integer; before_reminders integer; begin
   payload:=jsonb_build_object('petId',current_setting('travel.pet'),'issuerId',current_setting('travel.staff'),'rabiesVaccinationId',current_setting('travel.vaccine'),
-    'travelDate',current_setting('travel.day')::date+365,'destination','Cebu <Port>','rabiesConfirmed',true,'eligibilityConfirmed',true);
+    'travelDate',current_setting('travel.day')::date+365,'destination','Cebu <Port>','controlNumber','00443','validUntil',current_setting('travel.day')::date+365,'vaccineExpirationDate',current_setting('travel.day')::date+120,'veterinarianTin','IGNORED-CERTIFICATE-OVERRIDE','rabiesConfirmed',true,'eligibilityConfirmed',true);
   perform set_config('travel.payload',payload::text,true);
   perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||'{"isPublic":"true"}'),'VALIDATION_FAILED');
   perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||'{"patientPhotoRevision":0}'),'PHOTO_CONFLICT');
@@ -61,8 +62,27 @@ do $$ declare payload jsonb; result jsonb; key uuid:=gen_random_uuid(); before_q
   if (select is_public from public.travel_certificates where id=(result->>'id')::uuid) or current_setting('travel.token') !~ '^[a-f0-9]{64}$' then raise exception 'TEST: certificates must default private with random QR tokens'; end if;
   if not exists(select 1 from public.travel_certificates where id=(result->>'id')::uuid and reference_number like 'TC-%-000001' and status='issued'
     and snapshot#>>'{pet,name}'='Ming' and snapshot#>>'{owner,name}'='José & Ana' and snapshot#>>'{journey,destination}'='Cebu <Port>'
+    and control_number='00443' and snapshot->>'controlNumber'='00443' and search_text like '00443 %' and snapshot->>'version'='4'
+    and snapshot->>'issuedTime'=to_char(now() at time zone 'Asia/Manila','HH24:MI')
+    and snapshot->>'validUntil'=(current_setting('travel.day')::date+365)::text
+    and snapshot#>>'{owner,address}'='Test' and snapshot#>>'{owner,contactNumber}'='09171234567'
+    and snapshot#>>'{pet,color}'='Tri-Color' and snapshot#>>'{pet,sex}'='Female' and (snapshot#>>'{pet,weightKg}')::numeric=7.5
+    and snapshot#>>'{pet,microchipNumber}'='900123456789012' and snapshot#>>'{pet,birthDate}'='2020-01-01'
+    and snapshot#>>'{issuer,tinNumber}'='736-954-286' and snapshot#>>'{issuer,licenseExpiresOn}'='2027-01-01' and snapshot#>>'{vaccinations,0,expirationDate}'=(current_setting('travel.day')::date+120)::text
+    and snapshot#>>'{vaccinations,0,type}'='Anti-Rabies' and snapshot#>>'{vaccinations,0,vaccinated}'='true'
     and snapshot#>>'{vaccinations,0,brand}'='Saved brand' and snapshot#>>'{pet,photoDataUrl}'='data:image/png;base64,iVBORw0KGgo=' and recorded_by=auth.uid()) then raise exception 'TEST: certificate snapshot lost'; end if;
   if (select count(*) from public.travel_certificates)<>1 then raise exception 'TEST: retry duplicated certificate'; end if;
+  -- New fields are enforced by the server; malformed attempts neither issue nor consume a reference.
+  perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload-'controlNumber'),'VALIDATION_FAILED: enter a control number');
+  perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||'{"controlNumber":443}'),'VALIDATION_FAILED: enter a control number');
+  perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||'{"controlNumber":"   "}'),'VALIDATION_FAILED: enter a control number');
+  perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload-'validUntil'),'VALIDATION_FAILED: certificate valid-until');
+  perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||jsonb_build_object('validUntil',current_setting('travel.day')::date+364)),'VALIDATION_FAILED: certificate validity must cover');
+  perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||jsonb_build_object('validUntil',current_setting('travel.day')::date+366)),'VALIDATION_FAILED: certificate validity cannot exceed');
+  perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||'{"validUntil":"2026-02-30"}'),'VALIDATION_FAILED: enter valid');
+  perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||jsonb_build_object('vaccineExpirationDate',current_setting('travel.day')::date-31)),'VALIDATION_FAILED: vaccine product expiration cannot precede');
+  perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload),'VALIDATION_FAILED: control number already exists');
+
   if (select count(*) from public.queue_entries)<>before_queue or (select count(*) from public.reminders)<>before_reminders then raise exception 'TEST: issuing changed clinical workflows'; end if;
   perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||'{"rabiesConfirmed":false}'),'VALIDATION_FAILED');
   perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',payload||'{"eligibilityConfirmed":false}'),'VALIDATION_FAILED');
@@ -74,6 +94,44 @@ do $$ declare payload jsonb; result jsonb; key uuid:=gen_random_uuid(); before_q
   if has_table_privilege('authenticated','public.travel_certificates','INSERT') or has_table_privilege('authenticated','public.travel_certificates','UPDATE') or has_table_privilege('authenticated','private.travel_certificate_counters','SELECT') or has_function_privilege('authenticated','private.travel_certificate_mutation(text,jsonb)','EXECUTE') then raise exception 'TEST: direct certificate writes exposed'; end if;
   if has_table_privilege('authenticated','private.travel_certificate_photos','SELECT') or has_table_privilege('authenticated','private.travel_certificate_photos','INSERT') then raise exception 'TEST: prepared patient photos exposed'; end if;
 end $$;
+-- Certificate owner overrides are validated and stored without touching the clinic owner.
+-- Roll this successful extra issue back locally so reference-boundary checks remain exact.
+do $$ declare payload jsonb:=current_setting('travel.payload')::jsonb||'{"controlNumber":"OWNER-EDIT"}';
+  details jsonb:=jsonb_build_object('name',U&'Ma. Ni\00F1a <Abes>','address',E'Purok 2\nBarangay San Jose','contactNumber','+63 926 121 3497');
+  invalid jsonb; result jsonb; key uuid:=gen_random_uuid(); before_owner jsonb; begin
+  foreach invalid in array array['null'::jsonb,'[]'::jsonb,'123'::jsonb,'{}'::jsonb,
+    details||'{"name":""}',details||'{"address":"  "}',details||'{"contactNumber":null}',details||'{"name":123}',
+    details||jsonb_build_object('name',repeat('x',121)),details||jsonb_build_object('address',repeat('x',2001)),
+    details||jsonb_build_object('contactNumber',repeat('x',65)),details||jsonb_build_object('contactNumber',E'09\t123'),
+    details||jsonb_build_object('address',E'\n\r  ')] loop
+    perform pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,%L::uuid)',payload||jsonb_build_object('ownerDetails',invalid),key),'VALIDATION_FAILED: enter');
+  end loop;
+  select to_jsonb(o) into before_owner from public.owners o where id=current_setting('travel.person')::uuid;
+  begin
+    payload:=payload||jsonb_build_object('ownerDetails',details||'{"id":"ignored","extra":"not copied"}');
+    result:=public.portal_mutation('issue_travel_certificate',payload,key);
+    if public.portal_mutation('issue_travel_certificate',payload,key)<>result then raise exception 'TEST: owner edit retry changed document'; end if;
+    if not exists(select 1 from public.travel_certificates where id=(result->>'id')::uuid
+      and snapshot->'owner'=details and owner_name=details->>'name' and position(details->>'name' in search_text)>0
+      and pet_id=current_setting('travel.pet')::uuid and snapshot->>'version'='4') then raise exception 'TEST: certificate owner override lost'; end if;
+    if (select to_jsonb(o) from public.owners o where id=current_setting('travel.person')::uuid)<>before_owner then raise exception 'TEST: certificate changed clinic owner'; end if;
+    raise exception using errcode='ZX001',message='Rollback extra owner test certificate';
+  exception when sqlstate 'ZX001' then null; end;
+end $$;
+reset role;
+update public.profiles set license_expires_on=current_setting('travel.day')::date-1 where id=current_setting('travel.staff')::uuid;
+set local role authenticated;
+-- Expiry is recorded evidence and a warning, not an issuance gate.
+do $$ declare result jsonb; begin
+  begin
+    result:=public.portal_mutation('issue_travel_certificate',current_setting('travel.payload')::jsonb||'{"controlNumber":"EXPIRED-LICENSE"}',gen_random_uuid());
+    if not exists(select 1 from public.travel_certificates where id=(result->>'id')::uuid and snapshot#>>'{issuer,licenseExpiresOn}'=(current_setting('travel.day')::date-1)::text) then raise exception 'TEST: expired license snapshot lost'; end if;
+    raise exception using errcode='ZX002',message='Rollback warning-only test certificate';
+  exception when sqlstate 'ZX002' then null; end;
+end $$;
+reset role;
+update public.profiles set license_expires_on='2027-01-01' where id=current_setting('travel.staff')::uuid;
+set local role authenticated;
 reset role;
 set local role service_role;
 do $$ begin
@@ -126,6 +184,12 @@ set local role authenticated;
 select pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',current_setting('travel.payload')),'VALIDATION_FAILED');
 reset role;
 update public.pets set status='Active' where id=current_setting('travel.pet')::uuid;
+-- Designation is enforced independently of permissions and already issued documents.
+update public.profiles set is_veterinarian=false where id=current_setting('travel.staff')::uuid;
+set local role authenticated;
+select pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',current_setting('travel.payload')),'VALIDATION_FAILED: select an active, designated veterinarian');
+reset role;
+update public.profiles set is_veterinarian=true where id=current_setting('travel.staff')::uuid;
 -- Recheck eligibility from saved records; the issued snapshot never changes.
 update public.vaccinations set next_due_at=null where id=current_setting('travel.vaccine')::uuid;
 set local role authenticated;
@@ -138,7 +202,7 @@ reset role;
 update public.vaccinations set next_due_at=current_setting('travel.day')::date where id=current_setting('travel.vaccine')::uuid;
 set local role authenticated;
 do $$ declare result jsonb; begin
-  result:=public.portal_mutation('issue_travel_certificate',current_setting('travel.payload')::jsonb||jsonb_build_object('travelDate',current_setting('travel.day'),'isPublic',true),gen_random_uuid());
+  result:=public.portal_mutation('issue_travel_certificate',current_setting('travel.payload')::jsonb||jsonb_build_object('travelDate',current_setting('travel.day'),'validUntil',current_setting('travel.day'),'controlNumber','00444','isPublic',true),gen_random_uuid());
   if result->>'referenceNumber' not like '%-000002' then raise exception 'TEST: failed issues consumed reference numbers'; end if;
   if not (select is_public from public.travel_certificates where id=(result->>'id')::uuid) then raise exception 'TEST: public choice during issuance lost'; end if;
 end $$;
@@ -167,6 +231,8 @@ select pg_temp.reject_travel(format('select public.portal_mutation(''issue_trave
 reset role;
 -- Immutable content and source links cannot be changed, even by the RPC role.
 set local role veterina_rpc;
+select pg_temp.reject_travel(format('update public.travel_certificates set control_number=''00445'' where id=%L::uuid',current_setting('travel.certificate')),'IMMUTABLE_CERTIFICATE');
+select pg_temp.reject_travel(format('update public.travel_certificates set valid_until=issued_on where id=%L::uuid',current_setting('travel.certificate')),'IMMUTABLE_CERTIFICATE');
 select pg_temp.reject_travel(format('update public.travel_certificates set destination=''Changed'' where id=%L::uuid',current_setting('travel.certificate')),'IMMUTABLE_CERTIFICATE');
 select pg_temp.reject_travel(format('update public.travel_certificates set pet_id=null where id=%L::uuid',current_setting('travel.certificate')),'IMMUTABLE_CERTIFICATE');
 select pg_temp.reject_travel(format('update public.travel_certificates set public_token=%L where id=%L::uuid',repeat('a',64),current_setting('travel.certificate')),'IMMUTABLE_CERTIFICATE');

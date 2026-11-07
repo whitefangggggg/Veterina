@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { useClinicData } from '../context/ClinicDataContext'
+import { dateInClinic } from '../lib/dailyWorkflow'
+import { visitDateTime } from '../lib/patientVitals'
 
 export default function VisitCard({ visit, children }) {
-  const { execute } = useClinicData()
+  const { execute, timezone } = useClinicData()
   const [draft, setDraft] = useState(undefined)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const color = draft === undefined ? visit.cardColor : draft
   const changed = color !== visit.cardColor
-  const date = parseISO(visit.visitedAt)
+  const date = parseISO(dateInClinic(visit.visitedAt, timezone))
   const pickerId = `visit-color-${visit.id}`
 
   const save = async (nextColor) => {
@@ -35,7 +37,7 @@ export default function VisitCard({ visit, children }) {
       <small>{format(date, 'yyyy')}</small>
     </div>
     <div className="visit-content">
-      <div className="visit-color-controls" role="group" aria-label={`Card color for ${visit.type} checkup from ${format(date, 'd MMM yyyy, h:mm a')}`}>
+      <div className="visit-color-controls" role="group" aria-label={`Card color for ${visit.type} checkup from ${visitDateTime(visit.visitedAt, timezone)}`}>
         <label htmlFor={pickerId}>Card color</label>
         <input id={pickerId} type="color" value={color || '#ffffff'} disabled={saving} onChange={(event) => { setDraft(event.target.value); setError(''); setMessage('') }} />
         <button type="button" className="text-link" disabled={saving || !changed} onClick={() => save(color)}>{saving ? 'Saving…' : 'Save color'}</button>

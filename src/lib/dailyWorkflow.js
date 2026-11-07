@@ -4,9 +4,9 @@ const encoded = (value) => encodeURIComponent(value)
 const terminalReminder = (status) => ['Completed', 'Cancelled'].includes(status)
 const dateFormatters = new Map()
 export const isClinicDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && !Number.isNaN(Date.parse(value)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value
-export const patientSource = (id, tab = 'timeline', fragment = '') => `/patients/${encoded(id)}?tab=${tab}${fragment ? '#' + encoded(fragment) : ''}`
+export const patientSource = (id, tab = 'history', fragment = '') => `/patients/${encoded(id)}?tab=${tab}${fragment ? '#' + encoded(fragment) : ''}`
 export const appointmentSource = (appointment) => `/appointments?date=${encoded(appointment.date)}#appointment-${encoded(appointment.id)}`
-export const reminderSource = (id) => `/reminders?status=All#reminder-${encoded(id)}`
+export const reminderSource = (id) => `/appointments?view=tasks&status=All#reminder-${encoded(id)}`
 export const queueSource = (entry) => `/queue?status=All&date=${encoded(entry.finishedDate || entry.queueDate)}#queue-${encoded(entry.id)}`
 
 export function dateInClinic(value, timezone) {
@@ -47,7 +47,7 @@ export function buildPatientTimeline(data, patientId) {
     }
   }
   for (const service of data.serviceRecords || []) {
-    if (service.petId === patientId) add('Service', service.id, service.arrivedAt, service.service, 'Record only', service.serviceNotes, patientSource(patientId, 'services', `service-${service.id}`))
+    if (service.petId === patientId) add('Service', service.id, service.arrivedAt, service.service, 'Record only', service.serviceNotes, patientSource(patientId, 'history', `service-${service.id}`))
   }
   for (const vaccine of data.vaccinations || []) {
     if (vaccine.petId === patientId) add('Vaccination', vaccine.id, vaccine.administeredAt, vaccine.vaccine, vaccine.recordingPurpose === 'record_only' ? 'Record only' : vaccine.careStatus || 'Recorded', [vaccine.brand, vaccine.nextDueAt ? `Next dose: ${vaccine.nextDueAt}` : ''].filter(Boolean).join(' · '), patientSource(patientId, 'vaccines', `vaccination-${vaccine.id}`))

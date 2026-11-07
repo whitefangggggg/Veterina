@@ -75,14 +75,14 @@ async function checkHeroTextContrast(page, theme) {
 try {
   await mkdir('test-artifacts.local', { recursive: true })
   const { context, page, state } = await scenario()
-  const routes = ['/dashboard', '/patients', `/patients/${patient}`, '/queue', '/appointments', '/reminders', '/inventory', '/suppliers', '/reports', '/travel-certificates', '/knowledge', '/settings']
+  const routes = ['/dashboard', '/patients', `/patients/${patient}`, '/queue', '/appointments', '/reminders', '/inventory', '/suppliers', '/reports', '/travel-certificates', '/settings']
   for (const theme of clinicThemes.slice(0, 2)) {
     state.settings.brand_color = theme.color
     for (const route of routes) {
       await page.goto(app.origin + route)
       await expect(page.locator('.workspace-header')).toBeVisible()
       await checkTheme(page, theme)
-      await expect(page.locator('.header-refresh')).toHaveCSS('color', rgb(theme.color))
+      await expect(page.getByRole('button', { name: 'Refresh clinic records', exact: true })).toHaveCount(0)
       const actions = page.locator('.spacious-content .button-primary:visible')
       if (await actions.count()) await expect(actions.first()).toHaveCSS('background-color', rgb(theme.color))
       if (route === '/dashboard') {
@@ -114,11 +114,11 @@ try {
     console.log(`PASS every clinic route: ${theme.name}`)
   }
 
-  // Refresh an already-mounted workspace to prove theme changes reach global siblings.
+  // Reload clinic settings to prove selected themes reach global siblings.
   await page.goto(`${app.origin}/patients/${patient}`)
   for (const theme of clinicThemes) {
     state.settings.brand_color = theme.color
-    await page.getByRole('button', { name: 'Refresh clinic records', exact: true }).click()
+    await page.reload()
     await checkTheme(page, theme)
     await page.getByRole('button', { name: 'Add Record', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Add Record', exact: true })
@@ -157,7 +157,7 @@ try {
   console.log('PASS all six palettes: refreshed theme, global PWA/dialogs, controls, contrast, hover, active, focus, selected and disabled states')
 
   state.settings.brand_color = clinicThemes[1].color
-  await page.getByRole('button', { name: 'Refresh clinic records', exact: true }).click()
+  await page.reload()
   await checkTheme(page, clinicThemes[1])
   await page.goto(app.origin + '/clinic-setup')
   await page.getByRole('button', { name: 'Save & continue', exact: true }).click()

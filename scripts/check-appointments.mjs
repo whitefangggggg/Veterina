@@ -25,6 +25,8 @@ const raw = {
 const errors = [], writes = []
 let failArrival = true
 let failFollowUp = true
+let failContactAck = true
+const taskReceipts = new Map()
 const app = await browserServer(5188)
 try {
   const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' })
@@ -38,6 +40,7 @@ try {
     if (url.pathname === '/rest/v1/rpc/portal_mutation') {
       const { p_action: action, p_data: payload, p_key: key } = route.request().postDataJSON()
       writes.push({ action, payload, key })
+      if (taskReceipts.has(key)) return reply(taskReceipts.get(key))
       if (action === 'update_encounter') Object.assign(raw.visits[0], { follow_up_date: payload.followUpDate, plan: payload.plan })
       else if (action === 'reschedule_appointment') Object.assign(raw.appointments[0], { notes: payload.notes })
       else if (action === 'check_in_appointment') {
@@ -48,6 +51,7 @@ try {
       } else if (action === 'reschedule_follow_up') {
         assert.equal(payload.visitId, 'checkup')
         Object.assign(raw.visits[0], { follow_up_scheduled_date: payload.date })
+        raw.reminder_worklist?.filter((task) => task.visit_id === payload.visitId && !['completed', 'cancelled'].includes(task.status)).forEach((task) => { task.due_at = payload.date + 'T00:00:00+08:00' })
       } else if (action === 'arrive_follow_up') {
         assert.equal(payload.petId, pet)
         assert.equal(payload.serviceId, 'followup-service')
@@ -58,7 +62,15 @@ try {
         raw.visit_vitals.push({ id: 'new-vitals', visit_id: 'new-followup-checkup', weight_kg: Number(payload.weightKg), measured_at: '2026-10-26T04:10:00Z' })
         raw.queue_entries.push({ id: 'followup-arrival', pet_id: pet, visit_id: 'new-followup-checkup', category: 'checkup', service_name: 'Follow-up', service_type_id: payload.serviceId, status: 'waiting', veterinarian_id: actor, notes: payload.notes, queue_number: 2, queue_date: '2026-10-26', arrived_at: '2026-10-26T04:10:00Z' })
         return reply({ id: 'new-followup-checkup', queueEntryId: 'followup-arrival', queueNumber: 2, queueDate: '2026-10-26' })
-      } else throw new Error(`Unexpected schedule mutation ${action}`)
+      } else if (action === 'log_reminder_attempt') {
+        raw.reminder_activity.push({ id: 'contact-' + writes.length, reminder_id: payload.id, action: 'contact_attempt', note: payload.notes, created_at: '2026-10-26T05:00:00Z' })
+        taskReceipts.set(key, { id: payload.id })
+        if (failContactAck) { failContactAck = false; return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Contact acknowledgement interrupted' }) }) }
+      } else if (action === 'complete_reminder') Object.assign(raw.reminder_worklist.find((task) => task.id === payload.id), { status: 'completed', outcome: payload.outcome })
+      else if (action === 'snooze_reminder') Object.assign(raw.reminder_worklist.find((task) => task.id === payload.id), { status: 'snoozed', due_at: payload.dueDate + 'T00:00:00+08:00' })
+      else if (action === 'create_reminder') raw.reminder_worklist.push({ id: 'new-task', pet_id: payload.petId, reminder_type: payload.reminderType, title: payload.title, notes: payload.notes, due_at: payload.dueDate + 'T00:00:00+08:00', status: 'upcoming' })
+      else if (action === 'book_appointment') raw.appointments.push({ id: 'task-booking', pet_id: payload.petId, service_type_id: 'surgery', veterinarian_id: actor, starts_at: payload.date + 'T01:00:00Z', ends_at: payload.date + 'T01:30:00Z', status: 'confirmed' })
+      else throw new Error(`Unexpected schedule mutation ${action}`)
       return reply({ id: payload.id })
     }
     assert.equal(route.request().method(), 'GET')
@@ -115,7 +127,8 @@ try {
   const followUp = page.locator('#follow-up-checkup')
   await expect(followUp).toContainText('Time not set')
   await expect(followUp).toContainText('Procedure follow-up')
-  await expect(followUp.getByRole('button')).toHaveCount(0)
+  await expect(followUp.getByRole('button', { name: 'Reschedule follow-up', exact: true })).toBeVisible()
+  await expect(followUp.getByRole('button', { name: 'Patient arrived', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'The day is open', exact: true })).toHaveCount(0)
   for (const width of [320, 375, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
@@ -219,6 +232,87 @@ try {
   assert.equal(raw.visits[0].follow_up_date, '2026-10-28')
   assert.equal(raw.visits.length, 2)
   await expect(page.locator('#new-followup-checkup')).toContainText('Waiting')
+  // The calendar, owner contact tasks and legacy reminder URLs now share one workspace.
+  Object.assign(raw.visits[0], { follow_up_arrived_at: null, follow_up_scheduled_date: '2026-10-28' })
+  raw.appointments.push({ ...raw.appointments[0], id: 'planned', starts_at: '2026-10-28T01:00:00Z', ends_at: '2026-10-28T01:30:00Z', status: 'confirmed' })
+  raw.vaccinations = [{ id: 'vac', pet_id: pet, vaccine_name: 'Rabies', administered_at: '2025-10-28', next_due_at: '2026-10-28' }]
+  raw.reminder_worklist = [
+    { id: 'follow', pet_id: pet, visit_id: 'checkup', reminder_type: 'follow_up', title: 'Review incision call', due_at: '2026-10-28T00:00:00+08:00', status: 'upcoming' },
+    { id: 'booked', pet_id: pet, appointment_id: 'planned', reminder_type: 'appointment', title: 'Confirm booking', due_at: '2026-10-28T00:00:00+08:00', status: 'upcoming' },
+    { id: 'custom', pet_id: pet, reminder_type: 'custom', title: 'Owner requested call', due_at: '2026-10-28T00:00:00+08:00', status: 'upcoming' },
+    { id: 'vac-call', pet_id: pet, vaccination_id: 'vac', reminder_type: 'vaccination', title: 'Rabies due contact', due_at: '2026-10-28T00:00:00+08:00', status: 'upcoming' },
+  ]
+  raw.reminder_activity = []
+  await page.goto(calendar('2026-10-28'))
+  await expect(page.locator('#follow-up-checkup #reminder-follow')).toHaveCount(1)
+  await expect(page.locator('#appointment-planned #reminder-booked')).toHaveCount(1)
+  await expect(page.locator('.day-agenda > .schedule-task-card')).toHaveCount(2)
+  await page.locator('#reminder-follow').getByRole('button', { name: 'Log contact', exact: true }).click()
+  await page.getByLabel('Contact notes', { exact: true }).fill('Reached owner, reviewed the booking')
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('acknowledgement interrupted')
+  await expect(page.getByLabel('Contact notes', { exact: true })).toHaveValue('Reached owner, reviewed the booking')
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  assert.equal(raw.reminder_activity.length, 1)
+  const contacts = writes.filter((write) => write.action === 'log_reminder_attempt')
+  assert.equal(contacts[0].key, contacts[1].key)
+  await page.locator('#reminder-custom').getByRole('button', { name: 'Book appointment', exact: true }).click()
+  await expect(page.getByLabel('Patient', { exact: true })).toHaveValue(pet)
+  await expect(page.getByLabel('Date', { exact: true })).toHaveValue('2026-10-28')
+  await page.getByRole('button', { name: 'Create appointment', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  assert.equal(raw.reminder_worklist.find((task) => task.id === 'custom').status, 'upcoming', 'Booking incorrectly completed its contact task')
+  await page.getByRole('button', { name: 'Follow-ups & tasks', exact: true }).click()
+  await page.locator('#reminder-follow').getByRole('button', { name: 'Edit', exact: true }).click()
+  await expect(page.getByLabel('Due date', { exact: true })).toHaveAttribute('readonly', '')
+  await page.keyboard.press('Escape')
+  await page.locator('#reminder-follow').getByRole('button', { name: 'Reschedule follow-up', exact: true }).click()
+  await page.getByLabel('Follow-up date', { exact: true }).fill('2026-10-29')
+  await page.getByRole('button', { name: 'Save follow-up date', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  assert.equal(raw.reminder_worklist.find((task) => task.id === 'follow').due_at.slice(0, 10), '2026-10-29')
+  assert.equal(raw.visits[0].follow_up_date, '2026-10-28', 'Rescheduling changed the original clinical follow-up date')
+  await page.locator('#reminder-vac-call').getByRole('button', { name: 'Snooze contact', exact: true }).click()
+  await page.getByLabel('New due date').fill('2026-10-29')
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  assert.equal(raw.vaccinations[0].next_due_at, '2026-10-28')
+  await page.locator('#reminder-custom').getByRole('button', { name: 'Complete', exact: true }).click()
+  await page.getByLabel('Call outcome').selectOption('Appointment booked')
+  await page.getByRole('button', { name: 'Save outcome', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.locator('#reminder-custom')).toHaveCount(0)
+  assert.equal(raw.appointments.find((item) => item.id === 'task-booking').status, 'confirmed')
+  await page.getByRole('button', { name: 'Add task', exact: true }).click()
+  await page.getByLabel('Patient', { exact: true }).selectOption(pet)
+  await page.getByLabel('Title', { exact: true }).fill('Custom scheduling task')
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.locator('#reminder-new-task')).toBeVisible()
+  for (const width of [320, 375, 1440]) {
+    await page.setViewportSize({ width, height: 1100 })
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Combined tasks overflow at ${width}`)
+    await page.screenshot({ path: `test-artifacts.local/appointment-tasks-${width}.png`, fullPage: true })
+    await page.goto(calendar('2026-10-29'))
+    await expect(page.locator('#reminder-follow')).toHaveCount(1)
+    await expect(page.locator('#reminder-vac-call')).toHaveCount(1)
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Combined calendar overflows at ${width}`)
+    await page.screenshot({ path: `test-artifacts.local/appointment-calendar-${width}.png`, fullPage: true })
+    await page.getByRole('button', { name: 'Follow-ups & tasks', exact: true }).click()
+  }
+  await page.goto(app.origin + '/reminders?status=All&type=Custom#reminder-custom')
+  await expect(page).toHaveURL(/appointments\?status=All&type=Custom&view=tasks#reminder-custom/)
+  await expect(page.locator('#reminder-custom')).toBeFocused()
+  await expect(page.locator('#reminder-custom')).toContainText('Appointment booked')
+  await page.reload()
+  await expect(page.locator('#reminder-custom')).toBeFocused()
+  raw.profiles[0].role = 'clinical_staff'
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Delete reminder', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Open workspaces', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Choose a workspace' }).locator('a[href="/reminders"]')).toHaveCount(0)
+  await page.keyboard.press('Escape')
   assert.deepEqual(errors, [])
-  console.log('PASS appointment editing/check-in, wrong-day follow-up warnings/rescheduling, new clinical record with queue/weight, retry/reload without duplicates, finalized source preservation, and mobile layouts')
+  console.log('PASS appointment editing/check-in, wrong-day follow-up warnings/rescheduling, new clinical record with queue/weight, retry/reload without duplicates, finalized source preservation, combined task/calendar management, contact retries/history, legacy redirects, booking and mobile layouts')
 } finally { await app.close() }

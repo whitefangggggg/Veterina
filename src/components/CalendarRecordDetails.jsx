@@ -123,6 +123,7 @@ function TimelineDetails({ event, data, onEdit }) {
 export default function CalendarRecordDetails({ records, kind, onEdit }) {
   const data = useClinicData()
   const { profile } = useAuth()
+  if (kind === 'clinical') return records.map((record) => <CalendarRecordDetails key={record.historyKey} records={[record.sourceRecord]} kind={record.historyKind} onEdit={onEdit} />)
   return records.map((record) => <article className="calendar-preview-record" key={record.id} style={kind === 'checkup' && record.cardColor ? { '--preview-color': record.cardColor } : undefined}>
     <header><h3>{kind === 'checkup' ? record.diagnosis || record.complaint || record.type : kind === 'vaccination' ? record.vaccine : kind === 'service' ? record.service : record.title}</h3>
       {kind === 'timeline' && <Badge tone="blue">{record.kind} · {record.status}</Badge>}

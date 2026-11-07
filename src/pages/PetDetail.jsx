@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
   ArrowLeft,
   CalendarPlus,
@@ -38,13 +37,14 @@ import { fetchReport, printPatientHistory } from '../lib/reports'
 import { prescriptionMedications } from '../lib/prescriptions'
 import { QueueDialog } from '../components/QueueEditors'
 import NewVisitDialog, { ServiceVisitEditor } from '../components/NewVisitDialog'
-import PatientTimeline from '../components/PatientTimeline'
+import PatientVitals from '../components/PatientVitals'
+import ServiceHistoryCard from '../components/ServiceHistoryCard'
 import PatientSchedule from '../components/PatientSchedule'
 import { useHashTarget } from '../lib/useHashTarget'
 import { formatPatientAge } from '../utils/clinicRules'
-import { clinicalHistoryParams, filterClinicalHistory } from '../lib/clinicalHistory'
+import { clinicalHistoryParams, combinedClinicalHistory, filterClinicalHistory, normalizePatientHistoryParams } from '../lib/clinicalHistory'
 import { dateInClinic, isClinicDate } from '../lib/dailyWorkflow'
-import { recordHistoryFields, serviceHistoryRecords, vaccinationHistoryRecords } from '../lib/patientRecordHistory'
+import { recordHistoryFields, vaccinationHistoryRecords } from '../lib/patientRecordHistory'
 
 function CareStatus({ record }) {
   if (record.recordingPurpose === 'record_only') return <Badge>Record only</Badge>
@@ -60,10 +60,16 @@ export default function PetDetail() {
   const targetId = useHashTarget()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { profile } = useAuth()
   const { getPet, getOwner, visits, vaccinations, reminders, alerts, profiles, settings, queueEntries, serviceRecords: historicalServices, today, timezone } = useClinicData()
   const [modal, setModal] = useState(null)
-  const tab = ['history', 'timeline', 'vaccines', 'growth', 'services'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'history'
+  const normalizedParams = useMemo(() => normalizePatientHistoryParams(searchParams), [searchParams])
+  const activeParams = normalizedParams || searchParams
+  const tab = ['history', 'vaccines', 'growth'].includes(activeParams.get('tab')) ? activeParams.get('tab') : 'history'
+  useEffect(() => {
+    if (normalizedParams) navigate({ search: `?${normalizedParams}`, hash: location.hash }, { replace: true, preventScrollReset: true })
+  }, [normalizedParams, navigate, location.hash])
   const setTab = (value) => {
     const next = new URLSearchParams(searchParams)
     next.set('tab', value)
@@ -87,8 +93,10 @@ export default function PetDetail() {
   const patientAge = formatPatientAge(pet?.birthDate, today)
   const owner = getOwner(pet?.ownerId)
   const petVisits = useMemo(() => visits.filter((item) => item.petId === petId).sort((a, b) => b.visitedAt.localeCompare(a.visitedAt)), [visits, petId])
-  const historyFilters = Object.fromEntries(Object.entries(clinicalHistoryParams).map(([field, param]) => [field, searchParams.get(param) || '']))
-  const filteredVisits = filterClinicalHistory(petVisits, historyFilters, timezone)
+  const maintenance = [...queueEntries.filter((entry) => entry.petId === petId && entry.category === 'maintenance'), ...historicalServices.filter((entry) => entry.petId === petId)]
+  const historyRecords = combinedClinicalHistory(petVisits, maintenance)
+  const historyFilters = Object.fromEntries(Object.entries(clinicalHistoryParams).map(([field, param]) => [field, activeParams.get(param) || '']))
+  const filteredVisits = filterClinicalHistory(historyRecords, historyFilters, timezone)
   const historyView = !targetId && searchParams.get('historyView') === 'calendar' ? 'calendar' : 'cards'
   const latestHistoryDate = dateInClinic(filteredVisits[0]?.visitedAt, timezone) || today
   const requestedHistoryDay = searchParams.get('historyDay')
@@ -129,13 +137,9 @@ export default function PetDetail() {
     setSearchParams(next, { replace: true, preventScrollReset: true })
   }
   const petVaccinations = vaccinations.filter((item) => item.petId === petId)
-  const maintenance = [...queueEntries.filter((entry) => entry.petId === petId && entry.category === 'maintenance'), ...historicalServices.filter((entry) => entry.petId === petId)].sort((a, b) => b.arrivedAt.localeCompare(a.arrivedAt))
   const vaccineRecords = vaccinationHistoryRecords(petVaccinations, profiles, timezone)
   const vaccineFields = recordHistoryFields(vaccineRecords, [['vaccine', 'Vaccine', 'All vaccines'], ['brand', 'Brand', 'All brands'], ['status', 'Care status', 'All care statuses'], ['due', 'Next dose status', 'All next dose statuses'], ['veterinarian', 'Veterinarian', 'All veterinarians']])
-  const serviceRecords = serviceHistoryRecords(maintenance, timezone)
-  const serviceFields = recordHistoryFields(serviceRecords, [['service', 'Service', 'All services'], ['status', 'Service status', 'All service statuses'], ['veterinarian', 'Veterinarian', 'All veterinarians'], ['notes', 'Service notes', 'All records']])
   const petReminders = reminders.filter((item) => item.petId === petId && !['Completed', 'Cancelled'].includes(item.status))
-  const weightData = [...petVisits].reverse().map((visit) => ({ visitId: visit.id, date: format(parseISO(visit.visitedAt), 'MMM yy'), weight: visit.weightKg, bcs: visit.bodyConditionScore }))
 
   if (!pet) return <div className="page"><Link to="/patients" className="text-link"><ArrowLeft size={17} weight="bold" /> Back to patients</Link><div className="not-found"><h1>Patient not found</h1></div></div>
 
@@ -171,7 +175,7 @@ export default function PetDetail() {
         <div><Scales size={19} weight="duotone" /><span>Current weight<strong>{pet.latestWeight ? `${pet.latestWeight} kg` : 'Not recorded'}</strong></span></div>
         <div><Pulse size={19} weight="duotone" /><span>Last visit<strong>{petVisits[0] ? format(parseISO(petVisits[0].visitedAt), 'd MMM yyyy') : 'No visits'}</strong></span></div>
         <div><Syringe size={19} weight="duotone" /><span>Vaccinations<strong>{petVaccinations.length} recorded</strong></span></div>
-        <div><CalendarPlus size={19} weight="duotone" /><span>Open reminders<strong>{petReminders.length} upcoming</strong></span></div>
+        <div><CalendarPlus size={19} weight="duotone" /><span>Follow-up tasks<strong><Link className="text-link" to={`/appointments?view=tasks&taskPet=${encodeURIComponent(pet.id)}`}>{petReminders.length} open</Link></strong></span></div>
       </div>
 
       <div className="record-layout">
@@ -181,25 +185,23 @@ export default function PetDetail() {
             onArrive={(dialog) => setModal({ type: 'schedule-arrival', dialog })} />
           <div className="tabs" role="tablist">
             <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>Clinical history</button>
-            <button className={tab === 'timeline' ? 'active' : ''} onClick={() => setTab('timeline')}>Care timeline</button>
             <button className={tab === 'vaccines' ? 'active' : ''} onClick={() => setTab('vaccines')}>Vaccinations</button>
             <button className={tab === 'growth' ? 'active' : ''} onClick={() => setTab('growth')}>Weight & vitals</button>
-            <button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Service history</button>
           </div>
-          {tab === 'timeline' && <PatientTimeline key={petId} patientId={petId} />}
 
           {tab === 'history' && (
             <>
-            <ClinicalHistoryFilters visits={petVisits} filters={historyFilters} onChange={changeHistoryFilter} onClear={clearHistoryFilters} count={filteredVisits.length} timezone={timezone} view={historyView} onViewChange={changeHistoryView} />
+            <ClinicalHistoryFilters combined itemName="record" itemPlural="records" visits={historyRecords} filters={historyFilters} onChange={changeHistoryFilter} onClear={clearHistoryFilters} count={filteredVisits.length} timezone={timezone} view={historyView} onViewChange={changeHistoryView} />
             {historyView === 'calendar' && <>
-              <ClinicalHistoryCalendar visits={filteredVisits} month={historyMonth} day={historyDay} today={today} timezone={timezone} onMonthChange={changeHistoryMonth} onDayChange={changeHistoryDay} onDayPreview={(day) => setModal({ type: 'calendar-preview', day })} />
-              <div className="clinical-history-day-heading"><h2>{format(parseISO(historyDay), 'd MMMM yyyy')}</h2><span>{visibleVisits.length} checkup{visibleVisits.length === 1 ? '' : 's'}</span></div>
+              <ClinicalHistoryCalendar itemName="record" itemPlural="records" visits={filteredVisits} month={historyMonth} day={historyDay} today={today} timezone={timezone} onMonthChange={changeHistoryMonth} onDayChange={changeHistoryDay} onDayPreview={(day) => setModal({ type: 'calendar-preview', day })} />
+              <div className="clinical-history-day-heading"><h2>{format(parseISO(historyDay), 'd MMMM yyyy')}</h2><span>{visibleVisits.length} record{visibleVisits.length === 1 ? '' : 's'}</span></div>
             </>}
             <div className="clinical-timeline">
               {visibleVisits.map((visit) => {
+                if (visit.historyKind === 'service') return <ServiceHistoryCard key={visit.historyKey} record={visit.sourceRecord} timezone={timezone} onEdit={(record) => setModal({ type: 'historical-service', record })} />
                 const activeQueue = ['Waiting', 'In progress'].includes(visit.careStatus) ? visit.careQueue : null
                 return (
-                <VisitCard key={visit.id} visit={visit}>
+                <VisitCard key={visit.historyKey} visit={visit}>
                     <div className="visit-heading"><div><Badge tone="blue">{visit.type}</Badge>{visit.serviceName && <Badge>{visit.serviceName}</Badge>}<CareStatus record={visit} /><h2>{visit.finalizedAt ? visit.diagnosis || visit.complaint : <button type="button" className="visit-edit-trigger" aria-label={`Edit ${visit.type} checkup from ${format(parseISO(visit.visitedAt), 'd MMM yyyy, h:mm a')}`} onClick={() => openCheckup(visit)}>{visit.diagnosis || visit.complaint}</button>}</h2><p>{visit.complaint}</p></div><span>{visit.veterinarian}</span></div>
                     <div className="vitals-strip">
                       <span><Scales size={15} weight="duotone" /> {visit.weightKg != null ? `${visit.weightKg} kg` : 'Not recorded'}</span>
@@ -233,9 +235,9 @@ export default function PetDetail() {
                     {visit.followUpDate && <div className="follow-up-note"><CalendarPlus size={16} weight="duotone" /> {visit.recordingPurpose === 'record_only' ? 'Historical follow-up date' : 'Follow-up due'} {format(parseISO(visit.followUpDate), 'd MMMM yyyy')}</div>}
                 </VisitCard>
               )})}
-              {!petVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No clinical visits yet</h3><p>Record the first checkup to begin this pet’s history.</p></div>}
-              {petVisits.length > 0 && !filteredVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No matching checkups</h3><p>Try another clinical detail or clear the filters to see all checkups.</p><button type="button" className="button button-secondary" onClick={clearHistoryFilters}>Show all checkups</button></div>}
-              {historyView === 'calendar' && filteredVisits.length > 0 && !visibleVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No checkups on this day</h3><p>Select a marked day to see its clinical details.</p></div>}
+              {!historyRecords.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No clinical records yet</h3><p>Record a checkup or service to begin this pet’s history.</p></div>}
+              {historyRecords.length > 0 && !filteredVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No matching records</h3><p>Try another search or clear the filters to see all records.</p><button type="button" className="button button-secondary" onClick={clearHistoryFilters}>Show all records</button></div>}
+              {historyView === 'calendar' && filteredVisits.length > 0 && !visibleVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No records on this day</h3><p>Select a marked day to see its clinical details.</p></div>}
             </div>
             </>
           )}
@@ -259,30 +261,8 @@ export default function PetDetail() {
             </SectionCard>
           )}
 
-          {tab === 'services' && <SectionCard title="Maintenance service history" description="Grooming and other maintenance services recorded at the clinic.">
-            <PatientRecordBrowser records={serviceRecords} scope="service" label="Service history" itemName="service" itemPlural="services" fields={serviceFields} dateLabel="Service date" placeholder="Search service, notes or queue number…" emptyTitle="No maintenance services recorded" emptyDescription="Saved grooming and maintenance services will appear here." previewKind="service">
-            {(visible) => visible.map((entry) => <article className="directory-card" key={entry.id} id={`service-${entry.id}`}><div><h3>{entry.service}</h3><p>{entry.queueNumber ? `${entry.queueNumber} · ` : ''}{entry.queueDate} · {entry.veterinarian}</p><Badge>{entry.recordingPurpose === 'record_only' ? 'Record only' : entry.status.replaceAll('_', ' ')}</Badge>{entry.serviceNotes && <p className="service-notes">{entry.serviceNotes}</p>}</div>{entry.recordingPurpose === 'record_only' && <button className="text-link" onClick={() => setModal({ type: 'historical-service', record: entry })}>Edit service record</button>}{['waiting', 'in_progress'].includes(entry.status) && <Link className="text-link" to="/queue">Open queue</Link>}</article>)}
-            </PatientRecordBrowser>
-          </SectionCard>}
+          {tab === 'growth' && <PatientVitals pet={pet} visits={petVisits} timezone={timezone} />}
 
-          {tab === 'growth' && (
-            <SectionCard title="Weight trend" description="Every measurement remains tied to its original clinic visit">
-              {weightData.length ? (
-                <div className="chart-wrap">
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={weightData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
-                      <defs><linearGradient id="weightFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--brand)" stopOpacity={0.24}/><stop offset="95%" stopColor="var(--brand)" stopOpacity={0}/></linearGradient></defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e6e9e5" />
-                      <XAxis dataKey="date" tickLine={false} axisLine={false} />
-                      <YAxis tickLine={false} axisLine={false} unit=" kg" domain={['dataMin - 1', 'dataMax + 1']} />
-                      <Tooltip formatter={(value) => [`${value} kg`, 'Weight']} />
-                      <Area type="monotone" dataKey="weight" stroke="var(--brand)" strokeWidth={3} fill="url(#weightFill)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : <div className="empty-inline"><Scales size={30} weight="duotone" /><h3>No measurements yet</h3></div>}
-            </SectionCard>
-          )}
         </div>
 
         <aside className="record-sidebar">
@@ -310,8 +290,8 @@ export default function PetDetail() {
         {profile.role === 'owner' && <button className="button button-secondary danger-text" onClick={() => setModal({ type: 'delete', entity: 'pet', record: pet })}>Delete patient</button>}
         </aside>
       </div>
-      {modal?.type === 'calendar-preview' && <CalendarDayPreview label="Clinical history" day={modal.day} count={previewVisits.length} itemName="checkup" itemPlural="checkups" timezone={timezone} onClose={() => setModal(null)}><CalendarRecordDetails records={previewVisits} kind="checkup" /></CalendarDayPreview>}
-      {modal?.type === 'new-visit' && <NewVisitDialog pet={pet} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Visit' }); setTab(saved.serviceWorkflow === 'maintenance' ? 'services' : saved.serviceWorkflow === 'vaccination' ? 'vaccines' : 'history') }} onClose={() => setModal(null)} />}
+      {modal?.type === 'calendar-preview' && <CalendarDayPreview label="Clinical history" day={modal.day} count={previewVisits.length} itemName="record" itemPlural="records" timezone={timezone} onClose={() => setModal(null)}><CalendarRecordDetails records={previewVisits} kind="clinical" /></CalendarDayPreview>}
+      {modal?.type === 'new-visit' && <NewVisitDialog pet={pet} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Visit' }); setTab(saved.serviceWorkflow === 'vaccination' ? 'vaccines' : 'history') }} onClose={() => setModal(null)} />}
       {modal?.type === 'historical-service' && <ServiceVisitEditor pet={pet} purpose="record_only" record={modal.record} service={{ id: modal.record.serviceTypeId, name: modal.record.service }} onClose={() => setModal(null)} />}
       {modal?.type === 'visit' && <VisitModal pet={pet} record={modal.record} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Checkup' }) }} onClose={() => setModal(null)} />}
       {modal?.type === 'queue-care' && <QueueDialog modal={{ type: 'care', entry: modal.entry }} onClose={() => setModal(null)} />}
