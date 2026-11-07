@@ -28,7 +28,7 @@ do $$
 #variable_conflict use_variable
 declare
   actor uuid:=current_setting('clinical_test.owner')::uuid;
-  owner_id uuid; pet uuid; vaccine_item uuid; vaccine_id uuid; visit_id uuid; queue uuid; service uuid; booking uuid;
+  owner_id uuid; pet uuid; vaccine_item uuid; vaccine_batch uuid; vaccine_id uuid; visit_id uuid; queue uuid; service uuid; booking uuid;
   data jsonb; pet_data jsonb; clinical jsonb; result jsonb; replay uuid; document jsonb; rejected boolean;
   today date:=(now() at time zone coalesce((select timezone from public.clinic_settings limit 1),'Asia/Manila'))::date;
   before_stock integer;
@@ -75,8 +75,10 @@ begin
   data:=jsonb_build_object('name','Fixture vaccine','brand','Fixture Brand','category','Vaccines','unit','dose','minimumStock','0');
   perform pg_temp.reject('create_inventory_item',data||'{"brand":""}', 'VALIDATION_FAILED%');
   vaccine_item:=(public.portal_mutation('create_inventory_item',data,gen_random_uuid())->>'id')::uuid;
+  select id into vaccine_batch from public.inventory_batches where item_id=vaccine_item;
+  perform public.portal_mutation('record_inventory_movement',jsonb_build_object('id',vaccine_item,'batchId',vaccine_batch,'delta',5,'reason','Delivery'),gen_random_uuid());
   select count(*) into before_stock from public.inventory_movements;
-  clinical:=jsonb_build_object('petId',pet,'veterinarianId',actor,'inventoryItemId',vaccine_item,'vaccine','Forged name','brand','Forged brand','administeredAt',today,'nextDueAt',today+10);
+  clinical:=jsonb_build_object('petId',pet,'veterinarianId',actor,'inventoryItemId',vaccine_item,'batchId',vaccine_batch,'dispenseQuantity',1,'vaccine','Forged name','brand','Forged brand','administeredAt',today,'nextDueAt',today+10);
   replay:=gen_random_uuid(); result:=public.portal_mutation('create_queued_vaccination',clinical,replay);
   vaccine_id:=(result->>'id')::uuid; queue:=(result->>'queueEntryId')::uuid;
   if public.portal_mutation('create_queued_vaccination',clinical,replay)<>result then raise exception 'TEST: vaccine retry'; end if;
@@ -86,14 +88,16 @@ begin
   perform public.portal_mutation('start_queue_entry',jsonb_build_object('id',queue,'veterinarianId',actor),gen_random_uuid());
   perform public.portal_mutation('save_queue_draft',jsonb_build_object('id',queue,'draftVersion',0,'record',jsonb_build_object('inventoryItemId',vaccine_item::text,'dose','Partial dose')),gen_random_uuid());
   perform pg_temp.reject('complete_queue_entry',jsonb_build_object('id',queue,'draftVersion',0,'record',clinical),'DRAFT_CONFLICT%');
+  perform pg_temp.reject('complete_queue_entry',jsonb_build_object('id',queue,'draftVersion',1,'record',clinical),'INVENTORY_UNAVAILABLE%');
+  perform public.portal_mutation('update_inventory_item',data||jsonb_build_object('id',vaccine_item,'name','Renamed vaccine','brand','New Brand','isActive','true'),gen_random_uuid());
   perform public.portal_mutation('complete_queue_entry',jsonb_build_object('id',queue,'draftVersion',1,'record',clinical||jsonb_build_object('dose','Saved dose')),gen_random_uuid());
   if (select brand from public.vaccinations where id=vaccine_id)<>'Fixture Brand' or (select vaccine_name from public.vaccinations where id=vaccine_id)<>'Fixture vaccine' then raise exception 'TEST: snapshot changed after inventory edit'; end if;
   if (select count(*) from public.vaccinations where pet_id=pet)<>1 or (select count(*) from public.reminders where vaccination_id=vaccine_id)<>1 then raise exception 'TEST: duplicate clinical record/reminder'; end if;
-  if (select count(*) from public.inventory_movements)<>before_stock then raise exception 'TEST: selecting vaccine changed stock'; end if;
-  perform pg_temp.reject('create_vaccination',clinical,'VALIDATION_FAILED%');
-  perform pg_temp.reject('create_vaccination',clinical||jsonb_build_object('inventoryItemId',''),'VALIDATION_FAILED%');
-  perform public.portal_mutation('delete_record',jsonb_build_object('entity','inventory_item','id',vaccine_item,'reason','Rollback history preservation check'),gen_random_uuid());
-  if not exists(select 1 from public.vaccinations where id=vaccine_id and inventory_item_id is null and brand='Fixture Brand' and vaccine_name='Fixture vaccine') then raise exception 'TEST: deleting inventory erased historical snapshots'; end if;
+  if (select count(*) from public.inventory_movements)<>before_stock+1 then raise exception 'TEST: completion did not deduct stock once'; end if;
+  perform pg_temp.reject('create_vaccination',clinical-'batchId','INVENTORY_UNAVAILABLE%');
+  perform pg_temp.reject('create_vaccination',clinical||jsonb_build_object('inventoryItemId',''),'INVENTORY_UNAVAILABLE%');
+  perform pg_temp.reject('delete_record',jsonb_build_object('entity','inventory_item','id',vaccine_item,'reason','Rollback history preservation check'),'IMMUTABLE_LEDGER%');
+  if not exists(select 1 from public.vaccinations where id=vaccine_id and inventory_item_id=vaccine_item and brand='Fixture Brand' and vaccine_name='Fixture vaccine') then raise exception 'TEST: deleting inventory erased historical snapshots'; end if;
   if (select count(*) from public.reminders where vaccination_id=vaccine_id)<>1 then raise exception 'TEST: clearing inventory link duplicated reminder'; end if;
 
   service:=(public.portal_mutation('create_service',jsonb_build_object('name','Fixture maintenance','duration','60','workflow','maintenance'),gen_random_uuid())->>'id')::uuid;
@@ -122,8 +126,8 @@ end $$;
 -- Seed genuine historical data as administrator, then edit through staff RPCs.
 reset role;
 update public.visit_vitals set body_condition_scale=9,body_condition_score=7 where visit_id=current_setting('clinical_test.visit')::uuid;
-insert into public.vaccinations(pet_id,vaccine_name,lot_number,administered_at,administered_by)
-values(current_setting('clinical_test.pet')::uuid,'Legacy vaccine','LEGACY-LOT',current_date,current_setting('clinical_test.owner')::uuid);
+insert into public.vaccinations(pet_id,vaccine_name,lot_number,administered_at,administered_by,stock_tracked)
+values(current_setting('clinical_test.pet')::uuid,'Legacy vaccine','LEGACY-LOT',current_date,current_setting('clinical_test.owner')::uuid,false);
 set local role authenticated;
 do $$
 declare data jsonb; v public.vaccinations; q uuid; a uuid; result jsonb;

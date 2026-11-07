@@ -24,7 +24,7 @@ do $$ declare o uuid; p uuid; q uuid; v uuid; vac uuid; key uuid; data jsonb; it
   begin perform public.create_encounter(data || '{"complaint":"different payload"}'::jsonb,key);raise exception 'FAIL: changed payload replay';exception when raise_exception then if sqlerrm not like '%retry payload changed%' then raise;end if;end;
   if (select count(*) from public.visits where pet_id=p)<>1 or (select count(*) from public.visit_vitals where visit_id=v)<>1 or (select count(*) from public.reminders where visit_id=v)<>1 then raise exception 'FAIL: atomic encounter';end if;
   vaccine_item:=(public.portal_mutation('create_inventory_item',jsonb_build_object('name','Fixture Rabies','brand','Fixture Brand','category','Vaccines','unit','route','Oral','dose','minimumStock',0,'allowsFraction','false'),gen_random_uuid())->>'id')::uuid;
-  key:=gen_random_uuid();data:=jsonb_build_object('petId',p,'inventoryItemId',vaccine_item,'lotNumber','TEST-LOT','administeredAt',current_date,'nextDueAt',current_date+30);
+  key:=gen_random_uuid();data:=jsonb_build_object('petId',p,'inventoryItemId',vaccine_item,'batchId',(select id from public.inventory_batches where item_id=vaccine_item limit 1),'dispenseQuantity',1,'lotNumber','TEST-LOT','administeredAt',current_date,'nextDueAt',current_date+30);
   vac:=(public.create_vaccination(data,key)->>'id')::uuid;perform public.create_vaccination(data,key);
   if (select count(*) from public.reminders where vaccination_id=vac)<>1 then raise exception 'FAIL: duplicate vaccine reminder';end if;
   perform public.book_appointment(jsonb_build_object('petId',p,'date',current_date+10,'time','09:00','service','Wellness check','veterinarianId',current_setting('test.staff')),gen_random_uuid());

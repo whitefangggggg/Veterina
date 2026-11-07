@@ -30,7 +30,7 @@ assert.equal(sql('select count(*) from public.owners'), '0', 'Start with an empt
 const admin = createClient(env.TEST_SUPABASE_URL, env.TEST_SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 const checked = ({ data, error }) => { if (error) throw error; return data }
 await mkdir('test-artifacts.local', { recursive: true })
-for (const suite of ['security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'follow_up_arrivals', 'clinic_rbac', 'owner_staff_signup', 'google_account_registration', 'clinic_logo', 'owner_clinic_onboarding', 'platform_subscriptions', 'checkup_completion', 'historical_checkups', 'historical_vaccinations', 'unified_patient_visits', 'travel_certificates', 'veterinarian_tin_settings', 'veterinarian_professional_details']) {
+for (const suite of ['security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'follow_up_arrivals', 'clinic_rbac', 'owner_staff_signup', 'google_account_registration', 'clinic_logo', 'owner_clinic_onboarding', 'platform_subscriptions', 'checkup_completion', 'historical_checkups', 'historical_vaccinations', 'unified_patient_visits', 'travel_certificates', 'veterinarian_tin_settings', 'veterinarian_professional_details', 'clinic_appearance_theme', 'preventive_care']) {
   const result = spawnSync('psql', [env.TEST_DATABASE_URL, '-X', '-v', 'ON_ERROR_STOP=1', '-f', `supabase/tests/${suite}.sql`], { encoding: 'utf8', windowsHide: true })
   await writeFile(`test-artifacts.local/${suite}.log`, (result.stdout || '') + (result.stderr || ''))
   if (result.error) throw result.error
@@ -42,6 +42,10 @@ const stockConcurrency = spawnSync(process.execPath, ['scripts/check-prescriptio
 await writeFile('test-artifacts.local/prescription-stock.log', (stockConcurrency.stdout || '') + (stockConcurrency.stderr || ''))
 assert.equal(stockConcurrency.status, 0, 'Prescription stock concurrency failed; see test-artifacts.local/prescription-stock.log')
 console.log('PASS isolated prescription stock concurrency')
+const preventiveConcurrency = spawnSync(process.execPath, ['scripts/check-preventive-stock.mjs'], { encoding: 'utf8', windowsHide: true })
+await writeFile('test-artifacts.local/preventive-stock.log', (preventiveConcurrency.stdout || '') + (preventiveConcurrency.stderr || ''))
+assert.equal(preventiveConcurrency.status, 0, 'Preventive stock concurrency failed; see test-artifacts.local/preventive-stock.log')
+console.log('PASS isolated preventive stock concurrency')
 const followUpConcurrency = spawnSync(process.execPath, ['scripts/check-follow-up-arrivals.mjs'], { encoding: 'utf8', windowsHide: true })
 await writeFile('test-artifacts.local/follow-up-arrivals.log', (followUpConcurrency.stdout || '') + (followUpConcurrency.stderr || ''))
 assert.equal(followUpConcurrency.status, 0, 'Follow-up concurrency failed; see test-artifacts.local/follow-up-arrivals.log')
@@ -287,7 +291,7 @@ try {
   assert.ok(dispensingLedger[0].reference.includes(prescriptions[0].id))
   console.log('PASS real prescription combo → committed dispensing → lost acknowledgement/retry → immutable reload/edit → inventory balance; one stock deduction')
 
-  const travelVaccine = { id: sql(`begin; select set_config('request.jwt.claims','${JSON.stringify({ sub: owner.id, role: 'authenticated' })}',true); insert into public.vaccinations(clinic_id,pet_id,vaccine_name,brand,lot_number,dose,administered_at,next_due_at,administered_by) values('${patient.clinic_id}','${patient.id}','Travel vaccination evidence','Original travel brand','TRAVEL-1','1 ml','${date}','${Number(date.slice(0, 4)) + 1}${date.slice(4)}','${owner.id}') returning id; commit;`).split('\n').at(-1) }
+  const travelVaccine = { id: sql(`begin; select set_config('request.jwt.claims','${JSON.stringify({ sub: owner.id, role: 'authenticated' })}',true); insert into public.vaccinations(clinic_id,pet_id,vaccine_name,brand,lot_number,dose,administered_at,next_due_at,administered_by,stock_tracked) values('${patient.clinic_id}','${patient.id}','Travel vaccination evidence','Original travel brand','TRAVEL-1','1 ml','${date}','${Number(date.slice(0, 4)) + 1}${date.slice(4)}','${owner.id}',false) returning id; commit;`).split('\n').at(-1) }
   await page.goto(`${app.origin}/settings`)
   await expect(page.getByLabel('Veterinarian TIN', { exact: true })).toHaveCount(0)
   const beforeCredentials = checked(await admin.from('profiles').select('full_name,tin_number,prc_license_number,ptr_number,license_expires_on').eq('id', owner.id).single())
@@ -343,7 +347,7 @@ try {
   assert.ok(savedTravel.search_text.includes(travelOwner.name))
   const publicLink = await travelDialog.getByRole('link', { name: 'Open QR link' }).getAttribute('href')
   const publicToken = new URL(publicLink).hash.slice(1)
-  const readPublic = () => fetch(`${env.TEST_SUPABASE_URL}/functions/v1/travel-certificate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: publicToken }) })
+  const readPublic = () => fetch(`${env.TEST_SUPABASE_URL}/functions/v1/travel-certificate`, { method: 'POST', headers: { apikey: env.TEST_SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: publicToken }) })
   assert.equal((await readPublic()).status, 404, 'New certificates must start private')
   await travelDialog.getByLabel('Certificate visibility', { exact: true }).selectOption('public')
   await travelDialog.getByRole('button', { name: 'Save visibility' }).click()
@@ -427,13 +431,13 @@ try {
   await page.goto(app.origin + '/patients/' + patient.id)
   await openNewVisit(page, 'Vaccination')
   await page.getByRole('button', { name: /Record-keeping only/ }).click()
-  await page.getByLabel('Vaccine name', { exact: true }).fill('Historical Anti-Rabies')
+  await page.getByLabel('Product name 1', { exact: true }).fill('Historical Anti-Rabies')
   await page.getByLabel('Date administered').fill('2020-01-02')
-  await page.getByLabel('Next due date').fill('2030-01-02')
+  await page.getByLabel('Next due date 1').fill('2030-01-02')
   await page.getByLabel('Veterinarian', { exact: true }).fill('Dok Máya sa Bukid')
   let loseHistoricalVaccineAcknowledgement = true
   await page.route('**/rest/v1/rpc/portal_mutation', async (route) => {
-    if (loseHistoricalVaccineAcknowledgement && route.request().postDataJSON().p_action === 'create_record_only_vaccination') {
+    if (loseHistoricalVaccineAcknowledgement && route.request().postDataJSON().p_action === 'create_preventive_care') {
       loseHistoricalVaccineAcknowledgement = false
       const response = await route.fetch()
       assert.ok(response.ok(), 'Historical vaccination must commit before response loss')
@@ -441,9 +445,9 @@ try {
     }
     return route.continue()
   })
-  await page.getByRole('button', { name: 'Save historical vaccination' }).click()
+  await page.getByRole('button', { name: 'Save historical record' }).click()
   await expect(page.getByRole('alert')).toBeVisible()
-  await page.getByRole('button', { name: 'Save historical vaccination' }).click()
+  await page.getByRole('button', { name: 'Save historical record' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.unroute('**/rest/v1/rpc/portal_mutation')
   const historicalVax = checked(await admin.from('vaccinations').select('*').eq('vaccine_name', 'Historical Anti-Rabies'))
@@ -454,9 +458,75 @@ try {
   assert.equal(historicalVax[0].recorded_by, owner.id)
   assert.equal(operationalCounts(), beforeHistoricalVaccine)
   await page.reload()
-  await page.getByRole('button', { name: 'Vaccinations', exact: true }).click()
-  await expect(page.locator('.vaccine-row').filter({ hasText: 'Historical Anti-Rabies' })).toContainText('Record only')
+  await page.getByRole('button', { name: 'Vaccinations and Deworming', exact: true }).click()
+  await expect(page.locator('.preventive-history-card').filter({ hasText: 'Historical Anti-Rabies' })).toContainText('Record only')
   console.log('PASS real historical vaccination -> lost acknowledgement retry -> one saved record with custom clinician and no queue, reminders, appointments or stock changes')
+
+  const careClient = createClient(env.TEST_SUPABASE_URL, env.TEST_SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  checked(await careClient.auth.signInWithPassword({ email: owner.email, password }))
+  const careMutation = async (action, data) => checked(await careClient.rpc('portal_mutation', { p_action: action, p_data: data, p_key: crypto.randomUUID() }))
+  for (const kind of ['vaccination', 'deworming']) {
+    const product = await careMutation('create_inventory_item', { name: `Integration ${kind} product`, brand: 'Integration care brand', category: kind === 'vaccination' ? 'Vaccines' : 'Medicine', unit: 'dose', minimumStock: 0 })
+    const stockBatch = checked(await admin.from('inventory_batches').select('id').eq('item_id', product.id).single())
+    await careMutation('record_inventory_movement', { id: product.id, batchId: stockBatch.id, delta: 5, reason: 'Synthetic care delivery' })
+    await page.goto(app.origin + '/patients/' + patient.id)
+    await openNewVisit(page, 'Vaccination')
+    await page.getByRole('button', { name: /Queue processing/ }).click()
+    await page.getByLabel('Record type', { exact: true }).selectOption(kind)
+    const count = kind === 'vaccination' ? 2 : 1
+    for (let index = 1; index <= count; index++) {
+      if (index > 1) await page.getByRole('button', { name: 'Add another vaccine' }).click()
+      await page.getByLabel(`Inventory product ${index}`, { exact: true }).selectOption(product.id)
+      await page.getByLabel(`Stock batch ${index}`, { exact: true }).selectOption(stockBatch.id)
+      await page.getByLabel(`Stock quantity ${index}`, { exact: true }).fill('1')
+      await page.getByLabel(`Dose ${index}`, { exact: true }).fill('Recorded clinical dose')
+    }
+    if (kind === 'deworming') await expect(page.getByRole('button', { name: 'Add another vaccine' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Save record', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    const parent = checked(await careClient.from('preventive_care_records').select('*').eq('pet_id', patient.id).eq('kind', kind).eq('recording_purpose', 'queue').order('created_at', { ascending: false }).limit(1).single())
+    const ticket = checked(await admin.from('queue_entries').select('id').eq('preventive_record_id', parent.id).single())
+    const balance = () => Number(sql(`select sum(quantity_delta) from public.inventory_movements where batch_id='${stockBatch.id}'`))
+    assert.equal(balance(), 5, 'Creating waiting care must not consume stock')
+    await page.goto(app.origin + '/queue')
+    await page.locator(`#queue-${ticket.id}`).getByRole('button', { name: 'Start care', exact: true }).click()
+    await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await page.locator(`#queue-${ticket.id}`).getByRole('button', { name: 'Record vaccinations / deworming', exact: true }).click()
+    await page.getByRole('button', { name: 'Save as draft', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    assert.equal(balance(), 5, 'Saving a draft must not consume stock')
+    await page.locator(`#queue-${ticket.id}`).getByRole('button', { name: 'Resume vaccinations / deworming', exact: true }).click()
+    let loseCareAcknowledgement = kind === 'vaccination'
+    await page.route('**/rest/v1/rpc/portal_mutation', async (route) => {
+      if (loseCareAcknowledgement && route.request().postDataJSON().p_action === 'complete_queue_entry') {
+        loseCareAcknowledgement = false
+        const response = await route.fetch()
+        assert.ok(response.ok(), 'Grouped completion must commit before response loss')
+        return route.abort('failed')
+      }
+      return route.continue()
+    })
+    await page.getByRole('button', { name: 'Save and complete care', exact: true }).click()
+    if (kind === 'vaccination') {
+      await expect(page.getByRole('alert')).toBeVisible()
+      await page.getByRole('button', { name: 'Save and complete care', exact: true }).click()
+    }
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.unroute('**/rest/v1/rpc/portal_mutation')
+    assert.equal(balance(), 5 - count)
+    assert.equal(Number(sql(`select count(*) from private.preventive_dispenses where preventive_record_id='${parent.id}'`)), count)
+    await page.goto(app.origin + '/patients/' + patient.id + '?tab=vaccines')
+    const card = page.locator(`#preventive-${parent.id}`)
+    await expect(card).toContainText('Completed')
+    await card.getByRole('button', { name: kind === 'vaccination' ? 'Edit vaccination record' : 'Edit deworming', exact: true }).click()
+    await expect(page.getByLabel('Stock batch 1')).toBeDisabled()
+    await page.getByLabel('Dose 1', { exact: true }).fill('Corrected clinical details')
+    await page.getByRole('button', { name: 'Save record', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    assert.equal(balance(), 5 - count, 'Clinical edits must not consume stock again')
+  }
+  await careClient.auth.signOut()
+  console.log('PASS real grouped vaccines and single deworming: inventory selection, waiting/drafts, lost completion response/retry, stock receipts, completed locks, edits and reload')
 
   await openNewVisit(page, 'Grooming')
   await page.getByRole('button', { name: /Queue processing/ }).click()

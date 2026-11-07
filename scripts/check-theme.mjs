@@ -17,8 +17,11 @@ const errors = []
 const app = await browserServer(5198)
 
 async function scenario(mode = 'clinic') {
-  const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' })
+  const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', colorScheme: 'light' })
+  // Appearance contracts do not depend on the external font CDN being reachable.
+  await context.route('https://fonts.googleapis.com/**', (route) => route.fulfill({ contentType: 'text/css', body: '' }))
   const state = {
+    themeKeys: [], failThemeSave: false, failThemeRefresh: false,
     profile: { id: actor, clinic_id: 'clinic', full_name: 'Theme owner', role: 'owner', is_active: true },
     settings: { id: 'settings', clinic_id: 'clinic', clinic_name: 'Theme clinic', address: 'Test address', phone: '09171234567', timezone: 'Asia/Manila', brand_color: clinicThemes[0].color, onboarding_completed_at: '2026-11-01T00:00:00Z', onboarding_step: 1 },
   }
@@ -31,11 +34,21 @@ async function scenario(mode = 'clinic') {
     if (url.pathname === '/auth/v1/user') return reply(session().user)
     if (url.pathname === '/auth/v1/token') return reply(session())
     if (url.pathname === '/auth/v1/logout') return reply({})
+    if (url.pathname === '/rest/v1/rpc/portal_mutation') {
+      const { p_action, p_data, p_key } = route.request().postDataJSON()
+      if (p_action === 'set_clinic_theme') {
+        state.themeKeys.push(p_key)
+        if (state.failThemeSave) return reply({ message: 'Color save unavailable. Try again.' }, 503)
+        state.settings.brand_color = p_data.brandColor
+      }
+      return reply({ id: state.settings.id })
+    }
     if (url.pathname === '/rest/v1/rpc/owner_veterina_code') return reply({ code: 'VET-0123456789ABCDEF0123' })
     if (url.pathname === '/functions/v1/admin-staff') return reply({ accounts: [] })
     if (url.pathname === '/functions/v1/platform-admin') return reply({ serverNow: new Date().toISOString(), clinics: [], codes: [] })
     if (url.pathname === '/functions/v1/pet-photo') return reply({ enabled: false })
     if (url.pathname === '/functions/v1/travel-certificate') return reply({ status: 'unavailable' })
+    if (url.pathname === '/rest/v1/clinic_settings' && state.failThemeRefresh) return reply({ message: 'Refresh unavailable' }, 400)
     const raw = {
       profiles: ['pending', 'registration'].includes(mode) ? [] : [state.profile], clinic_settings: [state.settings],
       owners: [{ id: 'household', full_name: 'Theme household', phone: '09171234567', is_active: true }],
@@ -54,9 +67,55 @@ async function scenario(mode = 'clinic') {
 }
 
 const rootTheme = (page) => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--brand').trim())
+const tokenColor = (page, token) => page.evaluate((token) => {
+  const probe = document.createElement('span')
+  probe.style.color = `var(${token})`
+  document.body.append(probe)
+  const color = getComputedStyle(probe).color
+  probe.remove()
+  return color
+}, token)
+const checkBrandFill = async (locator, theme) => {
+  await expect.poll(() => locator.evaluate((element, color) => {
+    const style = getComputedStyle(element)
+    return style.backgroundColor === color || style.backgroundImage.includes(color)
+  }, rgb(theme.color))).toBe(true)
+}
 const checkTheme = async (page, theme) => {
   await expect.poll(() => rootTheme(page)).toBe(theme.color)
-  await expect(page.getByRole('button', { name: 'Install Veterina', exact: true })).toHaveCSS('background-color', rgb(theme.color))
+  await checkBrandFill(page.getByRole('button', { name: 'Install Veterina', exact: true }), theme)
+}
+
+const setMode = async (page, mode) => page.evaluate((mode) => {
+  localStorage.setItem('veterina-appearance', mode)
+  dispatchEvent(new StorageEvent('storage', { key: 'veterina-appearance' }))
+}, mode)
+const checkMode = async (page, mode) => {
+  await expect(page.locator('html')).toHaveAttribute('data-appearance', mode)
+  await expect(page.locator('html')).toHaveCSS('color-scheme', mode)
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', mode === 'dark' ? '#111b19' : '#f3f5f2')
+}
+const checkReadable = async (page) => {
+  const failures = await page.evaluate(() => {
+    const canvas = document.createElement('canvas').getContext('2d')
+    const rgba = (color) => { canvas.clearRect(0, 0, 1, 1); canvas.fillStyle = color; canvas.fillRect(0, 0, 1, 1); return [...canvas.getImageData(0, 0, 1, 1).data] }
+    const lum = (color) => color.slice(0, 3).map((v) => v / 255).map((v) => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0)
+    return [...document.querySelectorAll('.page-header p, .auth-description, .vt-section-heading > p:last-child, .public-certificate-message p, .appearance-option small, .clinic-theme-preview p')].filter((element) => element.getBoundingClientRect().height).flatMap((element) => {
+      let ancestor = element; let background; let gradient = false
+      while (ancestor) {
+        const style = getComputedStyle(ancestor)
+        if (style.backgroundImage !== 'none') gradient = true
+        const parsed = rgba(style.backgroundColor)
+        if (parsed[3] === 255) { background = parsed; break }
+        ancestor = ancestor.parentElement
+      }
+      if (!background || gradient) return []
+      const foreground = lum(rgba(getComputedStyle(element).color)); const back = lum(background)
+      const ratio = (Math.max(foreground, back) + .05) / (Math.min(foreground, back) + .05)
+      return ratio < 4.5 ? [`${element.className || element.tagName}: ${ratio.toFixed(2)}`] : []
+    })
+  })
+  assert.deepEqual(failures, [], `Unreadable text on ${page.url()}`)
 }
 
 async function checkHeroTextContrast(page, theme) {
@@ -84,7 +143,7 @@ try {
       await checkTheme(page, theme)
       await expect(page.getByRole('button', { name: 'Refresh clinic records', exact: true })).toHaveCount(0)
       const actions = page.locator('.spacious-content .button-primary:visible')
-      if (await actions.count()) await expect(actions.first()).toHaveCSS('background-color', rgb(theme.color))
+      if (await actions.count()) await checkBrandFill(actions.first(), theme)
       if (route === '/dashboard') {
         await expect(page.locator('.home-hero')).toHaveCSS('color', 'rgb(255, 255, 255)')
         assert.ok((await page.locator('.home-hero').evaluate((element) => getComputedStyle(element).backgroundImage)).includes(rgb(theme.color)), 'Hero gradient must use the selected clinic color')
@@ -147,7 +206,7 @@ try {
     await expect(page.getByRole('button', { name: /Queue processing/ })).toBeVisible()
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Install Veterina', exact: true }).click()
-    await expect(page.getByRole('dialog', { name: 'Install Veterina', exact: true }).getByRole('button', { name: 'Done', exact: true })).toHaveCSS('background-color', rgb(theme.color))
+    await checkBrandFill(page.getByRole('dialog', { name: 'Install Veterina', exact: true }).getByRole('button', { name: 'Done', exact: true }), theme)
     await page.keyboard.press('Escape')
     await page.getByRole('link', { name: 'Veterina home', exact: true }).click()
     await expect(page.locator('.home-hero')).toBeVisible()
@@ -162,7 +221,7 @@ try {
   await page.goto(app.origin + '/clinic-setup')
   await page.getByRole('button', { name: 'Save & continue', exact: true }).click()
   await page.getByRole('radio', { name: 'Orchid', exact: true }).check()
-  await expect(page.locator('.onboarding-card .button-primary').first()).toHaveCSS('background-color', rgb(clinicThemes[2].color))
+  await checkBrandFill(page.locator('.onboarding-card .button-primary').first(), clinicThemes[2])
   await checkTheme(page, clinicThemes[1])
   await page.goto(`${app.origin}/patients/${patient}`)
   for (const width of [320, 375]) {
@@ -187,25 +246,177 @@ try {
   await checkTheme(page, clinicThemes[3])
   // A public route reached without a document reload must also clear the clinic override.
   await page.evaluate(() => { history.pushState({}, '', '/'); dispatchEvent(new PopStateEvent('popstate')) })
-  await expect(page.locator('.landing')).toBeVisible()
+  await expect(page.locator('.vt-page')).toBeVisible()
   await checkTheme(page, clinicThemes[0])
   await context.close()
   console.log('PASS local onboarding preview, mobile layouts, sign-out, account switch and public-route theme cleanup')
+
+  const appearance = await scenario()
+  const display = appearance.page
+  await display.goto(app.origin + '/settings')
+  await display.getByRole('button', { name: 'Appearance', exact: true }).click()
+  await display.getByRole('radio', { name: /^System/ }).focus()
+  await display.keyboard.press('ArrowLeft')
+  await expect(display.getByRole('radio', { name: /^Dark/ })).toBeChecked()
+  await expect(display.locator('.appearance-option').filter({ has: display.getByRole('radio', { name: /^Dark/ }) })).toHaveCSS('outline-style', 'solid')
+  await display.getByRole('radio', { name: /^Dark/ }).check()
+  await checkMode(display, 'dark')
+  await checkReadable(display)
+  await display.reload()
+  await checkMode(display, 'dark')
+  await display.getByRole('button', { name: 'Appearance', exact: true }).click()
+  await expect(display.getByRole('radio', { name: /^Dark/ })).toBeChecked()
+  const sibling = await appearance.context.newPage()
+  await sibling.goto(app.origin + '/')
+  await checkMode(sibling, 'dark')
+  await display.getByRole('radio', { name: /^Light/ }).check()
+  await checkMode(sibling, 'light')
+  await display.getByRole('radio', { name: /^System/ }).check()
+  await display.emulateMedia({ colorScheme: 'dark' })
+  await checkMode(display, 'dark')
+  await display.emulateMedia({ colorScheme: 'light' })
+  await checkMode(display, 'light')
+  await display.getByRole('radio', { name: /^Dark/ }).check()
+  await display.emulateMedia({ colorScheme: 'light' })
+  await checkMode(display, 'dark')
+  await setMode(display, 'invalid-mode')
+  await checkMode(display, 'light')
+  await display.getByRole('radio', { name: /^Dark/ }).check()
+  await sibling.close()
+
+  // The sample changes locally; failed saves retain selection and retry key.
+  appearance.state.failThemeSave = true
+  await display.getByRole('radio', { name: 'Orchid', exact: true }).check()
+  await checkTheme(display, clinicThemes[0])
+  await checkBrandFill(display.locator('.clinic-theme-preview-button'), clinicThemes[2])
+  await display.getByRole('button', { name: 'Save clinic color', exact: true }).click()
+  await expect(display.getByRole('alert')).toContainText('Try again')
+  await expect(display.getByRole('radio', { name: 'Orchid', exact: true })).toBeChecked()
+  await checkTheme(display, clinicThemes[0])
+  appearance.state.failThemeSave = false
+  await display.getByRole('button', { name: 'Save clinic color', exact: true }).click()
+  await expect(display.getByRole('status')).toContainText('Clinic color saved')
+  assert.equal(appearance.state.themeKeys[0], appearance.state.themeKeys[1], 'Failed save must reuse its retry key')
+  await checkTheme(display, clinicThemes[2])
+  await display.reload()
+  await checkTheme(display, clinicThemes[2])
+  await display.getByRole('button', { name: 'Appearance', exact: true }).click()
+  await display.getByRole('radio', { name: 'Rose', exact: true }).check()
+  appearance.state.failThemeRefresh = true
+  await display.getByRole('button', { name: 'Save clinic color', exact: true }).click()
+  await expect(display.locator('.appearance-settings [role="alert"]')).toContainText('saved, but could not be refreshed')
+  await expect(display.getByRole('radio', { name: 'Rose', exact: true })).toBeChecked()
+  await checkTheme(display, clinicThemes[2])
+  appearance.state.failThemeRefresh = false
+  await display.getByRole('button', { name: 'Retry refresh', exact: true }).click()
+  await checkTheme(display, clinicThemes[3])
+  await expect(display.locator('.appearance-settings [role="alert"]')).toHaveCount(0)
+
+  for (const theme of clinicThemes) {
+    appearance.state.settings.brand_color = theme.color
+    for (const route of (clinicThemes.indexOf(theme) < 2 ? routes : ['/dashboard', `/patients/${patient}`, '/settings'])) {
+      await display.goto(app.origin + route)
+      await expect(display.locator('.workspace-header')).toBeVisible()
+      await checkMode(display, 'dark')
+      await checkTheme(display, theme)
+      await checkReadable(display)
+      await expect(display.locator('.spacious-shell')).not.toHaveCSS('background-color', 'rgb(243, 245, 242)')
+      if (route === `/patients/${patient}`) {
+        await display.getByRole('button', { name: 'Add Record', exact: true }).click()
+        await expect(display.getByRole('dialog')).toHaveCSS('background-color', 'rgb(27, 41, 36)')
+        await display.keyboard.press('Escape')
+        await display.getByRole('button', { name: 'Weight & vitals', exact: true }).click()
+        await expect(display.locator('.recharts-area-curve')).toHaveCSS('stroke', await tokenColor(display, '--brand-ink'))
+      }
+      if (route === '/settings') {
+        await display.getByRole('button', { name: 'Appearance', exact: true }).click()
+        await checkReadable(display)
+        for (const width of [320, 375, 1440]) {
+          await display.setViewportSize({ width, height: 1000 })
+          assert.ok(await display.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Appearance overflow at ${width}px`)
+          if (theme === clinicThemes[0]) await display.screenshot({ path: `test-artifacts.local/appearance-dark-${width}.png`, fullPage: true })
+        }
+      }
+    }
+  }
+  await display.emulateMedia({ media: 'print' })
+  await expect(display.locator('html')).toHaveCSS('color-scheme', 'light')
+  await expect(display.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await display.emulateMedia({ media: 'screen' })
+  appearance.state.settings.onboarding_completed_at = null
+  await display.goto(app.origin + '/dashboard')
+  await expect(display.locator('.clinic-onboarding')).toBeVisible()
+  await checkMode(display, 'dark')
+  await expect(display.locator('.onboarding-card')).toHaveCSS('background-color', 'rgb(27, 41, 36)')
+  appearance.state.settings.onboarding_completed_at = '2026-11-01T00:00:00Z'
+  appearance.state.profile.role = 'clinical_staff'
+  await display.goto(app.origin + '/settings')
+  await display.getByRole('button', { name: 'Appearance', exact: true }).click()
+  await expect(display.getByRole('radio', { name: /^Dark/ })).toBeVisible()
+  await expect(display.getByRole('heading', { name: 'Clinic color theme', exact: true })).toHaveCount(0)
+  await expect(display.getByRole('button', { name: 'Staff accounts', exact: true })).toHaveCount(0)
+  await display.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await expect(display.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible()
+  await checkMode(display, 'dark')
+  await checkTheme(display, clinicThemes[0])
+  await appearance.context.close()
+  console.log('PASS display controls, persistence, OS changes, cross-tab sync, color preview/save/retry, dark clinic routes, six palettes, mobile, print and staff permissions')
 
   for (const [mode, paths] of [
     ['public', ['/', '/sign-in', '/create-account', '/forgot-password', '/reset-password', '/admin/sign-in', '/travel-certificate']],
     ['pending', ['/access-pending']], ['registration', ['/complete-account']],
     ['clinic', ['/subscription']], ['platform', ['/admin']],
   ]) {
-    const scenarioState = await scenario(mode)
-    for (const route of paths) {
-      await scenarioState.page.goto(app.origin + route)
-      await expect(scenarioState.page.locator('h1, h2').first()).toBeVisible()
-      await expect(scenarioState.page).toHaveURL(app.origin + route)
-      await checkTheme(scenarioState.page, clinicThemes[0])
+    for (const appearanceMode of ['light', 'dark']) {
+      const scenarioState = await scenario(mode)
+      await scenarioState.context.addInitScript((mode) => localStorage.setItem('veterina-appearance', mode), appearanceMode)
+      for (const route of paths) {
+        await scenarioState.page.goto(app.origin + route)
+        await expect(scenarioState.page.locator('h1, h2').first()).toBeVisible()
+        await expect(scenarioState.page).toHaveURL(app.origin + route)
+        await checkTheme(scenarioState.page, clinicThemes[0])
+        await checkMode(scenarioState.page, appearanceMode)
+        await checkReadable(scenarioState.page)
+      }
+      await scenarioState.context.close()
+      console.log(`PASS ${mode} pages: ${appearanceMode}`)
     }
-    await scenarioState.context.close()
   }
+  for (const blockedStorage of [false, true]) {
+    const fallback = await scenario('public')
+    await fallback.page.emulateMedia({ colorScheme: 'dark' })
+    await fallback.context.addInitScript((blocked) => {
+      if (blocked) {
+        Storage.prototype.getItem = () => { throw new Error('Storage unavailable') }
+        Storage.prototype.setItem = () => { throw new Error('Storage unavailable') }
+      } else localStorage.setItem('veterina-appearance', 'invalid-mode')
+    }, blockedStorage)
+    await fallback.page.goto(app.origin + '/')
+    await expect(fallback.page.locator('.vt-page')).toBeVisible()
+    await checkMode(fallback.page, 'dark')
+    await fallback.context.close()
+  }
+  const unavailable = await scenario()
+  await unavailable.context.addInitScript(() => {
+    const read = Storage.prototype.getItem; const write = Storage.prototype.setItem
+    Storage.prototype.getItem = function (key) { if (key === 'veterina-appearance') throw new Error('Storage unavailable'); return read.call(this, key) }
+    Storage.prototype.setItem = function (key, value) { if (key === 'veterina-appearance') throw new Error('Storage unavailable'); return write.call(this, key, value) }
+  })
+  await unavailable.page.goto(app.origin + '/settings')
+  await unavailable.page.getByRole('button', { name: 'Appearance', exact: true }).click()
+  await unavailable.page.getByRole('radio', { name: /^Dark/ }).check()
+  await checkMode(unavailable.page, 'dark')
+  await unavailable.page.getByRole('link', { name: 'Veterina home', exact: true }).click()
+  await expect(unavailable.page.locator('.home-hero')).toBeVisible()
+  await checkMode(unavailable.page, 'dark')
+  await unavailable.context.close()
+  const bootstrap = await scenario('public')
+  await bootstrap.context.route((url) => url.pathname === '/src/main.jsx', (route) => route.fulfill({ contentType: 'application/javascript', body: 'export {}' }))
+  await bootstrap.page.emulateMedia({ colorScheme: 'dark' })
+  await bootstrap.page.goto(app.origin + '/')
+  await expect(bootstrap.page.locator('#root')).toBeEmpty()
+  await checkMode(bootstrap.page, 'dark')
+  await bootstrap.context.close()
   assert.deepEqual(errors, [])
-  console.log('PASS standalone public/auth/account/subscription/platform pages use default primary; no browser errors')
-} finally { await app.close() }
+  console.log('PASS public/auth/account/subscription/platform pages in both modes, invalid/unavailable storage, in-memory selection and pre-React appearance; no browser errors')
+} catch (error) { console.error('Browser errors:', errors); for(const context of app.browser.contexts()) for(const page of context.pages()) console.error('Failed page', page.url(), (await page.locator('body').innerText().catch(()=>'' )).slice(0,1200)); throw error } finally { await app.close() }

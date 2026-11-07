@@ -44,7 +44,9 @@ import { useHashTarget } from '../lib/useHashTarget'
 import { formatPatientAge } from '../utils/clinicRules'
 import { clinicalHistoryParams, combinedClinicalHistory, filterClinicalHistory, normalizePatientHistoryParams } from '../lib/clinicalHistory'
 import { dateInClinic, isClinicDate } from '../lib/dailyWorkflow'
-import { recordHistoryFields, vaccinationHistoryRecords } from '../lib/patientRecordHistory'
+import { recordHistoryFields } from '../lib/patientRecordHistory'
+import { preventiveHistoryRecords } from '../lib/preventiveCare'
+import PreventiveCareCard from '../components/PreventiveCareCard'
 
 function CareStatus({ record }) {
   if (record.recordingPurpose === 'record_only') return <Badge>Record only</Badge>
@@ -62,7 +64,7 @@ export default function PetDetail() {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile } = useAuth()
-  const { getPet, getOwner, visits, vaccinations, reminders, alerts, profiles, settings, queueEntries, serviceRecords: historicalServices, today, timezone } = useClinicData()
+  const { getPet, getOwner, visits, preventiveCare, reminders, alerts, profiles, settings, queueEntries, serviceRecords: historicalServices, today, timezone } = useClinicData()
   const [modal, setModal] = useState(null)
   const normalizedParams = useMemo(() => normalizePatientHistoryParams(searchParams), [searchParams])
   const activeParams = normalizedParams || searchParams
@@ -94,7 +96,7 @@ export default function PetDetail() {
   const owner = getOwner(pet?.ownerId)
   const petVisits = useMemo(() => visits.filter((item) => item.petId === petId).sort((a, b) => b.visitedAt.localeCompare(a.visitedAt)), [visits, petId])
   const maintenance = [...queueEntries.filter((entry) => entry.petId === petId && entry.category === 'maintenance'), ...historicalServices.filter((entry) => entry.petId === petId)]
-  const historyRecords = combinedClinicalHistory(petVisits, maintenance)
+  const historyRecords = combinedClinicalHistory(petVisits, maintenance, preventiveCare.filter((record) => record.petId === petId))
   const historyFilters = Object.fromEntries(Object.entries(clinicalHistoryParams).map(([field, param]) => [field, activeParams.get(param) || '']))
   const filteredVisits = filterClinicalHistory(historyRecords, historyFilters, timezone)
   const historyView = !targetId && searchParams.get('historyView') === 'calendar' ? 'calendar' : 'cards'
@@ -136,9 +138,9 @@ export default function PetDetail() {
     Object.values(clinicalHistoryParams).forEach((param) => next.delete(param))
     setSearchParams(next, { replace: true, preventScrollReset: true })
   }
-  const petVaccinations = vaccinations.filter((item) => item.petId === petId)
-  const vaccineRecords = vaccinationHistoryRecords(petVaccinations, profiles, timezone)
-  const vaccineFields = recordHistoryFields(vaccineRecords, [['vaccine', 'Vaccine', 'All vaccines'], ['brand', 'Brand', 'All brands'], ['status', 'Care status', 'All care statuses'], ['due', 'Next dose status', 'All next dose statuses'], ['veterinarian', 'Veterinarian', 'All veterinarians']])
+  const petPreventive = preventiveCare.filter((item) => item.petId === petId)
+  const vaccineRecords = preventiveHistoryRecords(petPreventive)
+  const vaccineFields = recordHistoryFields(vaccineRecords, [['kind', 'Record type', 'Vaccinations and Deworming'], ['status', 'Care status', 'All care statuses'], ['due', 'Next dose status', 'All next dose statuses'], ['veterinarian', 'Veterinarian', 'All veterinarians']])
   const petReminders = reminders.filter((item) => item.petId === petId && !['Completed', 'Cancelled'].includes(item.status))
 
   if (!pet) return <div className="page"><Link to="/patients" className="text-link"><ArrowLeft size={17} weight="bold" /> Back to patients</Link><div className="not-found"><h1>Patient not found</h1></div></div>
@@ -174,7 +176,7 @@ export default function PetDetail() {
       <div className="pet-summary-grid">
         <div><Scales size={19} weight="duotone" /><span>Current weight<strong>{pet.latestWeight ? `${pet.latestWeight} kg` : 'Not recorded'}</strong></span></div>
         <div><Pulse size={19} weight="duotone" /><span>Last visit<strong>{petVisits[0] ? format(parseISO(petVisits[0].visitedAt), 'd MMM yyyy') : 'No visits'}</strong></span></div>
-        <div><Syringe size={19} weight="duotone" /><span>Vaccinations<strong>{petVaccinations.length} recorded</strong></span></div>
+        <div><Syringe size={19} weight="duotone" /><span>Vaccinations and Deworming<strong>{petPreventive.filter((record) => record.kind === 'vaccination').length} vaccination records / {petPreventive.filter((record) => record.kind === 'deworming').length} deworming records</strong></span></div>
         <div><CalendarPlus size={19} weight="duotone" /><span>Follow-up tasks<strong><Link className="text-link" to={`/appointments?view=tasks&taskPet=${encodeURIComponent(pet.id)}`}>{petReminders.length} open</Link></strong></span></div>
       </div>
 
@@ -185,7 +187,7 @@ export default function PetDetail() {
             onArrive={(dialog) => setModal({ type: 'schedule-arrival', dialog })} />
           <div className="tabs" role="tablist">
             <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>Clinical history</button>
-            <button className={tab === 'vaccines' ? 'active' : ''} onClick={() => setTab('vaccines')}>Vaccinations</button>
+            <button className={tab === 'vaccines' ? 'active' : ''} onClick={() => setTab('vaccines')}>Vaccinations and Deworming</button>
             <button className={tab === 'growth' ? 'active' : ''} onClick={() => setTab('growth')}>Weight & vitals</button>
           </div>
 
@@ -198,6 +200,7 @@ export default function PetDetail() {
             </>}
             <div className="clinical-timeline">
               {visibleVisits.map((visit) => {
+                if (visit.historyKind === 'preventive') return <PreventiveCareCard key={visit.historyKey} record={visit.sourceRecord} onEdit={(record) => setModal({ type: 'vaccine', record })} />
                 if (visit.historyKind === 'service') return <ServiceHistoryCard key={visit.historyKey} record={visit.sourceRecord} timezone={timezone} onEdit={(record) => setModal({ type: 'historical-service', record })} />
                 const activeQueue = ['Waiting', 'In progress'].includes(visit.careStatus) ? visit.careQueue : null
                 return (
@@ -243,22 +246,18 @@ export default function PetDetail() {
           )}
 
           {tab === 'vaccines' && (
-            <SectionCard title="Vaccination history" description="Vaccine records, brands, care status and next due dates" action={<button className="button button-primary small-button" onClick={() => setModal({ type: 'vaccine' })}><Plus size={16} weight="bold" /> Add vaccine</button>}>
-              <PatientRecordBrowser records={vaccineRecords} scope="vaccine" label="Vaccinations" itemName="vaccination" itemPlural="vaccinations" fields={vaccineFields} dateLabel="Vaccination date" placeholder="Search vaccine, brand, dose or lot…" emptyTitle="No vaccinations recorded" emptyDescription="Saved vaccination records will appear here." previewKind="vaccination">
-              {(visible) =>
-              <div className="vaccine-list">
-                {visible.map((vaccine) => (
-                  <div className="vaccine-row" key={vaccine.id} id={`vaccination-${vaccine.id}`}>
-                    <div className="vaccine-icon"><Syringe size={20} weight="duotone" /></div>
-                    <div><strong>{vaccine.vaccine}</strong><span>{['Recorded', 'Completed'].includes(vaccine.careStatus) ? 'Given' : 'Recorded date'} {format(parseISO(vaccine.administeredAt), 'd MMM yyyy')} · {vaccine.dose || 'Not recorded'}</span><CareStatus record={vaccine} /></div>
-                    <div><span>Brand</span><strong>{vaccine.brand || 'Not recorded'}</strong>{vaccine.lotNumber && <small>Historical lot: {vaccine.lotNumber}</small>}</div>
-                    <div><span>{vaccine.recordingPurpose === 'record_only' ? 'Historical next due' : 'Next due'}</span><strong>{vaccine.nextDueAt ? format(parseISO(vaccine.nextDueAt), 'd MMM yyyy') : 'Not scheduled'}</strong><Badge tone={vaccine.nextDoseStatus === 'Overdue' ? 'danger' : vaccine.nextDoseStatus === 'Due today' ? 'warning' : vaccine.nextDoseStatus === 'Up to date' ? 'success' : 'neutral'}>{vaccine.nextDoseStatus}</Badge></div>
-                    <div className="record-actions">{['Waiting', 'In progress'].includes(vaccine.careStatus) ? <Link className="button button-secondary small-button" to="/queue">Open queued vaccination</Link> : <button className="button button-secondary small-button" onClick={() => setModal({ type: 'vaccine', record: vaccine })}>Edit vaccine</button>}{profile.role === 'owner' && <button className="button button-secondary small-button danger-text" onClick={() => setModal({ type: 'delete', entity: 'vaccination', record: vaccine })}>Delete vaccine</button>}</div>
-                  </div>
-                ))}
-              </div>}
+            <section className="preventive-section">
+              <header className="section-header preventive-section-header">
+                <div className="preventive-section-heading">
+                  <span className="preventive-section-icon" aria-hidden="true"><ShieldCheck size={26} weight="duotone" /></span>
+                  <div><h2>Vaccinations and Deworming</h2><p>Vaccination records, deworming treatments, and next due dates.</p></div>
+                </div>
+                <button className="button button-primary preventive-add-button" onClick={() => setModal({ type: 'vaccine' })}><Plus size={18} weight="bold" /> Add vaccination or deworming</button>
+              </header>
+              <PatientRecordBrowser records={vaccineRecords} scope="vaccine" label="Vaccinations and Deworming" itemName="record" itemPlural="records" fields={vaccineFields} dateLabel="Administration date" placeholder="Search product, brand, dose or lot" emptyTitle="No vaccinations or deworming recorded" emptyDescription="Saved vaccination and deworming records will appear here." previewKind="preventive">
+                {(visible) => visible.map((record) => <PreventiveCareCard key={record.id} record={record} onEdit={(record) => setModal({ type: 'vaccine', record })} onDelete={profile.role === 'owner' ? (record) => setModal({ type: 'delete', entity: 'preventive', record }) : undefined} />)}
               </PatientRecordBrowser>
-            </SectionCard>
+            </section>
           )}
 
           {tab === 'growth' && <PatientVitals pet={pet} visits={petVisits} timezone={timezone} />}
@@ -297,7 +296,7 @@ export default function PetDetail() {
       {modal?.type === 'queue-care' && <QueueDialog modal={{ type: 'care', entry: modal.entry }} onClose={() => setModal(null)} />}
       {modal?.type === 'appointment' && <AppointmentEditor record={modal.record} onClose={() => setModal(null)} />}
       {modal?.type === 'schedule-arrival' && <QueueDialog modal={modal.dialog} onSaved={(saved) => setCareReceipt({ ...saved, petId: pet.id, label: 'Follow-up checkup' })} onClose={() => setModal(null)} />}
-      {modal?.type === 'vaccine' && <VaccineModal pet={pet} record={modal.record} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Vaccination' }) }} onClose={() => setModal(null)} />}
+      {modal?.type === 'vaccine' && <VaccineModal pet={pet} record={modal.record} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Vaccinations and Deworming' }) }} onClose={() => setModal(null)} />}
       {modal?.type === 'owner' && <OwnerEditor record={owner} onClose={() => setModal(null)} />}
       {modal?.type === 'pet' && <PetEditor record={pet} onClose={() => setModal(null)} />}
       {modal?.type === 'prescription' && <PrescriptionEditor pet={pet} record={modal.record} onClose={() => setModal(null)} />}

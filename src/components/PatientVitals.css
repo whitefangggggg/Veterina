@@ -4,12 +4,12 @@
 .patient-baseline-weight { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 14px 20px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink); }
 .patient-baseline-weight span { flex-basis: 100%; color: var(--muted); font-size: 12px; }
 .patient-vitals-scroll { max-width: 100%; overflow-x: auto; border-top: 1px solid var(--line); }
-.patient-vitals-scroll:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.patient-vitals-scroll:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: -2px; }
 .patient-vitals table { width: 100%; min-width: 700px; border-collapse: collapse; text-align: left; font-size: 12px; }
 .patient-vitals th, .patient-vitals td { padding: 14px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .patient-vitals thead th { color: var(--muted); background: var(--surface-soft); font-weight: 650; }
 .patient-vitals tbody th { font-weight: 500; }
-.patient-vitals a { color: var(--brand-dark); text-decoration: underline; text-underline-offset: 3px; }
-.patient-vitals a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.patient-vitals a { color: var(--brand-strong-ink); text-decoration: underline; text-underline-offset: 3px; }
+.patient-vitals a:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 3px; }
 .patient-vitals caption { text-align: left; padding: 12px 16px; color: var(--muted); font-size: 12px; }
 @media (max-width: 480px) { .patient-weight-chart { padding-inline: 0; } }

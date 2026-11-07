@@ -4,7 +4,7 @@
   border-bottom: 1px solid var(--line);
 }
 .veterinarian-title { display: flex; align-items: center; gap: 12px; }
-.veterinarian-title > span { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border: 1px solid color-mix(in srgb, var(--brand) 15%, var(--line)); border-radius: 12px; color: var(--brand); background: var(--brand-soft); }
+.veterinarian-title > span { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border: 1px solid color-mix(in srgb, var(--brand) 15%, var(--line)); border-radius: 12px; color: var(--brand-ink); background: var(--brand-soft); }
 .veterinarian-details-settings > .section-header h2 { font-size: 20px; }
 .veterinarian-details-settings > .section-header p { max-width: 56ch; margin-top: 10px; line-height: 1.6; }
 .veterinarian-details-settings > .section-header > .button { flex: none; min-height: 44px; }
@@ -22,7 +22,7 @@
 .veterinarian-profile { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .veterinarian-profile-header { display: flex; align-items: flex-start; gap: 13px; padding: 22px 22px 0; }
 .veterinarian-profile-header > div { min-width: 0; }
-.veterinarian-avatar { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 50%; color: var(--brand); background: var(--brand-soft); font-size: 14px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.veterinarian-avatar { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 50%; color: var(--brand-ink); background: var(--brand-soft); font-size: 14px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 .veterinarian-avatar-neutral { color: var(--muted); background: var(--surface-soft); }
 .veterinarian-profile-header h3 { margin: 0 0 9px; color: var(--ink); font-size: 16px; line-height: 1.4; font-weight: 650; overflow-wrap: anywhere; }
 .veterinarian-badges { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -39,9 +39,9 @@
 .veterinarian-profile-footer > span { color: var(--muted); font-size: 12px; }
 .veterinarian-profile-footer .button { min-height: 40px; padding-inline: 13px; }
 .veterinarian-directory-note { display: flex; align-items: flex-start; gap: 9px; margin-top: 22px; padding: 14px 16px; border-radius: 10px; color: var(--muted); background: var(--surface-soft); }
-.veterinarian-directory-note > svg { flex: none; margin-top: 1px; color: var(--brand); }
+.veterinarian-directory-note > svg { flex: none; margin-top: 1px; color: var(--brand-ink); }
 .veterinarian-directory-note p { margin: 0; font-size: 12px; line-height: 1.7; }
-.veterinarian-directory-note button { border: 0; padding: 0; color: var(--brand); background: transparent; font: inherit; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.veterinarian-directory-note button { border: 0; padding: 0; color: var(--brand-ink); background: transparent; font: inherit; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .veterinarian-settings-body > .empty-state { padding: 44px 20px; border: 1px dashed var(--line); border-radius: 12px; }
 .veterinarian-settings-body > .empty-state .button { margin-top: 16px; }
 @media (max-width: 1050px) {

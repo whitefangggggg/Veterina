@@ -74,7 +74,7 @@ export function DeleteRecordDialog({ entity, record, onClose, onDeleted }) {
   return <RecordEditor title={`Permanently delete ${record.name || record.fullName || record.title || 'record'}?`}
     description="This permanently removes the record and its linked history. This action is logged and cannot be undone."
     fields={[{ name: 'reason', label: 'Reason for deletion', type: 'textarea', required: true, span: true }]}
-    onSave={async ({ reason }) => { await execute('delete_record', { entity, id: record.id, reason }); onDeleted?.() }}
+    onSave={async ({ reason }) => { await execute(entity === 'preventive' ? 'delete_preventive_care' : 'delete_record', { entity, id: record.id, reason }); onDeleted?.() }}
     onClose={onClose} submitLabel="Permanently delete" />
 }
 

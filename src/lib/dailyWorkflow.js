@@ -49,7 +49,11 @@ export function buildPatientTimeline(data, patientId) {
   for (const service of data.serviceRecords || []) {
     if (service.petId === patientId) add('Service', service.id, service.arrivedAt, service.service, 'Record only', service.serviceNotes, patientSource(patientId, 'history', `service-${service.id}`))
   }
+  for (const record of data.preventiveCare || []) {
+    if (record.petId === patientId) add(record.kind === 'deworming' ? 'Deworming' : 'Vaccination', record.id, record.administeredAt, record.vaccine, record.recordingPurpose === 'record_only' ? 'Record only' : record.careStatus, record.items.map((item) => item.vaccine).join(', '), patientSource(patientId, 'vaccines', `preventive-${record.id}`))
+  }
   for (const vaccine of data.vaccinations || []) {
+    if (data.preventiveCare?.some((record) => record.items.some((item) => item.id === vaccine.id))) continue
     if (vaccine.petId === patientId) add('Vaccination', vaccine.id, vaccine.administeredAt, vaccine.vaccine, vaccine.recordingPurpose === 'record_only' ? 'Record only' : vaccine.careStatus || 'Recorded', [vaccine.brand, vaccine.nextDueAt ? `Next dose: ${vaccine.nextDueAt}` : ''].filter(Boolean).join(' · '), patientSource(patientId, 'vaccines', `vaccination-${vaccine.id}`))
   }
   for (const reminder of data.reminders || []) {

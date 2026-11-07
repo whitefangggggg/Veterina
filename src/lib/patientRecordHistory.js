@@ -47,7 +47,7 @@ const eventTime = (value, timezone) => !value || isClinicDate(value) || !dateInC
 export function clinicalCalendarEntries(visits, timezone) {
   return visits.map((visit) => ({
     id: visit.historyKey || visit.id, date: dateInClinic(visit.visitedAt, timezone), time: eventTime(visit.visitedAt, timezone),
-    type: visit.type || 'Checkup', title: visit.historyKind === 'service' ? visit.serviceNotes || statusName(visit.status) : visit.diagnosis || visit.complaint || 'Checkup', color: visit.cardColor,
+    type: visit.type || 'Checkup', title: visit.historyKind === 'preventive' ? visit.vaccine : visit.historyKind === 'service' ? visit.serviceNotes || statusName(visit.status) : visit.diagnosis || visit.complaint || 'Checkup', color: visit.cardColor,
     timestamp: Date.parse(visit.visitedAt) || 0,
   }))
 }
@@ -56,7 +56,7 @@ export function patientCalendarEntries(records, kind, timezone) {
   return records.map(({ id, date, record }) => {
     const at = kind === 'timeline' ? record.at : kind === 'service' ? record.arrivedAt : record.administeredAt
     const type = kind === 'timeline' ? record.visitType || (record.kind === 'Checkup' ? record.title : record.kind)
-      : kind === 'service' ? record.service : 'Vaccination'
+      : kind === 'service' ? record.service : kind === 'preventive' ? (record.kind === 'deworming' ? 'Deworming' : 'Vaccination') : 'Vaccination'
     const title = kind === 'timeline' ? [record.kind !== type && record.kind !== 'Checkup' ? record.kind : '', record.detail || record.title].filter(Boolean).join(' · ')
       : kind === 'service' ? record.serviceNotes || statusName(record.status) : record.vaccine
     return { id, date, type, title, time: eventTime(at, timezone), timestamp: isClinicDate(at) ? 0 : Date.parse(at) || 0 }

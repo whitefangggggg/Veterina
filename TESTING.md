@@ -1,5 +1,69 @@
 # Testing Veterina
 
+Patients use **Vaccinations and Deworming**. A vaccination record contains one
+or more vaccine items; a deworming record contains exactly one administration.
+Live items require active Vaccines/Medicine inventory, an available batch and a
+stock quantity separate from clinical dose. Waiting records and drafts do not
+deduct stock. Completion consumes every item atomically, and completed-record
+edits consume only newly added vaccines. Consumed products/batches/quantities
+and their records cannot be removed; corrections go through Inventory.
+Historical records accept manual details and create no operational effects.
+
+Existing vaccine IDs, reminders and certificate references remain intact under
+one-item parent records. Legacy rows are exempt from retroactive stock deduction.
+The original single-vaccine APIs retain their receipt namespaces and child-ID
+responses, and reject edits/deletion that would overwrite a multi-vaccine group.
+Individual vaccine evidence remains available to travel certificates; deworming
+is excluded. Due-date exports include both types and their record identifiers.
+Printed histories group administrations and use an explicit white background.
+
+Development (`yerrtkosxksacqxznrhk`) has migrations
+`20261107043221_preventive_care_records.sql` and
+`20261107043602_preventive_care_explicit_grants.sql`. Apply both before releasing
+the frontend in another environment. Hosted verification preserved all 15 vaccine
+rows and two issued certificates, with matching clinical, certificate, stock and
+settings fingerprints. Backfilled queue links and stock exemptions were checked.
+Browser writes/private helper access are denied; tenant RLS is enabled and the
+security advisor baseline is unchanged.
+
+`20261107043603_preventive_care_service_role_read.sql` grants the trusted
+server-side workflow read access to the grouped parent and its private stock
+ledger. Apply it with the preceding migrations before deploying this frontend.
+
+`test:preventive-care` (also available through `test:historical-vaccinations`)
+covers repeatable vaccine rows, single-product deworming, historical editing,
+inventory categories, drafts, retries, completed-item locks, legacy deep links,
+search/type filters, calendar previews and mobile layouts in both appearance
+modes. `test:preventive-stock` uses actual concurrent PostgreSQL transactions to
+check overselling and simultaneous lost-response retries. `preventive_care.sql`
+adds atomic stock failures, repeated batch selections, fractional units, appends,
+permissions, cancellation/deletion, reminders, reports and legacy adapters.
+The real `test:database` workflow also exercises both live types through Auth,
+PostgREST and the browser, including a deliberately lost completion response.
+
+Settings > Appearance is available to every approved staff member. Light, Dark,
+and System apply across clinic, public, authentication, account and platform
+pages. The preference is browser-local (`veterina-appearance`), defaults to System,
+syncs between tabs, and stays usable in memory when storage is unavailable.
+The document head applies the resolved mode before React loads. Print and
+standalone prescription/certificate exports retain white paper backgrounds.
+
+Owners can preview and save the existing six clinic palettes in Appearance.
+`portal_mutation('set_clinic_theme', { brandColor }, retryKey)` updates only the
+active clinic's `brand_color`, using the existing audit and retry mechanisms.
+Migration `20261107025039_clinic_appearance_theme.sql` is applied to Development
+(`yerrtkosxksacqxznrhk`); the settings fingerprint and advisor baseline were
+unchanged. Apply this migration before releasing the frontend elsewhere.
+
+`test:theme` covers modes, OS changes, reloads, cross-tab sync, preview/save/retry,
+retained selections and recovery when a saved color cannot be refreshed,
+staff permissions, route/palette coverage, mobile layouts, keyboard focus,
+contrast, unavailable storage and pre-React initialization. Appearance screenshots
+are saved under ignored `test-artifacts.local/appearance-dark-*.png`.
+`supabase/tests/clinic_appearance_theme.sql` rolls back its fixtures and checks
+all six colors, owner/staff/anonymous/inactive/expired boundaries, clinic
+isolation, unchanged settings/credentials and audited idempotent retries.
+
 Clinic and veterinarian settings are separated. Settings > Clinic profile updates
 only clinic identity/preferences. Settings > Veterinarian Details lists approved
 accounts (including inactive ones), veterinarian designation, and per-person name,

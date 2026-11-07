@@ -22,7 +22,7 @@ values(current_setting('queue_test.pet')::uuid,(select id from public.service_ty
   clock_timestamp()+interval '1 second',clock_timestamp()+interval '2 seconds','pending',current_setting('queue_test.owner')::uuid,current_setting('queue_test.owner')::uuid);
 select set_config('queue_test.appointment',(select id::text from public.appointments where created_by=current_setting('queue_test.owner')::uuid),true);
 insert into public.appointments(pet_id,service_type_id,starts_at,ends_at,status,veterinarian_id,created_by)
-values(current_setting('queue_test.pet')::uuid,(select id from public.service_types where name='Vaccination'),
+values(current_setting('queue_test.pet')::uuid,(select id from public.service_types where name='Vaccinations and Deworming'),
   clock_timestamp()+interval '3 seconds',clock_timestamp()+interval '4 seconds','confirmed',current_setting('queue_test.staff')::uuid,current_setting('queue_test.staff')::uuid);
 select set_config('queue_test.cancel_appointment',(select id::text from public.appointments where created_by=current_setting('queue_test.staff')::uuid),true);
 -- Exercise a clinic-midnight boundary and deletion without changing wall time.
@@ -38,7 +38,7 @@ begin
   returning id,queue_number into first_id,first_ticket;
   if (select queue_date from public.queue_entries where id=first_id)<>date '2098-12-31' then raise exception 'TEST: ticket date did not use clinic timezone'; end if;
   insert into public.queue_entries(pet_id,category,service_name,source,status,arrived_at,created_by)
-  values(current_setting('queue_test.pet')::uuid,'vaccination','Vaccination','walk_in','cancelled',
+  values(current_setting('queue_test.pet')::uuid,'vaccination','Vaccinations and Deworming','walk_in','cancelled',
     timestamp '2099-01-01 00:00:00' at time zone clinic_zone,current_setting('queue_test.owner')::uuid)
   returning id,queue_number into second_id,second_ticket;
   if first_ticket<>1 or second_ticket<>1 or (select queue_date from public.queue_entries where id=second_id)<>date '2099-01-01' then raise exception 'TEST: daily ticket reset'; end if;
@@ -62,6 +62,8 @@ begin
 end $$;
 insert into public.inventory_items(name,brand,category,unit,created_by) values('Queue vaccine','Queue Brand','Vaccines','dose',current_setting('queue_test.owner')::uuid);
 select set_config('queue_test.vaccine_item',(select id::text from public.inventory_items where created_by=current_setting('queue_test.owner')::uuid),true);
+select public.portal_mutation('create_batch',jsonb_build_object('itemId',current_setting('queue_test.vaccine_item'),'lotNumber','QUEUE-STOCK'),gen_random_uuid());
+select public.portal_mutation('record_inventory_movement',jsonb_build_object('id',current_setting('queue_test.vaccine_item'),'batchId',(select id from public.inventory_batches where item_id=current_setting('queue_test.vaccine_item')::uuid limit 1),'delta',100,'reason','Delivery'),gen_random_uuid());
 set local role authenticated;
 do $$
 #variable_conflict use_variable
@@ -113,10 +115,10 @@ begin
   rejected:=false;
   begin perform public.portal_mutation('save_queue_draft',payload||jsonb_build_object('draftVersion',1,'record',jsonb_build_object('petId',pet)),gen_random_uuid()); exception when others then if sqlerrm like 'VALIDATION_FAILED: unsupported draft fields%' then rejected:=true; else raise; end if; end;
   if not rejected then raise exception 'TEST: draft changed patient identity'; end if;
-  record_data:=jsonb_build_object('petId',pet,'veterinarianId',doctor,'inventoryItemId',current_setting('queue_test.vaccine_item'),'administeredAt',today,'nextDueAt',today+10);
+  record_data:=jsonb_build_object('petId',pet,'veterinarianId',doctor,'inventoryItemId',current_setting('queue_test.vaccine_item'),'batchId',(select id from public.inventory_batches where item_id=current_setting('queue_test.vaccine_item')::uuid limit 1),'dispenseQuantity',1,'administeredAt',today,'nextDueAt',today+10);
   select count(*) into before_count from public.vaccinations where pet_id=pet;
   rejected:=false;
-  begin perform public.portal_mutation('complete_queue_entry',jsonb_build_object('id',walkin,'draftVersion',1,'record',record_data||jsonb_build_object('nextDueAt',today-1)),gen_random_uuid()); exception when check_violation then rejected:=true; end;
+  begin perform public.portal_mutation('complete_queue_entry',jsonb_build_object('id',walkin,'draftVersion',1,'record',record_data||jsonb_build_object('nextDueAt',today-1)),gen_random_uuid()); exception when others then if sqlerrm like 'VALIDATION_FAILED%' or sqlstate='23514' then rejected:=true; else raise; end if; end;
   if not rejected or (select status from public.queue_entries where id=walkin)<>'in_progress' or (select count(*) from public.vaccinations where pet_id=pet)<>before_count then
     raise exception 'TEST: failed care save was not atomic'; end if;
   rejected:=false;
@@ -165,8 +167,9 @@ begin
   if (select visit_id from public.queue_entries where id=queue) is not null then raise exception 'TEST: visit delete reference'; end if;
   perform public.portal_mutation('delete_record',jsonb_build_object('entity','appointment','id',appointment,'reason','Queue rollback deletion'),gen_random_uuid());
   if (select appointment_id from public.queue_entries where id=queue) is not null then raise exception 'TEST: appointment delete reference'; end if;
-  perform public.portal_mutation('delete_record',jsonb_build_object('entity','vaccination','id',(select vaccination_id from public.queue_entries where id=walkin),'reason','Queue rollback deletion'),gen_random_uuid());
-  if (select vaccination_id from public.queue_entries where id=walkin) is not null then raise exception 'TEST: vaccination delete reference'; end if;
+  rejected:=false;
+  begin perform public.portal_mutation('delete_record',jsonb_build_object('entity','vaccination','id',(select vaccination_id from public.queue_entries where id=walkin),'reason','Queue rollback deletion'),gen_random_uuid()); exception when others then if sqlerrm like 'DISPENSING_LOCKED%' then rejected:=true; else raise; end if; end;
+  if not rejected or (select vaccination_id from public.queue_entries where id=walkin) is null then raise exception 'TEST: consumed vaccination deletion accepted'; end if;
 
   queue:=(public.portal_mutation('check_in_appointment',jsonb_build_object('appointmentId',current_setting('queue_test.cancel_appointment')),gen_random_uuid())->>'id')::uuid;
   if (select category from public.queue_entries where id=queue)<>'vaccination' then raise exception 'TEST: vaccination booking category'; end if;
@@ -190,7 +193,7 @@ begin
   record_data:=jsonb_build_object('petId',pet,'veterinarianId',doctor,'type','Wellness check','complaint','Patient-page checkup','weightKg','3','followUpDate',today+1,'encounteredAt',now());
   select count(*) into before_count from public.visits where pet_id=pet;
   rejected:=false;
-  begin perform public.portal_mutation('create_queued_encounter',record_data||'{"weightKg":"-1"}',gen_random_uuid()); exception when check_violation then rejected:=true; end;
+  begin perform public.portal_mutation('create_queued_encounter',record_data||'{"weightKg":"-1"}',gen_random_uuid()); exception when others then if sqlerrm like 'VALIDATION_FAILED%' or sqlstate='23514' then rejected:=true; else raise; end if; end;
   if not rejected or (select count(*) from public.visits where pet_id=pet)<>before_count or exists(select 1 from public.queue_entries where pet_id=pet and category='checkup' and status in ('waiting','in_progress')) then raise exception 'TEST: failed patient checkup left partial record/ticket'; end if;
   key_id:=gen_random_uuid(); result:=public.portal_mutation('create_queued_encounter',record_data,key_id);
   record_id:=(result->>'id')::uuid; queue:=(result->>'queueEntryId')::uuid;
@@ -219,10 +222,10 @@ begin
   perform public.portal_mutation('cancel_queue_entry',jsonb_build_object('id',queue),gen_random_uuid());
 
   -- Adding a vaccine from the patient page mirrors the checkup workflow.
-  record_data:=jsonb_build_object('petId',pet,'veterinarianId',doctor,'inventoryItemId',current_setting('queue_test.vaccine_item'),'administeredAt',today,'nextDueAt',today+20,'dose','Recorded dose');
+  record_data:=jsonb_build_object('petId',pet,'veterinarianId',doctor,'inventoryItemId',current_setting('queue_test.vaccine_item'),'batchId',(select id from public.inventory_batches where item_id=current_setting('queue_test.vaccine_item')::uuid limit 1),'dispenseQuantity',1,'administeredAt',today,'nextDueAt',today+20,'dose','Recorded dose');
   select count(*) into before_count from public.vaccinations where pet_id=pet;
   rejected:=false;
-  begin perform public.portal_mutation('create_queued_vaccination',record_data||jsonb_build_object('nextDueAt',today-1),gen_random_uuid()); exception when check_violation then rejected:=true; end;
+  begin perform public.portal_mutation('create_queued_vaccination',record_data||jsonb_build_object('nextDueAt',today-1),gen_random_uuid()); exception when others then if sqlerrm like 'VALIDATION_FAILED%' or sqlstate='23514' then rejected:=true; else raise; end if; end;
   if not rejected or (select count(*) from public.vaccinations where pet_id=pet)<>before_count or exists(select 1 from public.queue_entries where pet_id=pet and category='vaccination' and status in ('waiting','in_progress')) then raise exception 'TEST: failed vaccine save left partial record/ticket'; end if;
   key_id:=gen_random_uuid(); result:=public.portal_mutation('create_queued_vaccination',record_data,key_id);
   record_id:=(result->>'id')::uuid; queue:=(result->>'queueEntryId')::uuid;
@@ -260,8 +263,9 @@ begin
   begin perform public.portal_mutation('create_queued_vaccination',record_data,gen_random_uuid()); exception when others then if sqlerrm like 'FORBIDDEN%' then rejected:=true; else raise; end if; end;
   if not rejected then raise exception 'TEST: pending patient vaccine write'; end if;
   perform set_config('request.jwt.claims',jsonb_build_object('sub',doctor,'role','authenticated')::text,true);
-  perform public.portal_mutation('delete_record',jsonb_build_object('entity','pet','id',pet,'reason','Queue rollback cleanup'),gen_random_uuid());
-  if exists(select 1 from public.queue_entries where pet_id=pet) then raise exception 'TEST: patient deletion left queue rows'; end if;
+  rejected:=false;
+  begin perform public.portal_mutation('delete_record',jsonb_build_object('entity','pet','id',pet,'reason','Queue rollback cleanup'),gen_random_uuid()); exception when others then if sqlerrm like 'DISPENSING_LOCKED%' then rejected:=true; else raise; end if; end;
+  if not rejected or not exists(select 1 from public.pets where id=pet) then raise exception 'TEST: consumed history deletion accepted'; end if;
 end $$;
 reset role;
 update public.profiles set is_active=false where id=current_setting('queue_test.staff')::uuid;

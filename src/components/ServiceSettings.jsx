@@ -3,7 +3,7 @@ import { useClinicData } from '../context/ClinicDataContext'
 import { Badge, SectionCard } from './ui'
 import { RecordEditor } from './RecordForm'
 
-const workflows = [{ value: 'checkup', label: 'Checkup' }, { value: 'vaccination', label: 'Vaccination' }, { value: 'maintenance', label: 'Maintenance' }]
+const workflows = [{ value: 'checkup', label: 'Checkup' }, { value: 'vaccination', label: 'Vaccinations and Deworming' }, { value: 'maintenance', label: 'Maintenance' }]
 
 export default function ServiceSettings() {
   const { allServices, appointments, queueEntries, execute } = useClinicData()

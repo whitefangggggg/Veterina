@@ -4,12 +4,15 @@ import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import PwaStatus from './components/PwaStatus.jsx'
+import { AppearanceProvider } from './context/AppearanceContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-      <PwaStatus />
-    </AuthProvider>
+    <AppearanceProvider>
+      <AuthProvider>
+        <App />
+        <PwaStatus />
+      </AuthProvider>
+    </AppearanceProvider>
   </StrictMode>,
 )

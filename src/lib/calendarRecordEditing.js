@@ -3,6 +3,7 @@ const correction = (visit, role) => role === 'owner' ? [action('correct', 'Appen
 
 export function calendarEditActions(kind, record, data, role) {
   if (kind === 'checkup') return record.finalizedAt ? correction(record, role) : [action('visit', 'Edit checkup', record)]
+  if (kind === 'preventive') return [action('vaccine', 'Edit vaccination or deworming record', record)]
   if (kind === 'vaccination') return [action('vaccine', 'Edit vaccination', record)]
   if (kind === 'service' && record.recordingPurpose === 'record_only') return [action('historical-service', 'Edit service record', record)]
   if (kind === 'service') return [action('service-notes', 'Edit service notes', record)]
@@ -20,7 +21,9 @@ export function calendarEditActions(kind, record, data, role) {
     const service = (data.serviceRecords || []).find((entry) => entry.id === id)
     return service ? calendarEditActions('service', service, data, role) : []
   }
-  if (record.kind === 'Vaccination') {
+  if (['Vaccination','Deworming'].includes(record.kind)) {
+    const preventive = data.preventiveCare?.find((entry) => entry.id === id)
+    if (preventive) return calendarEditActions('preventive', preventive, data, role)
     const vaccine = data.vaccinations.find((vaccine) => vaccine.id === id)
     return vaccine ? calendarEditActions('vaccination', vaccine, data, role) : []
   }
@@ -30,6 +33,8 @@ export function calendarEditActions(kind, record, data, role) {
     if (entry.category === 'maintenance') return calendarEditActions('service', entry, data, role)
     const visit = data.visits.find((visit) => visit.id === entry.visit_id)
     if (visit) return calendarEditActions('checkup', visit, data, role)
+    const preventive = data.preventiveCare?.find((record) => record.id === entry.preventive_record_id)
+    if (preventive) return calendarEditActions('preventive', preventive, data, role)
     const vaccine = data.vaccinations.find((vaccine) => vaccine.id === entry.vaccination_id)
     if (vaccine) return calendarEditActions('vaccination', vaccine, data, role)
     if (entry.status === 'in_progress') return [action('queue-care', 'Edit care draft', entry)]

@@ -10,8 +10,9 @@ const normalize = (value) => String(value ?? '').normalize('NFKD').replace(/\p{M
 
 export const serviceStatus = (status) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled', record_only: 'Record only' })[status] || status || 'Recorded'
 
-export function combinedClinicalHistory(visits, services) {
+export function combinedClinicalHistory(visits, services, preventive = []) {
   const records = [...visits.map((visit) => ({ ...visit, historyKind: 'checkup', historyKey: `checkup:${visit.id}`, sourceRecord: visit })),
+    ...preventive.map((record) => ({ ...record, historyKind: 'preventive', historyKey: `preventive:${record.id}`, sourceRecord: record, visitedAt: record.administeredAt, type: record.kind === 'deworming' ? 'Deworming' : 'Vaccination', veterinarian: record.veterinarianName || 'Not recorded', clinicalNotes: record.items.map((item) => [item.vaccine,item.brand,item.dose,item.lotNumber].filter(Boolean).join(' ')).join(' ') })),
     ...services.map((service) => ({ ...service, historyKind: 'service', historyKey: `service:${service.id}`, sourceRecord: service,
       visitedAt: service.arrivedAt, type: service.service, careStatus: serviceStatus(service.status),
       veterinarian: service.veterinarian || 'Not recorded' }))]

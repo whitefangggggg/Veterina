@@ -34,8 +34,8 @@ try {
       select (now() at time zone timezone)::date into day from public.clinic_settings limit 1;
       person:=(public.portal_mutation('create_owner','{"fullName":"Concurrent owner","phone":"09171234567","address":"Test"}',gen_random_uuid())->>'id')::uuid;
       patient:=(public.portal_mutation('create_pet',jsonb_build_object('ownerId',person,'name','Concurrent pet','species','Cat','breed','Mixed','sex','Female','reproductiveStatus','Unknown'),gen_random_uuid())->>'id')::uuid;
-      insert into public.vaccinations(pet_id,vaccine_name,brand,lot_number,administered_at,next_due_at,administered_by)
-        values(patient,'Rabies','Brand','LOT',day-30,day+365,'${actor}') returning id into vaccine;
+      insert into public.vaccinations(pet_id,vaccine_name,brand,lot_number,administered_at,next_due_at,administered_by,stock_tracked)
+        values(patient,'Rabies','Brand','LOT',day-30,day+365,'${actor}',false) returning id into vaccine;
       perform set_config('travel.concurrent_payload',jsonb_build_object('petId',patient,'issuerId','${actor}','rabiesVaccinationId',vaccine,'travelDate',day+1,'validUntil',day+5,'destination','Cebu','rabiesConfirmed',true,'eligibilityConfirmed',true)::text,true);
     end $$;
     select current_setting('travel.concurrent_payload'); commit;`))

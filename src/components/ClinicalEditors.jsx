@@ -4,14 +4,13 @@ import { AsyncForm, RecordEditor } from './RecordForm'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { clinicDate, clinicTime, clinicTimestamp } from '../lib/clinicRepository'
-import { Badge, Field, Modal } from './ui'
+import { Field, Modal } from './ui'
 import { prescriptionInventoryBatches, prescriptionMedications } from '../lib/prescriptions'
 import PrescriptionMedicationPicker from './PrescriptionMedicationPicker'
 import { checkupReasons, ClinicianField, emptyMedication, HistoricalPrescriptionFields, MedicationDetailsFields, medicationPayload } from './ClinicalFields'
 import DateWordsField from './DateWordsField'
+import PreventiveCareEditor from './PreventiveCareEditor'
 import { format, parseISO } from 'date-fns'
-
-const staffOptions = (profiles) => profiles.filter((profile) => profile.is_active).map((profile) => ({ value: profile.id, label: profile.full_name || 'Clinic staff' }))
 
 export function VisitEditor(props) {
   const [purpose, setPurpose] = useState(props.purpose || null)
@@ -155,69 +154,8 @@ function CheckupEditor({ pet, record, queueEntry, onSaved, onClose, purpose, ser
 export function VaccineEditor(props) {
   const [purpose, setPurpose] = useState(props.purpose || null)
   const mode = props.record ? props.record.recordingPurpose || 'queue' : props.queueEntry ? 'queue' : purpose
-  if (!mode) return <RecordingPurpose pet={props.pet} kind="vaccination" onSelect={setPurpose} onClose={props.onClose} />
-  return mode === 'record_only' ? <HistoricalVaccinationEditor {...props} /> : <QueuedVaccinationEditor {...props} />
-}
-
-function HistoricalVaccinationEditor({ pet, record, onSaved, onClose }) {
-  const { execute, profiles, today } = useClinicData()
-  const [clinician, setClinician] = useState(() => ({ id: record?.veterinarianId || '', name: record?.administered_by_name || '' }))
-  return <RecordEditor title={record ? `Edit vaccination for ${pet.name}` : `Record vaccination for ${pet.name}`}
-    description="Record-keeping only. Save a previous vaccination directly to history without joining the queue, creating live reminders, or deducting stock."
-    initial={record || {}} onClose={onClose} submitLabel={record ? 'Save vaccination' : 'Save historical vaccination'}
-    onSave={async (values) => {
-      const saved = await execute(record ? 'update_vaccination' : 'create_record_only_vaccination', { ...values, petId: pet.id, recordingPurpose: 'record_only', ...(record ? { id: record.id } : {}) })
-      onSaved?.(saved)
-      return saved
-    }} fields={[
-      { name: 'vaccine', label: 'Vaccine name', required: true, maxLength: 300, span: true },
-      { name: 'brand', label: 'Brand', maxLength: 300 },
-      { name: 'lotNumber', label: 'Batch / lot number', maxLength: 200 },
-      { name: 'administeredAt', label: 'Date administered', type: 'date', required: true, max: today },
-      { name: 'nextDueAt', label: 'Next due date', type: 'date', hint: 'Historical information only; no live reminder. Must be after administration.' },
-      { name: 'dose', label: 'Dose', maxLength: 300 },
-      { name: 'veterinarianId', render: () => <ClinicianField label="Veterinarian" value={clinician} onChange={setClinician} profiles={profiles} /> },
-      { name: 'careStatus', render: () => <Field label="Care status"><Badge>Record only</Badge></Field> },
-    ]} />
-}
-
-function QueuedVaccinationEditor({ pet, record, queueEntry, onSaved, onClose, service }) {
-  const { execute, profiles, today, queueEntries, inventory } = useClinicData()
-  const { user } = useAuth()
-  const [draft] = useState(() => ({ values: queueEntry?.careDraft || {}, version: queueEntry?.draftVersion || 0 }))
-  const [inventoryItemId, setInventoryItemId] = useState(draft.values.inventoryItemId ?? record?.inventoryItemId ?? '')
-  const items = inventory.filter((item) => item.isActive && item.category === 'Vaccines')
-  const selected = inventory.find((item) => item.id === inventoryItemId)
-  const unchanged = record && inventoryItemId === record.inventoryItemId
-  const brand = unchanged ? record.brand : selected?.brand
-  const careStatus = queueEntry ? { waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' }[queueEntry.status] : record?.careStatus || 'Waiting'
-  const activeVaccination = queueEntries.find((entry) => entry.petId === pet.id && entry.category === 'vaccination' && ['waiting', 'in_progress'].includes(entry.status))
-  return <RecordEditor title={record ? `Edit vaccination for ${pet.name}` : `Record vaccination for ${pet.name}`} description={queueEntry ? `${queueEntry.queueNumber} · ${queueEntry.queueDate}. Save unfinished care as a draft, or save the vaccination to complete this visit. A next-due date creates a linked reminder automatically.` : record ? 'A next-due date creates a linked reminder automatically.' : 'Save this vaccine to add the patient to the queue automatically. A next-due date creates a linked reminder.'}
-    onClose={onClose} initial={{ administeredAt: today, veterinarianId: activeVaccination?.veterinarianId || user.id, ...record, ...draft.values, ...(queueEntry ? { veterinarianId: queueEntry.veterinarianId } : {}) }} submitLabel="Save vaccination"
-    onSaveDraft={queueEntry ? (values) => execute('save_queue_draft', { id: queueEntry.id, record: values, draftVersion: draft.version }) : undefined}
-    onSave={async (values) => {
-      const payload = { ...values, petId: pet.id, ...(service ? { serviceId: service.id } : {}), ...(record ? { id: record.id } : {}) }
-      const saved = await execute(queueEntry ? 'complete_queue_entry' : record ? 'update_vaccination' : 'create_queued_vaccination', queueEntry ? { id: queueEntry.id, record: payload, draftVersion: draft.version } : payload)
-      onSaved?.(saved)
-      return saved
-    }}
-    fields={[
-      { name: 'inventoryItemId', render: () => <Field label="Vaccine type" required={!record} span hint="Choose a vaccine from inventory. Stock movements are recorded separately.">
-        <select name="inventoryItemId" aria-label="Vaccine type" value={inventoryItemId} required={!record} onChange={(event) => setInventoryItemId(event.target.value)}>
-          <option value="" disabled={Boolean(record?.inventoryItemId)}>{record && !record.inventoryItemId ? `Keep historical vaccine: ${record.vaccine}` : 'Select vaccine from inventory'}</option>
-          {record?.inventoryItemId && !items.some((item) => item.id === record.inventoryItemId) && <option value={record.inventoryItemId}>{record.vaccine} (historical selection)</option>}
-          {items.map((item) => <option key={item.id} value={item.id} disabled={!item.brand?.trim() && item.id !== record?.inventoryItemId}>{item.name}{!item.brand?.trim() ? ' — add brand in inventory' : ''}</option>)}
-        </select>
-        {!items.length && <span>Add an active vaccine with a brand in Inventory to record a new vaccination.</span>}
-        {draft.values.vaccine && !draft.values.inventoryItemId && <small>Previous draft vaccine: {draft.values.vaccine}. Select its inventory item to continue.</small>}
-      </Field> },
-      { name: 'brand', render: () => <Field label="Brand"><input aria-label="Brand" readOnly value={brand || ''} placeholder={unchanged ? 'Not recorded on historical vaccination' : 'From selected inventory item'} /></Field> },
-      { name: 'careStatus', render: () => <Field label="Care status"><Badge tone={{ Completed: 'success', 'In progress': 'blue', Waiting: 'warning', Cancelled: 'danger' }[careStatus] || 'neutral'}>{careStatus}</Badge>{!record && !queueEntry && <small>Saving adds this vaccination to the queue as Waiting.</small>}</Field> },
-      { name: 'administeredAt', label: 'Date administered', type: 'date', required: true },
-      { name: 'nextDueAt', label: 'Next due date', type: 'date', hint: 'Optional; must be after the administered date.' },
-      { name: 'dose', label: 'Dose' },
-      { name: 'veterinarianId', label: 'Veterinarian', type: 'select', required: true, options: staffOptions(profiles).filter((option) => !queueEntry || option.value === queueEntry.veterinarianId) },
-    ]} />
+  if (!mode) return <RecordingPurpose pet={props.pet} kind="Vaccinations and Deworming" onSelect={setPurpose} onClose={props.onClose} />
+  return <PreventiveCareEditor {...props} purpose={mode} />
 }
 
 export function PrescriptionEditor({ pet, record, visitId, completingCheckup, onClose }) {

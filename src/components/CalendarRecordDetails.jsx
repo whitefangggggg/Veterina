@@ -7,6 +7,7 @@ import { Badge } from './ui'
 import { useAuth } from '../context/AuthContext'
 import { calendarEditActions } from '../lib/calendarRecordEditing'
 import PrescriptionActions from './PrescriptionActions'
+import PreventiveCareCard from './PreventiveCareCard'
 
 const statusName = (value) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' })[value] || value
 const dayLabel = (value, timezone) => { const date = dateInClinic(value, timezone); return date ? format(parseISO(date), 'd MMM yyyy') : 'Not recorded' }
@@ -60,19 +61,24 @@ function QueueDetails({ entry, data, onEdit }) {
   ]} />
   const visit = data.visits.find((visit) => visit.id === entry.visit_id)
   const vaccine = data.vaccinations.find((vaccine) => vaccine.id === entry.vaccination_id)
+  const preventive = data.preventiveCare.find((record) => record.id === entry.preventive_record_id)
   const draftLabels = { clinicalNotes: 'Clinical notes', complaint: 'Chief complaint', diagnosis: 'Diagnosis', subjective: 'Subjective', objective: 'Objective', assessment: 'Assessment', plan: 'Plan',
     weightKg: 'Weight (kg)', temperatureC: 'Temperature (°C)', heartRate: 'Heart rate (bpm)', respiratoryRate: 'Respiratory rate (rpm)', bodyConditionScore: 'Body condition', hydration: 'Hydration',
     followUpDate: 'Follow-up date', serviceNotes: 'Service notes', dose: 'Dose', administeredAt: 'Vaccination date', nextDueAt: 'Next due date' }
   const draft = Object.entries(entry.careDraft || {}).filter(([key, value]) => draftLabels[key] && value != null && value !== '').map(([key, value]) => [draftLabels[key], value])
+  const draftItems = entry.careDraft?.kind === 'deworming' ? [entry.careDraft.deworming].filter(Boolean) : entry.careDraft?.vaccines || []
   return <>
     <Fields rows={[
       ['Service', entry.service], ['Queue', entry.queueNumber], ['Queue date', entry.queueDate ? dayLabel(entry.queueDate, data.timezone) : ''], ['Status', statusName(entry.status)],
       ['Veterinarian', entry.veterinarian], ['Arrived', timeLabel(entry.arrivedAt, data.timezone)], ['Finished', timeLabel(entry.finished_at, data.timezone)],
       ['Source', entry.source?.replaceAll('_', ' ')], ['Notes', entry.notes], ['Service notes', entry.serviceNotes],
     ]} />
-    {draft.length > 0 && <section className="calendar-preview-section"><h4>Saved care draft</h4><Fields rows={draft} /><small>Saved {timeLabel(entry.draftSavedAt, data.timezone)}{entry.draftSavedBy && ` · ${entry.draftSavedBy}`}</small></section>}
+    {(draft.length > 0 || draftItems.length > 0) && <section className="calendar-preview-section"><h4>Saved care draft</h4><Fields rows={draft} />{draftItems.map((item, index) => {
+      const product = data.inventory.find((product) => product.id === item.inventoryItemId)
+      return <Fields key={item.id || index} rows={[[entry.careDraft.kind === 'deworming' ? 'Deworming product' : `Vaccine ${index + 1}`, product?.name || item.vaccine], ['Brand', item.brand || product?.brand], ['Batch', product?.batches.find((batch) => batch.id === item.batchId)?.lot_number || item.lotNumber], ['Stock quantity', item.dispenseQuantity != null ? `${item.dispenseQuantity} ${product?.unit || ''}` : ''], ['Dose', item.dose], ['Next due', item.nextDueAt]]} />
+    })}<small>Saved {timeLabel(entry.draftSavedAt, data.timezone)}{entry.draftSavedBy && ` · ${entry.draftSavedBy}`}</small></section>}
     {visit && <CheckupDetails visit={visit} data={data} onEdit={onEdit} />}
-    {vaccine && <VaccineDetails vaccine={vaccine} data={data} />}
+    {preventive ? <PreventiveCareCard record={preventive} /> : vaccine && <VaccineDetails vaccine={vaccine} data={data} />}
   </>
 }
 
@@ -94,7 +100,9 @@ function TimelineDetails({ event, data, onEdit }) {
       ? visit.prescriptions.some((prescription) => prescription.id === id) : visit.corrections.some((correction) => correction.id === id))
     if (visit) return <CheckupDetails visit={visit} data={data} onEdit={event.kind === 'Prescription' ? undefined : onEdit} />
   }
-  if (event.kind === 'Vaccination') {
+  if (['Vaccination','Deworming'].includes(event.kind)) {
+    const preventive = data.preventiveCare.find((entry) => entry.id === id)
+    if (preventive) return <PreventiveCareCard record={preventive} />
     const vaccine = data.vaccinations.find((vaccine) => vaccine.id === id)
     if (vaccine) return <VaccineDetails vaccine={vaccine} data={data} />
   }
@@ -124,6 +132,7 @@ export default function CalendarRecordDetails({ records, kind, onEdit }) {
   const data = useClinicData()
   const { profile } = useAuth()
   if (kind === 'clinical') return records.map((record) => <CalendarRecordDetails key={record.historyKey} records={[record.sourceRecord]} kind={record.historyKind} onEdit={onEdit} />)
+  if (kind === 'preventive') return records.map((record) => <div className="calendar-preview-record" key={record.id}><PreventiveCareCard record={record} onEdit={onEdit ? (record) => onEdit({ type: 'vaccine', record, petId: record.petId }) : undefined} /></div>)
   return records.map((record) => <article className="calendar-preview-record" key={record.id} style={kind === 'checkup' && record.cardColor ? { '--preview-color': record.cardColor } : undefined}>
     <header><h3>{kind === 'checkup' ? record.diagnosis || record.complaint || record.type : kind === 'vaccination' ? record.vaccine : kind === 'service' ? record.service : record.title}</h3>
       {kind === 'timeline' && <Badge tone="blue">{record.kind} · {record.status}</Badge>}

@@ -70,9 +70,9 @@ try {
   await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled()
   await mkdir('test-artifacts.local', { recursive: true })
   await page.screenshot({ path: 'test-artifacts.local/new-visit-picker-desktop.png' })
-  await page.getByRole('radio', { name: 'Vaccination', exact: true }).focus()
+  await page.getByRole('radio', { name: 'Vaccinations and Deworming', exact: true }).focus()
   await page.keyboard.press('Space')
-  await expect(page.getByRole('radio', { name: 'Vaccination', exact: true })).toBeChecked()
+  await expect(page.getByRole('radio', { name: 'Vaccinations and Deworming', exact: true })).toBeChecked()
   await page.keyboard.press('ArrowDown')
   await expect(page.getByRole('radio', { name: 'Follow-up', exact: true })).toBeChecked()
   await expect(page.locator('.visit-service-card.is-selected')).toHaveCount(1)
@@ -97,7 +97,7 @@ try {
         await expect(page.getByLabel('Reason for Checkup')).toHaveValue(service.name === 'Follow-up' ? 'Follow-up Checkup' : ['Surgery', 'Sick visit'].includes(service.name) ? 'Medical Concern' : 'Wellness Check')
         assert.equal(await page.getByLabel('Weight (kg)').evaluate((input) => input.required), purpose === 'Queue processing')
       } else if (service.workflow === 'vaccination') {
-        await expect(page.getByLabel(purpose === 'Queue processing' ? 'Vaccine type' : 'Vaccine name', { exact: true })).toBeVisible()
+        await expect(page.getByLabel(purpose === 'Queue processing' ? 'Inventory product 1' : 'Product name 1', { exact: true })).toBeVisible()
       } else {
         await expect(page.getByLabel(purpose === 'Queue processing' ? 'Arrival notes' : 'Work performed / service notes')).toBeVisible()
         await expect(page.getByLabel('Chief complaint')).toHaveCount(0)

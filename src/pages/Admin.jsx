@@ -8,6 +8,7 @@ import VeterinarianDetailsSettings from '../components/VeterinarianDetailsSettin
 import ClinicJoinCode from '../components/ClinicJoinCode'
 import ClinicLogoSettings from '../components/ClinicLogoSettings'
 import ServiceSettings from '../components/ServiceSettings'
+import AppearanceSettings from '../components/AppearanceSettings'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { downloadReport, fetchReport, printPatientHistory } from '../lib/reports'
@@ -27,8 +28,8 @@ export function Reports() {
       : { date_from: filters.date_from, date_to: filters.date_to, ...(report === 'reminders' ? { reminder_status: filters.reminder_status } : {}) }
   const reports = [
     { id: 'patients', icon: PawPrint, title: 'Patient register', description: 'Patient identities, owners and identifiers', format: 'CSV' },
-    { id: 'vaccinations', icon: Syringe, title: 'Vaccinations due', description: 'Recorded doses and next-due dates', format: 'CSV' },
-    { id: 'history', icon: FileText, title: 'Complete clinical history', description: 'Identity, owner, alerts, encounters, vitals, vaccines and prescriptions', format: 'Print / Save as PDF' },
+    { id: 'vaccinations', icon: Syringe, title: 'Vaccinations and Deworming due', description: 'Each administered product and its next-due date', format: 'CSV' },
+    { id: 'history', icon: FileText, title: 'Complete clinical history', description: 'Identity, owner, alerts, encounters, vitals, vaccinations, deworming and prescriptions', format: 'Print / Save as PDF' },
     { id: 'inventory', icon: ClipboardText, title: 'Inventory status', description: 'Stock on hand, minimum levels and expirations', format: 'CSV' },
     { id: 'reminders', icon: ClockCountdown, title: 'Reminder outcomes', description: 'Follow-ups, due dates and contact outcomes', format: 'CSV' },
   ]
@@ -77,11 +78,11 @@ export function Settings() {
   const { profile, refreshAccess } = useAuth()
   const [tab, setTab] = useState('profile')
   const [saved, setSaved] = useState(false)
-  if (profile.role !== 'owner') return <div className="page"><PageHeader title="Clinic settings" description="Clinic settings and staff administration are managed by the clinic owner." /><SectionCard title={settings?.clinic_name}><div className="directory-card"><p>{settings?.address}</p><p>{settings?.phone}</p><p>{settings?.email}</p><p>Clinic timezone: {settings?.timezone}</p></div></SectionCard></div>
+  if (profile.role !== 'owner') return <div className="page"><PageHeader title="Clinic settings" description="Choose your display mode. Clinic settings and staff administration are managed by the clinic owner." /><div className="tabs"><button className={tab === 'profile' ? 'active' : ''} aria-pressed={tab === 'profile'} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'appearance' ? 'active' : ''} aria-pressed={tab === 'appearance'} onClick={() => setTab('appearance')}>Appearance</button></div>{tab === 'appearance' ? <AppearanceSettings /> : <SectionCard title={settings?.clinic_name}><div className="directory-card"><p>{settings?.address}</p><p>{settings?.phone}</p><p>{settings?.email}</p><p>Clinic timezone: {settings?.timezone}</p></div></SectionCard>}</div>
   return <div className="page">
     <PageHeader eyebrow="Owner access" title="Clinic settings" description="Manage your clinic profile, professional credentials, privacy settings and staff access." actions={<Link className="button button-secondary" to="/clinic-setup?next=%2Fsettings">Personalize clinic</Link>} />
-    <div className="tabs"><button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'veterinarians' ? 'active' : ''} onClick={() => setTab('veterinarians')}>Veterinarian Details</button><button className={tab === 'staff' ? 'active' : ''} onClick={() => setTab('staff')}>Staff accounts</button><button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Services</button></div>
-    {tab === 'services' ? <ServiceSettings /> : tab === 'veterinarians' ? <VeterinarianDetailsSettings onRegister={() => setTab('staff')} /> : tab === 'staff' ? <><ClinicJoinCode /><SectionCard className="settings-panel"><StaffAdmin /></SectionCard></> : <><ClinicLogoSettings /><SectionCard title="Clinic profile">
+    <div className="tabs"><button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'veterinarians' ? 'active' : ''} onClick={() => setTab('veterinarians')}>Veterinarian Details</button><button className={tab === 'staff' ? 'active' : ''} onClick={() => setTab('staff')}>Staff accounts</button><button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Services</button><button className={tab === 'appearance' ? 'active' : ''} aria-pressed={tab === 'appearance'} onClick={() => setTab('appearance')}>Appearance</button></div>
+    {tab === 'appearance' ? <AppearanceSettings /> : tab === 'services' ? <ServiceSettings /> : tab === 'veterinarians' ? <VeterinarianDetailsSettings onRegister={() => setTab('staff')} /> : tab === 'staff' ? <><ClinicJoinCode /><SectionCard className="settings-panel"><StaffAdmin /></SectionCard></> : <><ClinicLogoSettings /><SectionCard title="Clinic profile">
       <div className="settings-panel">
       {saved && <p className="auth-message" role="status">Clinic settings saved.</p>}
       <AsyncForm submitLabel="Save settings" onSave={async (values) => { setSaved(false); await execute('save_settings', { ...values, aiEnabled: values.aiEnabled === 'on' }); await refreshAccess(); setSaved(true) }}>

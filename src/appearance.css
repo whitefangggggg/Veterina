@@ -1,0 +1,50 @@
+/* Semantic colors follow the resolved browser appearance. Brand fills keep the
+   saved palette; foreground accents are lightened separately for contrast. */
+:root[data-appearance] {
+  --canvas: #f3f5f2;
+  --ink: #1c2e28;
+  --muted: #5f6e68;
+  --line: #e0e6e1;
+  --surface: #ffffff;
+  --surface-soft: #f7f9f7;
+  --brand-tint: #e6f2ee;
+  --brand-soft: light-dark(var(--brand-tint), color-mix(in srgb, var(--brand) 22%, #182421));
+  --brand-ink: light-dark(var(--brand), color-mix(in srgb, var(--brand) 38%, #ffffff));
+  --brand-strong-ink: light-dark(var(--brand-dark), color-mix(in srgb, var(--brand) 30%, #ffffff));
+  color: var(--ink);
+  background-color: var(--canvas);
+}
+:root[data-appearance="dark"] {
+  --canvas: #111b19;
+  --ink: #e7eeeb;
+  --muted: #afbeb7;
+  --line: #3b4d46;
+  --surface: #1b2924;
+  --surface-soft: #22332c;
+  --amber: #e9bd7a;
+  --amber-soft: #382d1f;
+  --rose: #f0aaaa;
+  --rose-soft: #3e2729;
+  --blue: #99c9e5;
+  --blue-soft: #203441;
+  --shadow: 0 1px 2px #00000026, 0 10px 28px #00000033;
+}
+html[data-appearance], body { background-color: var(--canvas); }
+:root[data-appearance="dark"] { background-image: none; }
+input, select, textarea { color: var(--ink); }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--brand); }
+/* Inline chart defaults otherwise force white tooltips and grey tick labels. */
+.recharts-default-tooltip { background: var(--surface) !important; border-color: var(--line) !important; color: var(--ink) !important; }
+.recharts-tooltip-label, .recharts-tooltip-item { color: var(--ink) !important; }
+.recharts-cartesian-axis-tick-value { fill: var(--muted); }
+.recharts-tooltip-cursor { fill: var(--surface-soft); }
+/* Keep brand artwork legible without changing its original pixels. */
+html[data-appearance="dark"] :is(.vt-brand img, .vt-footer img, .auth-brand img) { background: #fafbf7; border-radius: 8px; padding: 4px; }
+html[data-appearance="dark"] .clinic-logo-preview { background: #ffffff; color: #244b43; }
+/* A document is paper in both modes. Export renderers also own standalone CSS. */
+.travel-certificate-preview, .public-certificate-document { color-scheme: light; background: #ffffff; }
+@media print {
+  :root[data-appearance] { color-scheme: light !important; --canvas: #ffffff; --ink: #1c2e28; --muted: #5f6e68; --line: #e0e6e1; --surface: #ffffff; --surface-soft: #f7f9f7; --brand-ink: var(--brand); --brand-strong-ink: var(--brand-dark); --brand-soft: var(--brand-tint); --amber: #9a6116; --amber-soft: #fff4df; --rose: #b04747; --rose-soft: #fceceb; --blue: #356b8a; --blue-soft: #e8f2f7; color: var(--ink); background: #ffffff; }
+  body { color: var(--ink); background: #ffffff; }
+}

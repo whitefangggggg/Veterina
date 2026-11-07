@@ -21,15 +21,17 @@ export function ClinicDataProvider({ children }) {
     setRefreshing(true)
     try {
       const result = await fetchClinicData(supabase)
-      if (!mounted.current || current !== request.current) return
+      if (!mounted.current || current !== request.current) return false
       if (!result.profiles.some((profile) => profile.id === user.id && profile.is_active)) {
         await refreshAccess()
         throw new Error('FORBIDDEN')
       }
       setRaw(result)
       setError('')
+      return true
     } catch (error) {
       if (mounted.current && current === request.current) setError(clinicErrorMessage(error))
+      return false
     } finally {
       if (mounted.current && current === request.current) setRefreshing(false)
     }
@@ -45,10 +47,11 @@ export function ClinicDataProvider({ children }) {
     return () => { mounted.current = false; request.current += 1; clearInterval(tick); window.removeEventListener('focus', onFocus) }
   }, [reload])
 
-  const execute = async (action, payload) => {
+  const execute = async (action, payload, { requireRefresh = false } = {}) => {
     try {
       const result = await mutation(action, payload)
-      await reload()
+      const refreshed = await reload()
+      if (requireRefresh && !refreshed) throw new Error('Your change was saved, but could not be refreshed. Use Retry refresh to load it.')
       return result
     } catch (error) {
       // Refresh concurrent saves while the open editor retains its own inputs.

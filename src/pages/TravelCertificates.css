@@ -2,7 +2,7 @@
 .travel-certificates-page .directory-card > div { min-width: 0; }
 .travel-certificates-page .directory-card p { overflow-wrap: anywhere; }
 .travel-certificate-form .form-grid { gap: 20px; }
-.travel-license-warnings { padding: 14px 16px; border: 1px solid #dbbd80; border-radius: 10px; background: #fff8e9; color: #754f17; font-size: 13px; line-height: 1.5; }
+.travel-license-warnings { padding: 14px 16px; border: 1px solid light-dark(#dbbd80, var(--line)); border-radius: 10px; background: light-dark(#fff8e9, var(--surface-soft)); color: light-dark(#754f17, color-mix(in srgb, #754f17 32%, #ffffff)); font-size: 13px; line-height: 1.5; }
 .travel-license-warnings ul { margin: 8px 0; padding-left: 20px; }
 .travel-license-warnings p { margin: 0; }
 .travel-certificate-form input:not([type="checkbox"]), .travel-certificate-form select { width: 100%; min-width: 0; }
@@ -15,13 +15,13 @@
 .travel-confirmations { display: grid; gap: 14px; margin: 22px 0; }
 .travel-confirmations label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.6; }
 .travel-confirmations input { flex: none; margin-top: 4px; width: 18px; height: 18px; accent-color: var(--brand); }
-.travel-certificate-preview { display: block; width: 100%; height: min(70vh,800px); min-height: 320px; border: 1px solid var(--line); border-radius: 12px; background: white; margin: 18px 0; }
+.travel-certificate-preview { display: block; width: 100%; height: min(70vh,800px); min-height: 320px; border: 1px solid var(--line); border-radius: 12px; background: light-dark(white, var(--surface)); margin: 18px 0; }
 .travel-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0; font-size: 13px; }
 .travel-certificate-badges { display: flex; flex-wrap: wrap; gap: 8px; }
 .travel-sharing-panel { display: grid; grid-template-columns: minmax(0,1fr) 160px; gap: 24px; margin: 0 0 22px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-soft); }
 .travel-sharing-panel h3 { margin: 0; font-size: 16px; }
 .travel-sharing-panel p { margin: 8px 0 16px; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.travel-sharing-panel select { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: white; font-size: 13px; }
+.travel-sharing-panel select { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: light-dark(white, var(--surface)); font-size: 13px; }
 .travel-sharing-panel .button { margin-top: 14px; }
 .travel-sharing-qr { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
 .travel-sharing-qr img { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }

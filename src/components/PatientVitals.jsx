@@ -29,8 +29,8 @@ export default function PatientVitals({ pet, visits, timezone }) {
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
             <XAxis dataKey="visitId" tick={tick} height={44} interval="preserveStartEnd" tickLine={false} axisLine={false} minTickGap={30} padding={{ left: 22, right: 22 }} />
             <YAxis width={72} tickLine={false} axisLine={false} tickFormatter={(weight) => `${Number(weight.toFixed(2))} kg`} domain={domain} tick={{ fontSize: 11 }} />
-            <Tooltip labelFormatter={(id) => visitDateTime(byId.get(id)?.at, timezone)} formatter={(weight) => [`${weight} kg`, 'Weight']} />
-            <Area type="linear" dataKey="weight" stroke="var(--brand)" strokeWidth={2.5} fill="url(#patientWeightFill)" dot={{ r: 4, strokeWidth: 2, fill: 'var(--surface)' }} activeDot={{ r: 6 }} isAnimationActive={false} />
+            <Tooltip contentStyle={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--ink)' }} labelFormatter={(id) => visitDateTime(byId.get(id)?.at, timezone)} formatter={(weight) => [`${weight} kg`, 'Weight']} />
+            <Area type="linear" dataKey="weight" stroke="var(--brand-ink)" strokeWidth={2.5} fill="url(#patientWeightFill)" dot={{ r: 4, strokeWidth: 2, fill: 'var(--surface)' }} activeDot={{ r: 6 }} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div> : <div className="empty-inline"><Scales size={28} /><h3>No visit weights recorded</h3><p>Recorded weights will appear here when added to a checkup.</p></div>}

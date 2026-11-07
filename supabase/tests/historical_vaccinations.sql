@@ -9,6 +9,7 @@ insert into private.clinic_subscriptions(clinic_id,expires_at) values(current_se
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('history.actor'),'role','authenticated')::text,true);
 insert into public.inventory_items(name,sku,category,unit,minimum_stock,brand,created_by) values('Live vaccine','HIST-VAX-TEST','Vaccines','dose',0,'Live brand',current_setting('history.actor')::uuid);
 select set_config('history.item',(select id::text from public.inventory_items where name='Live vaccine'),true);
+select set_config('history.batch',(public.portal_mutation('create_batch',jsonb_build_object('itemId',current_setting('history.item'),'lotNumber','HIST-STOCK'),gen_random_uuid())->>'id'),true);
 set local role authenticated;
 
 do $$ declare person uuid; pet uuid; saved jsonb; payload jsonb; key uuid:=gen_random_uuid(); vaccine uuid; before_queue integer; before_reminders integer; before_stock integer; before_records integer; bad jsonb;
@@ -16,7 +17,7 @@ begin
   person:=(public.portal_mutation('create_owner','{"fullName":"Vaccination household","phone":"09171234567","address":"Test"}',gen_random_uuid())->>'id')::uuid;
   pet:=(public.portal_mutation('create_pet',jsonb_build_object('ownerId',person,'name','Historical vaccine pet','species','Dog','breed','Mixed','sex','Male','reproductiveStatus','Unknown'),gen_random_uuid())->>'id')::uuid;
   perform public.portal_mutation('create_queued_encounter',jsonb_build_object('petId',pet,'type','Wellness Check','complaint','Current care','weightKg',3,'veterinarianId',auth.uid()),gen_random_uuid());
-  perform public.portal_mutation('create_queued_vaccination',jsonb_build_object('petId',pet,'veterinarianId',auth.uid(),'inventoryItemId',current_setting('history.item'),'administeredAt',current_date,'nextDueAt',current_date+30),gen_random_uuid());
+  perform public.portal_mutation('create_queued_vaccination',jsonb_build_object('petId',pet,'veterinarianId',auth.uid(),'inventoryItemId',current_setting('history.item'),'batchId',current_setting('history.batch'),'dispenseQuantity',1,'administeredAt',current_date,'nextDueAt',current_date+30),gen_random_uuid());
   select count(*) into before_queue from public.queue_entries;
   select count(*) into before_reminders from public.reminders;
   select count(*) into before_stock from public.inventory_movements;

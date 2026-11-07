@@ -10,7 +10,8 @@ import { Modal } from './ui'
 import './NewVisitDialog.css'
 
 const serviceAppearance = (service) => ({
-  Vaccination: { Icon: Syringe, description: 'Vaccines and protection against disease.' },
+  'Vaccinations and Deworming': { Icon: Syringe, description: 'Multiple vaccines or one deworming administration.' },
+  Vaccination: { Icon: Syringe, description: 'Multiple vaccines or one deworming administration.' },
   'Follow-up': { Icon: ClockCounterClockwise, description: 'Review progress after previous care.' },
   Grooming: { Icon: Scissors, description: 'Baths, coat care and grooming services.' },
   'Wellness check': { Icon: ShieldCheck, description: 'Routine health and preventive care.' },
@@ -30,8 +31,8 @@ function ServicePicker({ pet, services, selectedId, onSelect, onContinue, onClos
           const checked = entry.id === selectedId
           return <label key={entry.id} className={`visit-service-card${checked ? ' is-selected' : ''}`}>
             <span className="visit-service-art" aria-hidden="true"><Icon size={29} weight="duotone" /></span>
-            <span className="visit-service-copy"><strong>{entry.name}</strong><span id={`${descriptionPrefix}-${index}`}>{description}</span></span>
-            <span className="visit-service-select"><input type="radio" name="serviceId" value={entry.id} aria-label={entry.name} aria-describedby={`${descriptionPrefix}-${index}`} checked={checked} required onChange={() => onSelect(entry.id)} /><span aria-hidden="true">{checked ? 'Selected' : 'Select'}</span></span>
+            <span className="visit-service-copy"><strong>{entry.name === 'Vaccination' ? 'Vaccinations and Deworming' : entry.name}</strong><span id={`${descriptionPrefix}-${index}`}>{description}</span></span>
+            <span className="visit-service-select"><input type="radio" name="serviceId" value={entry.id} aria-label={entry.name === 'Vaccination' ? 'Vaccinations and Deworming' : entry.name} aria-describedby={`${descriptionPrefix}-${index}`} checked={checked} required onChange={() => onSelect(entry.id)} /><span aria-hidden="true">{checked ? 'Selected' : 'Select'}</span></span>
           </label>
         })}
         {!services.length && <p className="visit-service-empty">No active services are configured. Ask the clinic owner to add a service.</p>}

@@ -14,7 +14,14 @@ export const clinicDays = [
 
 export function clinicThemeStyle(color) {
   const theme = clinicThemes.find((entry) => entry.color === color) || clinicThemes[0]
-  return { '--brand': theme.color, '--brand-dark': theme.dark, '--brand-soft': theme.soft }
+  return {
+    '--brand': theme.color, '--brand-dark': theme.dark,
+    '--brand-gradient': `linear-gradient(145deg, ${theme.color}, ${theme.dark})`,
+    '--brand-tint': theme.soft,
+    '--brand-soft': 'light-dark(var(--brand-tint), color-mix(in srgb, var(--brand) 22%, #182421))',
+    '--brand-ink': 'light-dark(var(--brand), color-mix(in srgb, var(--brand) 38%, #ffffff))',
+    '--brand-strong-ink': 'light-dark(var(--brand-dark), color-mix(in srgb, var(--brand) 30%, #ffffff))',
+  }
 }
 
 export function initialClinicSetup(settings) {

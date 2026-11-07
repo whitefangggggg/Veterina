@@ -65,6 +65,8 @@ try {
         Object.assign(entry, { status: 'completed', finished_at: '2026-10-18T03:00:00Z', care_draft: {}, draft_version: (entry.draft_version || 0) + 1 })
       } else if (action === 'update_prescription') {
         Object.assign(raw.prescriptions.find((prescription) => prescription.id === payload.id), { medications: payload.medications })
+      } else if (action === 'update_preventive_care') {
+        Object.assign(raw.vaccinations.find((vaccine) => vaccine.id === payload.id), { dose: payload.vaccines[0].dose, administered_at: payload.administeredAt, next_due_at: payload.vaccines[0].nextDueAt })
       } else if (action === 'update_vaccination') {
         Object.assign(raw.vaccinations.find((vaccine) => vaccine.id === payload.id), { dose: payload.dose, administered_at: payload.administeredAt, next_due_at: payload.nextDueAt })
       } else if (action === 'update_service_notes') {
@@ -87,14 +89,14 @@ try {
   const filters = page.getByRole('region', { name: 'Clinical history search and filters' })
   const search = page.getByRole('searchbox', { name: 'Search clinical history' })
   const clear = page.getByRole('button', { name: 'Clear filters', exact: true })
-  const clearFilters = async () => { await clear.click(); await openAdvanced(); await expect(page.getByLabel('Filter clinical details')).toHaveValue(''); await expect(page.getByLabel('Filter record type')).toHaveValue(''); await page.getByLabel('Filter record type').selectOption('checkup'); await expect(filters.getByRole('status')).toHaveText('3 of 6 records') }
+  const clearFilters = async () => { await clear.click(); await openAdvanced(); await expect(page.getByLabel('Filter clinical details')).toHaveValue(''); await expect(page.getByLabel('Filter record type')).toHaveValue(''); await page.getByLabel('Filter record type').selectOption('checkup'); await expect(filters.getByRole('status')).toHaveText('3 of 9 records') }
   const advanced = page.getByRole('button', { name: /^Advanced/ })
   const openAdvanced = async () => { if (await advanced.getAttribute('aria-expanded') === 'false') await advanced.click() }
   await expect(cards).toHaveCount(3)
   await expect(advanced).toHaveAttribute('aria-expanded', 'false')
   await expect(page.getByLabel('Filter reason or service')).toBeHidden()
   await expect(page.getByRole('button', { name: 'Cards', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(filters.getByRole('status')).toHaveText('3 of 6 records')
+  await expect(filters.getByRole('status')).toHaveText('3 of 9 records')
   await expect(page.getByLabel('Filter reason or service')).not.toContainText('Surgery')
   for (const query of ['VOMITING clavamox', 'Oral clavamox', 'Monitor hydration', 'gastritis', 'reduced appetite', 'tender abdomen', 'mild dehydration', 'bland diet', '34 kg', 'BCS 3/5', 'jose']) {
     await search.fill(query)
@@ -120,7 +122,7 @@ try {
   await expect(search).toHaveValue('gastritis')
   await expect(page.getByLabel('Filter veterinarian')).toHaveValue('Dr. José')
   await expect(cards).toHaveCount(1)
-  await page.getByRole('button', { name: 'Vaccinations', exact: true }).click()
+  await page.getByRole('button', { name: 'Vaccinations and Deworming', exact: true }).click()
   await expect(filters).toHaveCount(0)
   await page.getByRole('button', { name: 'Clinical history', exact: true }).click()
   await expect(search).toHaveValue('gastritis')
@@ -243,8 +245,8 @@ try {
   await page.goto(app.origin + `/patients/${pet}?tab=history`)
   await expect(page.getByRole('button', { name: 'Care timeline', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Service history', exact: true })).toHaveCount(0)
-  await expect(page.locator('.clinical-timeline > article')).toHaveCount(7)
-  assert.deepEqual(await page.locator('.clinical-timeline > article').evaluateAll((elements) => elements.slice(0, 3).map((element) => element.id)), ['service-groomed', 'service-recent', 'recent'])
+  await expect(page.locator('.clinical-timeline > article')).toHaveCount(10)
+  assert.deepEqual(await page.locator('.clinical-timeline > article').evaluateAll((elements) => elements.slice(0, 3).map((element) => element.id)), ['service-groomed', 'service-recent', 'preventive-rabies'])
   await page.locator('.record-main').screenshot({ path: 'test-artifacts.local/combined-history-desktop.png' })
   await openAdvanced()
   await page.getByLabel('Filter record type').selectOption('service')
@@ -255,16 +257,16 @@ try {
   await expect(page.locator('.service-history-card')).toContainText('Historical nail care')
   await expect(page.locator('.service-history-card').getByRole('button', { name: 'Edit service record' })).toBeVisible()
   await clear.click()
-  await expect(filters.getByRole('status')).toHaveText('7 of 7 records')
+  await expect(filters.getByRole('status')).toHaveText('10 of 10 records')
   await search.fill('Bath Q-001')
   await expect(page.locator('.clinical-timeline > article')).toHaveCount(1)
   await search.fill('Historical nail Bukid')
   await expect(page.locator('.clinical-timeline > article')).toHaveCount(1)
   await clear.click()
-  await expect(filters.getByRole('status')).toHaveText('7 of 7 records')
+  await expect(filters.getByRole('status')).toHaveText('10 of 10 records')
   await page.getByRole('button', { name: 'Calendar', exact: true }).click()
   await dayButton('2026-10-18').click()
-  await expect(preview.locator('.calendar-preview-record')).toHaveCount(3)
+  await expect(preview.locator('.calendar-preview-record')).toHaveCount(4)
   for (const text of ['Reduced appetite', 'Bath and trim', 'Historical nail care']) await expect(preview).toContainText(text)
   await expect(preview.getByRole('button', { name: 'Edit checkup', exact: true })).toHaveCount(1)
   await expect(preview.getByRole('button', { name: 'Edit service record', exact: true })).toHaveCount(1)
@@ -318,7 +320,7 @@ try {
   raw.visits = originalVisits; raw.visit_vitals = originalVitals; delete raw.pets[0].baseline_weight
   await page.setViewportSize({ width: 1440, height: 1100 })
   for (const tab of [
-    { button: 'Vaccinations', label: 'Vaccinations', row: '.vaccine-row', query: 'Nobivac RAB-001', field: 'Filter brand', value: 'Nobivac', item: 'vaccination', date: 'Vaccination date', day: '2026-10-18' },
+    { button: 'Vaccinations and Deworming', label: 'Vaccinations and Deworming', row: '.preventive-history-card', query: 'Nobivac RAB-001', field: 'Filter record type', value: 'Vaccination', item: 'record', date: 'Administration date', day: '2026-10-18' },
     { button: 'Clinical history', label: 'Clinical history', row: '.service-history-card', query: 'Bath and trim', field: 'Filter care status', value: 'Completed', item: 'record', date: 'Visit date', day: '2026-10-18' },
   ]) {
     if (tab.button === 'Clinical history') await page.goto(app.origin + `/patients/${pet}?tab=history`)
@@ -343,7 +345,7 @@ try {
     await expect(tabCalendar).toBeVisible()
     await expect(tabCalendar.locator('.calendar-has-appointments')).toHaveCount(1)
     const miniInfo = tabCalendar.locator('.record-calendar-event').first()
-    await expect(miniInfo.locator('strong')).toHaveText(tab.item === 'activity' ? 'Follow-up' : tab.item === 'vaccination' ? 'Vaccination' : 'Grooming')
+    await expect(miniInfo.locator('strong')).toHaveText(tab.item === 'activity' ? 'Follow-up' : tab.button === 'Vaccinations and Deworming' ? 'Vaccination' : 'Grooming')
     await expect(rows).toHaveCount(1)
     const tabDay = () => tabCalendar.locator(`[data-day="${tab.day}"] button`)
     await tabDay().focus()
@@ -353,10 +355,10 @@ try {
     if (tab.item === 'activity') {
       await expect(preview).toContainText('250 mg')
       await expect(preview).toContainText('Bland diet')
-    } else if (tab.item === 'vaccination') {
+    } else if (tab.button === 'Vaccinations and Deworming') {
       await expect(preview).toContainText('RAB-001')
       await expect(preview).toContainText('Nobivac')
-      await expect(preview).toContainText('18 Oct 2027')
+      await expect(preview).toContainText('2027-10-18')
     } else {
       await expect(preview).toContainText('Bath and trim')
       await expect(preview).toContainText('Q-001')
@@ -404,7 +406,7 @@ try {
   // A direct vaccination citation still opens its record even with calendar selected.
   await page.goto(app.origin + `/patients/${pet}?tab=vaccines&vaccineView=calendar#vaccination-dhpp`)
   await expect(page.locator('#vaccination-dhpp')).toBeFocused()
-  await expect(page.getByRole('region', { name: 'Vaccinations calendar', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Vaccinations and Deworming calendar', exact: true })).toHaveCount(0)
   assert.equal(writes.length, 0, 'Browsing calendar previews wrote to the API')
 
   // Edits replace the preview dialog, then return to the refreshed day preview.
@@ -443,11 +445,11 @@ try {
   await preview.getByRole('button', { name: 'Close', exact: true }).click()
 
   await openDay('vaccines', 'vaccine')
-  await preview.getByRole('button', { name: 'Edit vaccination', exact: true }).click()
+  await preview.getByRole('button', { name: 'Edit vaccination record', exact: true }).click()
   await expect(preview).toHaveAttribute('aria-label', 'Edit vaccination for Mochi')
-  await preview.getByLabel('Dose', { exact: true }).fill('2 mL')
-  await preview.getByRole('button', { name: 'Save vaccination', exact: true }).click()
-  await expect(preview).toHaveAttribute('aria-label', 'Vaccinations · 18 October 2026')
+  await preview.getByLabel('Dose 1', { exact: true }).fill('2 mL')
+  await preview.getByRole('button', { name: 'Save record', exact: true }).click()
+  await expect(preview).toHaveAttribute('aria-label', 'Vaccinations and Deworming · 18 October 2026')
   await expect(preview).toContainText('2 mL')
   await expect(preview).toContainText('Nobivac')
   await preview.getByRole('button', { name: 'Close', exact: true }).click()

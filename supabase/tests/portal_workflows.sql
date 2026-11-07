@@ -92,7 +92,7 @@ begin
   if not exists(select 1 from public.visit_corrections c where c.visit_id=visit_id and c.before_data#>>'{visit,id}'=visit_id::text and c.after_data->>'appended_correction'='Corrected historical entry') then raise exception 'TEST: correction snapshots missing'; end if;
 
   perform set_config('veterina_test.vaccine_item',(public.portal_mutation('create_inventory_item',jsonb_build_object('name','Rollback vaccine','brand','Rollback Brand','category','Vaccines','unit','route','Oral','dose','minimumStock','0'),gen_random_uuid())->>'id'),true);
-  data:=jsonb_build_object('petId',pet_id,'inventoryItemId',current_setting('veterina_test.vaccine_item'),'administeredAt',care_date,'nextDueAt',care_date+10,'veterinarianId',current_setting('veterina_test.owner'));
+  data:=jsonb_build_object('petId',pet_id,'inventoryItemId',current_setting('veterina_test.vaccine_item'),'batchId',(select b.id from public.inventory_batches b where b.item_id=current_setting('veterina_test.vaccine_item')::uuid limit 1),'dispenseQuantity',1,'administeredAt',care_date,'nextDueAt',care_date+10,'veterinarianId',current_setting('veterina_test.owner'));
   vaccine_id:=(public.portal_mutation('create_vaccination',data,gen_random_uuid())->>'id')::uuid;
   perform public.portal_mutation('update_vaccination',data||jsonb_build_object('id',vaccine_id,'nextDueAt',care_date+20),gen_random_uuid());
   if (select count(*) from public.reminders r where r.vaccination_id=vaccine_id and status not in ('completed','cancelled'))<>1 then raise exception 'TEST: vaccine reminder duplicate'; end if;

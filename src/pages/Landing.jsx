@@ -8,7 +8,7 @@ import { SleepingPatientCat, ExcitedPatientDog } from '../components/PixelPatien
 const features = [
   [ClipboardText, 'Patient records & clinical history', 'Keep pets, owners, vitals, consultation notes, and care plans together. Give every visit the context of the visits before it.'],
   [CalendarBlank, 'Appointments & daily queue', 'Bookings, care due dates and owner follow-ups in one calendar. See what is scheduled and who is waiting.'],
-  [Syringe, 'Vaccinations & follow-up tasks', 'Record doses, check next-due dates, and keep track of follow-up calls and their outcomes.'],
+  [Syringe, 'Vaccinations, deworming & follow-ups', 'Record vaccines and deworming, check next-due dates, and keep track of follow-up calls and their outcomes.'],
   [Package, 'Inventory & suppliers', 'Keep an eye on stock quantities, expiry dates, and movements, with supplier details close at hand.'],
 ]
 const journey = [

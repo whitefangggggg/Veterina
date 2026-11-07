@@ -1,4 +1,6 @@
 begin;
+-- Seed pre-migration vaccine evidence without retroactive stock tracking.
+alter table public.vaccinations alter column stock_tracked set default false;
 select set_config('travel.staff',gen_random_uuid()::text,true),set_config('travel.owner',gen_random_uuid()::text,true),set_config('travel.foreign',gen_random_uuid()::text,true);
 select set_config('travel.inactive',gen_random_uuid()::text,true);
 insert into auth.users(id,email,email_confirmed_at) values
@@ -207,15 +209,25 @@ do $$ declare result jsonb; begin
   if not (select is_public from public.travel_certificates where id=(result->>'id')::uuid) then raise exception 'TEST: public choice during issuance lost'; end if;
 end $$;
 reset role;
+update public.preventive_care_records set administered_at=current_setting('travel.day')::date+1 where id=current_setting('travel.vaccine')::uuid;
 update public.vaccinations set administered_at=current_setting('travel.day')::date+1,next_due_at=current_setting('travel.day')::date+365 where id=current_setting('travel.vaccine')::uuid;
 set local role authenticated;
 select pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',current_setting('travel.payload')),'VALIDATION_FAILED');
 reset role;
+update public.preventive_care_records set administered_at=current_setting('travel.day')::date-30 where id=current_setting('travel.vaccine')::uuid;
 update public.vaccinations set administered_at=current_setting('travel.day')::date-30 where id=current_setting('travel.vaccine')::uuid;
 insert into public.queue_entries(pet_id,category,service_name,source,veterinarian_id,notes,created_by,vaccination_id,status)
   values(current_setting('travel.pet')::uuid,'vaccination','Vaccine','patient_record',current_setting('travel.staff')::uuid,'',current_setting('travel.staff')::uuid,current_setting('travel.vaccine')::uuid,'waiting');
 set local role authenticated;
 select pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',current_setting('travel.payload')),'VALIDATION_FAILED');
+reset role;
+update public.queue_entries set preventive_record_id=current_setting('travel.vaccine')::uuid where vaccination_id=current_setting('travel.vaccine')::uuid;
+-- A second vaccine in this pending group cannot become certificate evidence.
+insert into public.vaccinations(pet_id,preventive_record_id,vaccine_name,brand,lot_number,dose,administered_at,next_due_at,administered_by,stock_tracked)
+select pet_id,preventive_record_id,'Second Anti-Rabies',brand,lot_number,dose,administered_at,next_due_at,administered_by,false from public.vaccinations where id=current_setting('travel.vaccine')::uuid;
+select set_config('travel.secondary',(select id::text from public.vaccinations where vaccine_name='Second Anti-Rabies'),true);
+set local role authenticated;
+select pg_temp.reject_travel(format('select public.portal_mutation(''issue_travel_certificate'',%L::jsonb,gen_random_uuid())',current_setting('travel.payload')::jsonb||jsonb_build_object('rabiesVaccinationId',current_setting('travel.secondary'))),'VALIDATION_FAILED');
 reset role;
 update public.queue_entries set status='in_progress' where vaccination_id=current_setting('travel.vaccine')::uuid;
 set local role authenticated;
@@ -248,7 +260,7 @@ reset role;
 -- Source deletion clears only the source FK; snapshots and references survive.
 delete from public.queue_entries where vaccination_id=current_setting('travel.vaccine')::uuid;
 delete from public.reminders where vaccination_id=current_setting('travel.vaccine')::uuid;
-delete from public.vaccinations where id=current_setting('travel.vaccine')::uuid;
+delete from public.preventive_care_records where id=current_setting('travel.vaccine')::uuid;
 delete from public.pets where id=current_setting('travel.pet')::uuid;
 do $$ begin
   if not exists(select 1 from public.travel_certificates where id=current_setting('travel.certificate')::uuid and pet_id is null and rabies_vaccination_id is null and snapshot#>>'{pet,name}'='Ming' and snapshot#>>'{pet,photoDataUrl}'='data:image/png;base64,iVBORw0KGgo=') then raise exception 'TEST: deleting source changed issued record'; end if;
