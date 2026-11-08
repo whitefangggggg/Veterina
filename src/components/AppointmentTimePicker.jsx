@@ -1,3 +1,4 @@
+import { SelectField } from './VeterinaSelect'
 import { useId, useState } from 'react'
 import { appointmentTimeOptions } from '../lib/appointmentScheduling'
 
@@ -36,19 +37,19 @@ export default function AppointmentTimePicker({ date, timezone, clock, initialTi
   return <div className="field" role="group" aria-labelledby={labelId}>
     <span id={labelId}>Time<b aria-hidden="true"> *</b></span>
     <div className="appointment-time-controls">
-      <select aria-label="Appointment hour" aria-describedby={hintId} required value={hour} onFocus={onRefresh} onChange={changeHour} disabled={!options.length}>
+      <SelectField aria-label="Appointment hour" aria-describedby={hintId} required value={hour} onFocus={onRefresh} onChange={changeHour} disabled={!options.length}>
         <option value="" disabled>Hour</option>
         {periodHours.map((option) => <option key={option.value} value={option.value}>{option.label.split(' ')[0]}</option>)}
-      </select>
+      </SelectField>
       <span aria-hidden="true">:</span>
-      <select aria-label="Appointment minute" aria-describedby={hintId} required value={minute} onFocus={onRefresh} onChange={changeMinute} disabled={!hour}>
+      <SelectField aria-label="Appointment minute" aria-describedby={hintId} required value={minute} onFocus={onRefresh} onChange={changeMinute} disabled={!hour}>
         <option value="" disabled>Min</option>
         {selectedHour?.minutes.map((value) => <option key={value} value={value}>{value}</option>)}
-      </select>
-      <select aria-label="Appointment period" aria-describedby={hintId} value={period} onFocus={onRefresh} onChange={changePeriod} disabled={periods.length < 2}>
+      </SelectField>
+      <SelectField aria-label="Appointment period" aria-describedby={hintId} value={period} onFocus={onRefresh} onChange={changePeriod} disabled={periods.length < 2}>
         {!periods.length && <option value="">AM/PM</option>}
         {periods.map((value) => <option key={value} value={value}>{value}</option>)}
-      </select>
+      </SelectField>
     </div>
     <input type="hidden" name="time" value={hour && minute ? `${hour}:${minute}` : ''} />
     <small id={hintId}>{options.length ? `Clinic time: ${timezone}. Only upcoming times are available.` : 'No upcoming times on this date. Choose a later date.'}</small>

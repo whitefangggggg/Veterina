@@ -92,6 +92,7 @@ Evidence: [routes](src/App.jsx), [workspace gate](src/components/ProtectedWorksp
 | Access completion | `/complete-account`, `/access-pending`, `/subscription` | Implemented |
 | Daily work | `/dashboard`, `/queue` | Implemented |
 | Patients | `/patients`, `/patients/:petId` | Implemented |
+| Hospitalization | `/admissions`, `/admissions/:admissionId` | Implemented locally; matching migrations required |
 | Scheduling/tasks | `/appointments`; `/reminders` redirects to its task view | Implemented |
 | Stock | `/inventory`, `/suppliers` | Implemented |
 | Documents | `/travel-certificates`, public `/travel-certificate` | Implemented; public serving needs matching function |
@@ -129,6 +130,7 @@ These IDs describe current behavior that upgrades must preserve. Configuration/d
 | SYS-21 | Platform activation codes, subscription durations/extensions/events, server access checks and payload-bound retries. Code-based access management does not process payments. | [PlatformAdmin](src/pages/PlatformAdmin.jsx), [Subscription](src/pages/Subscription.jsx), [function](supabase/functions/platform-admin/index.ts) |
 | SYS-22 | PWA installation/update/offline messaging; public build assets cached, while clinical data, Auth, mutations and private photos stay network-only. | Physical-device acceptance required: [configuration](vite.config.js), [PWA status](src/components/PwaStatus.jsx) |
 | SYS-23 | Authenticated private photo upload/read/removal through Edge Functions/Cloudinary, with cache/cleanup handling. Target provider verification and cleanup scheduling required. | Configuration dependent: [photo function](supabase/functions/pet-photo/index.ts), [cleanup](supabase/functions/pet-photo-cleanup/index.ts), [guide](TESTING.md) |
+| SYS-24 | Hospitalization: exclusive active patient admissions and cage occupancy; separate operational/clinical states; attributed monitoring, corrections, scheduled care and dose-based stock; atomic discharge with frozen summaries; structured historical stays without operational effects. Approved staff order/close care; owners configure facilities, cancel intake-only errors and correct evidence. | [Admissions](src/pages/Admissions.jsx), [workspace](src/pages/AdmissionDetail.jsx), [verification/rollout](TESTING.md#patient-admission-and-hospitalization-kan-19); hosted deployment remains configuration dependent. |
 
 ### 4.3 Knowledge and assistant
 
@@ -184,6 +186,7 @@ This map orients planning; it is not a replacement schema or migration specifica
 | Clinical | `visits`, `visit_vitals`, `diagnoses`, `treatments`, `prescriptions`, `visit_corrections`, `patient_service_records` |
 | Preventive | `preventive_care_records`, `vaccinations`, `deworming_administrations`, consumption history |
 | Operations | `queue_entries`, drafts/versions, `appointments`, `appointment_events`, `reminders`, `reminder_activity`; `reminder_worklist` read model |
+| Hospitalization | `admissions`, `admission_wards`, `admission_units`, `admission_occupancy`, `admission_observations`, `admission_events`, `admission_orders`, `admission_tasks`, `admission_administrations`, `admission_discharge_summaries`; canonical `visits`/`prescriptions` and existing inventory movements |
 | Stock | `inventory_items`, `inventory_batches`, `inventory_movements`, `suppliers`, `item_suppliers` |
 | Documents/accountability | `travel_certificates`, snapshots, `audit_logs`, `export_events`, retry receipts |
 | Platform | Private subscription/code/redemption/event/administrator/receipt records |

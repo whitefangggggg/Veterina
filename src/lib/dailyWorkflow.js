@@ -37,6 +37,7 @@ export function buildPatientTimeline(data, patientId) {
   }
   for (const visit of data.visits || []) {
     if (visit.petId !== patientId) continue
+    if (visit.admissionId) continue
     add('Checkup', visit.id, visit.visitedAt, visit.type, visit.finalizedAt ? 'Finalized' : visit.careStatus || 'Recorded', visit.diagnosis || visit.complaint, patientSource(patientId, 'history', visit.id), visit.type)
     for (const prescription of visit.prescriptions || []) {
       const medicationNames = prescriptionMedications(prescription).map((medication) => medication.medicationName).filter(Boolean).join(', ')
@@ -45,6 +46,12 @@ export function buildPatientTimeline(data, patientId) {
     for (const correction of visit.corrections || []) {
       add('Correction', correction.id, correction.created_at, 'Clinical correction appended', 'Recorded', correction.reason, patientSource(patientId, 'history', visit.id), visit.type)
     }
+  }
+  for (const admission of data.admissions || []) {
+    if ((admission.petId || admission.pet_id) !== patientId) continue
+    const href = `/admissions/${encoded(admission.id)}`
+    add('Admission', admission.id, admission.admitted_at, admission.is_historical ? 'Historical hospitalization' : 'Patient admitted', admission.is_historical ? 'Record only' : 'Admitted', admission.reason, href)
+    if (admission.closed_at) add(admission.status === 'cancelled' ? 'Admission cancellation' : 'Discharge', admission.id, admission.closed_at, admission.status === 'cancelled' ? 'Admission cancelled' : 'Patient discharged', admission.status === 'cancelled' ? 'Cancelled' : 'Discharged', admission.reason, href)
   }
   for (const service of data.serviceRecords || []) {
     if (service.petId === patientId) add('Service', service.id, service.arrivedAt, service.service, 'Record only', service.serviceNotes, patientSource(patientId, 'history', `service-${service.id}`))

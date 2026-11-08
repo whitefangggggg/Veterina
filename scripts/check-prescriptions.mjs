@@ -1,3 +1,5 @@
+import { withDetailedHistory } from './helpers/history.mjs'
+import { chooseSelectOption, selectControl } from './helpers/select.mjs'
 import { openNewVisit } from './helpers/new-visit.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Browser UI checks use intercepted API responses; portal_workflows.sql covers
@@ -131,7 +133,7 @@ try {
   await expect(logoPreview).toHaveAttribute('src', preparedLogo)
   await page.setViewportSize({ width: 1440, height: 1000 })
   console.log('PASS shop logo upload validation, resize, preview, cancel, save failure/retry, persisted reload and mobile layout')
-  await page.goto(`${origin}/patients/${petId}`)
+  await page.goto(withDetailedHistory(`${origin}/patients/${petId}`))
   await expect(page.getByRole('heading', { name: 'Mochi', exact: true })).toBeVisible()
   await openNewVisit(page)
   await page.getByRole('button', { name: /Queue processing/ }).click()
@@ -140,7 +142,7 @@ try {
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await page.getByRole('button', { name: 'Add prescription', exact: true }).click()
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByLabel('Open encounter', { exact: true })).toHaveValue(visitId)
+  await expect(selectControl(dialog.getByLabel('Open encounter', { exact: true }))).toHaveValue(visitId)
   await dialog.getByLabel('Medication name 1', { exact: true }).fill('Medicine A')
   await dialog.getByLabel('Dose 1', { exact: true }).fill('Recorded dose A')
   const frequency = dialog.getByRole('combobox', { name: 'Frequency 1', exact: true })
@@ -275,14 +277,14 @@ try {
   await expect(combo).toHaveValue('Stock medicine')
   await expect(dialog.getByLabel('Instructions 1', { exact: true })).toHaveValue('')
   await expect(dialog).toContainText('Inventory context only')
-  await expect(dialog.getByLabel('Stock batch 1').locator('option')).toHaveCount(2)
+  await expect(selectControl(dialog.getByLabel('Stock batch 1')).locator('option')).toHaveCount(2)
   await dialog.getByLabel('Dose 1', { exact: true }).fill('Prescribed dose')
   await dialog.getByLabel('Frequency 1', { exact: true }).fill('Prescribed frequency')
   await dialog.getByRole('combobox', { name: 'Route 1', exact: true }).fill('Oral')
   const callsBeforeValidation = calls.length
   await dialog.getByRole('button', { name: 'Save prescription', exact: true }).click()
   assert.equal(calls.length, callsBeforeValidation, 'Missing dispensing fields reached server')
-  await dialog.getByLabel('Stock batch 1').selectOption(raw.inventory_batches[0].id)
+  await chooseSelectOption(dialog.getByLabel('Stock batch 1'), raw.inventory_batches[0].id)
   await dialog.getByLabel('Dispensing quantity 1').fill('0.5')
   await dialog.getByRole('button', { name: 'Save prescription', exact: true }).click()
   assert.equal(calls.length, callsBeforeValidation, 'Fractional whole-unit quantity reached server')
@@ -326,7 +328,7 @@ try {
   await thirdCombo.press('ArrowDown')
   await thirdCombo.press('ArrowUp')
   await thirdCombo.press('Enter')
-  await dialog.getByLabel('Stock batch 3').selectOption(raw.inventory_batches[1].id)
+  await chooseSelectOption(dialog.getByLabel('Stock batch 3'), raw.inventory_batches[1].id)
   await dialog.getByLabel('Dispensing quantity 3').fill('0.25')
   await dialog.getByLabel('Dose 3', { exact: true }).fill('Recorded liquid dose')
   await dialog.getByLabel('Frequency 3', { exact: true }).fill('Recorded liquid frequency')

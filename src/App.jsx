@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation } fr
 import ProtectedWorkspace from './components/ProtectedWorkspace'
 import { useAuth } from './context/AuthContext'
 import { safeAuthReturnTo } from './lib/authAccess'
+import { NotFoundView, RouteErrorView } from './components/ErrorViews'
 
 const Landing = lazy(() => import('./pages/Landing'))
 const Auth = lazy(() => import('./pages/Auth'))
@@ -13,6 +14,8 @@ const PlatformAdmin = lazy(() => import('./pages/PlatformAdmin'))
 const Subscription = lazy(() => import('./pages/Subscription'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Queue = lazy(() => import('./pages/Queue'))
+const Admissions = lazy(() => import('./pages/Admissions'))
+const AdmissionDetail = lazy(() => import('./pages/AdmissionDetail'))
 const Patients = lazy(() => import('./pages/Patients'))
 const PetDetail = lazy(() => import('./pages/PetDetail'))
 const TravelCertificates = lazy(() => import('./pages/TravelCertificates'))
@@ -50,7 +53,7 @@ function LegacyReminderRedirect() {
   return <Navigate to={{ pathname: '/appointments', search: `?${params}`, hash: location.hash }} replace />
 }
 
-const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
+const router = createBrowserRouter([{ element: <RecoveryRedirect />, errorElement: <RouteErrorView />, children: [
   // Marketing-safe paths (/). Clinic workspaces can later live under /:clinicSlug or /app/:clinicSlug.
   {
     path: '/',
@@ -73,6 +76,8 @@ const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
     children: [
       { path: '/dashboard', element: load(<Dashboard />) },
       { path: '/queue', element: load(<Queue />) },
+      { path: '/admissions', element: load(<Admissions />) },
+      { path: '/admissions/:admissionId', element: load(<AdmissionDetail />) },
       { path: '/patients', element: load(<Patients />) },
       { path: '/patients/:petId', element: load(<PetDetail />) },
       { path: '/travel-certificates', element: load(<TravelCertificates />) },
@@ -84,9 +89,9 @@ const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
       { path: '/settings', element: load(<Settings />) },
       { path: '/clinic-setup', element: <Navigate to="/settings" replace /> },
       // { path: '/knowledge', element: load(<Knowledge />) },
-      { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
   },
+  { path: '*', element: <NotFoundView /> },
 ]}])
 
 export default function App() {

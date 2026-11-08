@@ -1,3 +1,4 @@
+import { SelectField } from './VeterinaSelect'
 import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { Field, Modal } from './ui'
 import { useClinicData } from '../context/ClinicDataContext'
@@ -67,9 +68,9 @@ export function AsyncForm({ onSave, onSaveDraft, onClose, children, submitLabel 
 export function RecordEditor({ title, description, fields, initial = {}, onSave, onSaveDraft, onClose, submitLabel, submitActions, embedded = false, className, wizard = false }) {
   const sectionId = useId()
   const renderField = ({ name, label, type = 'text', options, required, hint, span, render, ...props }) => render ? <Fragment key={name}>{render()}</Fragment> : <Field key={name} label={label} required={required} hint={hint} span={span}>
-    {type === 'select' ? <select name={name} defaultValue={initial[name] ?? ''} required={required} {...props}>
+    {type === 'select' ? <SelectField name={name} defaultValue={initial[name] ?? ''} required={required} {...props}>
       {options.map((option) => <option key={typeof option === 'object' ? option.value : option} value={typeof option === 'object' ? option.value : option}>{typeof option === 'object' ? option.label : option}</option>)}
-    </select> : type === 'textarea' ? <textarea name={name} defaultValue={initial[name] ?? ''} required={required} rows={3} {...props} />
+    </SelectField> : type === 'textarea' ? <textarea name={name} defaultValue={initial[name] ?? ''} required={required} rows={3} {...props} />
       : <input name={name} type={type} defaultValue={initial[name] ?? ''} required={required} {...props} />}
   </Field>
   const grouped = fields.some((field) => field.fields)

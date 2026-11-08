@@ -1,3 +1,5 @@
+import { SelectField } from './VeterinaSelect'
+import ContactActions from './ContactActions'
 import { useRef, useState } from 'react'
 import { DeleteRecordDialog, RecordEditor } from './RecordForm'
 import { useClinicData } from '../context/ClinicDataContext'
@@ -61,10 +63,10 @@ export function PetEditor({ record, onClose, initialOwnerId = '', embedded = fal
       { name: 'sex', label: 'Sex', type: 'select', required: true, options: [{ value: '', label: record?.sex === 'Unknown' ? 'Previously Unknown — select sex' : 'Select sex' }, 'Male', 'Female'] },
       { name: 'reproductiveStatus', label: 'Reproductive status', type: 'select', options: ['Intact', 'Neutered', 'Spayed', 'Unknown'] },
       { name: 'birthInformation', render: () => <>
-        <Field label="Birth information"><select aria-label="Birth information" name="birthMode" value={birthMode} onChange={(event) => setBirthMode(event.target.value)}>
+        <Field label="Birth information"><SelectField aria-label="Birth information" name="birthMode" value={birthMode} onChange={(event) => setBirthMode(event.target.value)}>
           {record?.birthDateEstimated && <option value="preserve">Keep estimated birth date</option>}
           <option value="date">Birth date</option><option value="age">Enter age</option>
-        </select></Field>
+        </SelectField></Field>
         {birthMode === 'age' ? <>
           <Field label="Age in years"><input name="ageYears" type="number" min="0" step="1" value={ageYears} onChange={(event) => setAgeYears(event.target.value)} /></Field>
           <Field label="Additional months"><input name="ageMonths" type="number" min="0" max="11" step="1" value={ageMonths} onChange={(event) => setAgeMonths(event.target.value)} /></Field>
@@ -90,7 +92,7 @@ export function OwnerDirectory() {
     <input className="directory-search" aria-label="Search owners" placeholder="Search owner name, email or phone" value={query} onChange={(event) => setQuery(event.target.value)} />
     <div className="record-directory">{filtered.map((owner) => <article className="directory-card" key={owner.id}>
       <div><h3>{owner.fullName}</h3><p>{owner.phone} · {owner.email || 'No email'}</p><p>{owner.address}</p><small>{owner.pets.length} linked patients · {owner.isActive ? 'Active' : 'Inactive'}</small></div>
-      <div className="record-actions"><button className="button button-secondary small-button" onClick={() => setModal({ type: 'edit', record: owner })}>Edit owner</button>{profile.role === 'owner' && <button className="button button-secondary small-button danger-text" onClick={() => setModal({ type: 'delete', record: owner })}>Delete owner</button>}</div>
+      <div className="record-actions"><ContactActions contact={owner} /><button className="button button-secondary small-button" onClick={() => setModal({ type: 'edit', record: owner })}>Edit owner</button>{profile.role === 'owner' && <button className="button button-secondary small-button danger-text" onClick={() => setModal({ type: 'delete', record: owner })}>Delete owner</button>}</div>
     </article>)}</div>
     {!filtered.length && <p className="empty-inline">No matching owners. Add an owner to start the patient registry.</p>}
     {modal?.type === 'edit' && <OwnerEditor record={modal.record} onClose={() => setModal(null)} />}

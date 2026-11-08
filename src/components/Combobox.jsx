@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { autoUpdate, flip, offset, shift, size, useFloating } from '@floating-ui/react'
 
 export default function Combobox({ label, name, value = '', onChange, options, required = false, allowCustom = false, disabled = false, placeholder, inputProps = {} }) {
   const id = useId()
@@ -9,6 +10,11 @@ export default function Combobox({ label, name, value = '', onChange, options, r
   const [query, setQuery] = useState(selected?.label || (allowCustom ? value : ''))
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
+  const { refs, floatingStyles } = useFloating({ open: open && !disabled, strategy: 'fixed', placement: 'bottom-start', whileElementsMounted: autoUpdate,
+    middleware: [offset(6), flip({ padding: 8 }), shift({ padding: 8 }), size({ padding: 8, apply({ rects, availableHeight, availableWidth, elements }) {
+      Object.assign(elements.floating.style, { width: `${Math.min(rects.reference.width, availableWidth)}px`, maxHeight: `${Math.min(260, availableHeight)}px` })
+    } })],
+  })
   useEffect(() => {
     if (lastValue.current !== value) {
       lastValue.current = value
@@ -27,7 +33,7 @@ export default function Combobox({ label, name, value = '', onChange, options, r
   }
   return <div className="medication-combobox">
     {name && <input type="hidden" name={name} value={value} />}
-    <input {...inputProps} ref={input} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open} aria-controls={id}
+    <input {...inputProps} ref={(node) => { input.current = node; refs.setReference(node) }} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open} aria-controls={open ? id : undefined}
       aria-activedescendant={open && choices.length ? `${id}-${Math.min(active, choices.length - 1)}` : undefined}
       autoComplete="off" placeholder={placeholder} value={query} required={required} disabled={disabled}
       onFocus={() => { setActive(0); setOpen(true) }} onBlur={() => setOpen(false)}
@@ -40,7 +46,7 @@ export default function Combobox({ label, name, value = '', onChange, options, r
         }
         if (event.key === 'Enter' && open) { event.preventDefault(); select(choices[Math.min(active, choices.length - 1)]) }
       }} />
-    {open && !disabled && <div className="medication-options" ref={list} id={id} role="listbox" aria-label={`${label} options`}>
+    {open && !disabled && <div className="medication-options vt-combobox-options" style={floatingStyles} ref={(node) => { list.current = node; refs.setFloating(node) }} id={id} role="listbox" aria-label={`${label} options`}>
       {!choices.length && <p role="presentation">No matching records.</p>}
       {choices.map((option, index) => <button type="button" role="option" tabIndex={-1} key={option.value} id={`${id}-${index}`} aria-selected={index === active}
         onMouseDown={(event) => event.preventDefault()} onMouseMove={() => setActive(index)} onClick={() => select(option)}><strong>{option.label}</strong>{option.detail && <span>{option.detail}</span>}</button>)}

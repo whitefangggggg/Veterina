@@ -1,3 +1,5 @@
+import { withDetailedHistory } from './helpers/history.mjs'
+import { chooseSelectOption, selectControl } from './helpers/select.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Intercepted UI contracts only; this suite never changes clinic data.
 import { expect } from '@playwright/test'
@@ -119,7 +121,7 @@ try {
   await booking.getByRole('link', { name: 'Chip', exact: true }).focus()
   await page.keyboard.press('Enter')
   await expect(selected).toBeFocused()
-  await page.goto(app.origin + '/patients/other-pet?appointmentId=booking#patient-appointment-booking')
+  await page.goto(withDetailedHistory(app.origin + '/patients/other-pet?appointmentId=booking#patient-appointment-booking'))
   await expect(page.getByRole('status').filter({ hasText: 'no longer available' })).toBeVisible()
   await expect(page.locator('#patient-appointment-booking')).toHaveCount(0)
 
@@ -169,11 +171,11 @@ try {
   assert.equal(writes.filter((write) => write.action === 'update_encounter').length, 0)
   // Appointment check-in uses its existing authenticated mutation and retry key.
   await page.clock.fastForward(86400000)
-  await page.goto(app.origin + `/patients/${pet}?appointmentId=booking#patient-appointment-booking`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?appointmentId=booking#patient-appointment-booking`))
   await selected.getByRole('button', { name: 'Patient arrived', exact: true }).click()
   await page.getByRole('button', { name: 'Check in', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Arrival interrupted')
-  await expect(page.getByLabel('Appointment', { exact: true })).toHaveValue('booking')
+  await expect(selectControl(page.getByLabel('Appointment', { exact: true }))).toHaveValue('booking')
   await page.getByRole('button', { name: 'Check in', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(selected).toContainText('Arrived')
@@ -189,7 +191,7 @@ try {
   raw.appointments[0].status = 'completed'
   raw.visits[0].follow_up_date = '2026-10-28'
   raw.visits[0].finalized_at = '2026-10-26T04:00:00Z'
-  await page.goto(app.origin + `/patients/${pet}`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}`))
   await expect(page.getByRole('button', { name: 'Edit follow-up', exact: true })).toBeDisabled()
   const beforeWarning = writes.length
   await page.locator('.patient-schedule').getByRole('button', { name: 'Patient arrived', exact: true }).click()
@@ -208,8 +210,8 @@ try {
   assert.equal(raw.visits[0].follow_up_scheduled_date, '2026-10-26')
   await page.reload()
   await page.locator('.patient-schedule').getByRole('button', { name: 'Patient arrived', exact: true }).click()
-  await expect(page.getByLabel('Service', { exact: true })).toHaveValue('followup-service')
-  await expect(page.getByLabel('Assigned veterinarian / staff', { exact: true })).toHaveValue(actor)
+  await expect(selectControl(page.getByLabel('Service', { exact: true }))).toHaveValue('followup-service')
+  await expect(selectControl(page.getByLabel('Assigned veterinarian / staff', { exact: true }))).toHaveValue(actor)
   await page.getByLabel('Arrival notes', { exact: true }).fill('Patient arrived for wound review')
   await expect(page.getByLabel('Current weight (kg)', { exact: true })).toHaveValue('')
   await page.getByLabel('Current weight (kg)', { exact: true }).fill('10.25')
@@ -258,7 +260,7 @@ try {
   const contacts = writes.filter((write) => write.action === 'log_reminder_attempt')
   assert.equal(contacts[0].key, contacts[1].key)
   await page.locator('#reminder-custom').getByRole('button', { name: 'Book appointment', exact: true }).click()
-  await expect(page.getByLabel('Patient', { exact: true })).toHaveValue(pet)
+  await expect(selectControl(page.getByLabel('Patient', { exact: true }))).toHaveValue(pet)
   await expect(page.getByLabel('Date', { exact: true })).toHaveValue('2026-10-28')
   await page.getByRole('button', { name: 'Create appointment', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -279,13 +281,13 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0)
   assert.equal(raw.vaccinations[0].next_due_at, '2026-10-28')
   await page.locator('#reminder-custom').getByRole('button', { name: 'Complete', exact: true }).click()
-  await page.getByLabel('Call outcome').selectOption('Appointment booked')
+  await chooseSelectOption(page.getByLabel('Call outcome'), 'Appointment booked')
   await page.getByRole('button', { name: 'Save outcome', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.locator('#reminder-custom')).toHaveCount(0)
   assert.equal(raw.appointments.find((item) => item.id === 'task-booking').status, 'confirmed')
   await page.getByRole('button', { name: 'Add task', exact: true }).click()
-  await page.getByLabel('Patient', { exact: true }).selectOption(pet)
+  await chooseSelectOption(page.getByLabel('Patient', { exact: true }), pet)
   await page.getByLabel('Title', { exact: true }).fill('Custom scheduling task')
   await page.getByRole('button', { name: 'Save changes', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)

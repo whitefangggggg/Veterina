@@ -137,7 +137,7 @@ describe('database transport', () => {
   it('paginates past the API limit and respects the supplier link composite key', async () => {
     const ordering = []
     const client = { from: (table) => {
-      const query = { select: () => query, order: (column) => { ordering.push([table, column]); return query }, range: async (start) => ({ data: table === 'pets' && start === 0 ? Array.from({ length: 500 }, (_, id) => ({ id })) : table === 'pets' ? [{ id: 500 }] : [], error: null }) }
+      const query = { select: () => query, is: () => query, order: (column) => { ordering.push([table, column]); return query }, range: async (start) => ({ data: table === 'pets' && start === 0 ? Array.from({ length: 500 }, (_, id) => ({ id })) : table === 'pets' ? [{ id: 500 }] : [], error: null }) }
       return query
     } }
     const result = await fetchClinicData(client)
@@ -147,7 +147,7 @@ describe('database transport', () => {
   })
 
   it('propagates failed reads instead of substituting fixtures', async () => {
-    const query = { select: () => query, order: () => query, range: async () => ({ data: null, error: { message: 'Permission denied' } }) }
+    const query = { select: () => query, is: () => query, order: () => query, range: async () => ({ data: null, error: { message: 'Permission denied' } }) }
     await expect(fetchClinicData({ from: () => query })).rejects.toMatchObject({ message: 'Permission denied' })
   })
 })

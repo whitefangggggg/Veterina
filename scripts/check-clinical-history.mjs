@@ -1,3 +1,5 @@
+import { withDetailedHistory } from './helpers/history.mjs'
+import { chooseSelectOption, selectControl } from './helpers/select.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 // UI acceptance with intercepted API responses; no clinic data is changed.
 import { expect } from '@playwright/test'
@@ -84,12 +86,12 @@ try {
   })
   const page = await context.newPage()
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto(app.origin + `/patients/${pet}?historyKind=checkup`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?historyKind=checkup`))
   const cards = page.locator('.visit-card:not(.service-history-card):not(.preventive-history-card)')
   const filters = page.getByRole('region', { name: 'Clinical history search and filters' })
   const search = page.getByRole('searchbox', { name: 'Search clinical history' })
   const clear = page.getByRole('button', { name: 'Clear filters', exact: true })
-  const clearFilters = async () => { await clear.click(); await openAdvanced(); await expect(page.getByLabel('Filter clinical details')).toHaveValue(''); await expect(page.getByLabel('Filter record type')).toHaveValue(''); await page.getByLabel('Filter record type').selectOption('checkup'); await expect(filters.getByRole('status')).toHaveText('3 of 9 records') }
+  const clearFilters = async () => { await clear.click(); await openAdvanced(); await expect(selectControl(page.getByLabel('Filter clinical details'))).toHaveValue(''); await expect(selectControl(page.getByLabel('Filter record type'))).toHaveValue(''); await chooseSelectOption(page.getByLabel('Filter record type'), 'checkup'); await expect(filters.getByRole('status')).toHaveText('3 of 9 records') }
   const advanced = page.getByRole('button', { name: /^Advanced/ })
   const openAdvanced = async () => { if (await advanced.getAttribute('aria-expanded') === 'false') await advanced.click() }
   await expect(cards).toHaveCount(3)
@@ -97,7 +99,7 @@ try {
   await expect(page.getByLabel('Filter reason or service')).toBeHidden()
   await expect(page.getByRole('button', { name: 'Cards', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(filters.getByRole('status')).toHaveText('3 of 9 records')
-  await expect(page.getByLabel('Filter reason or service')).not.toContainText('Surgery')
+  await expect(selectControl(page.getByLabel('Filter reason or service'))).not.toContainText('Surgery')
   for (const query of ['VOMITING clavamox', 'Oral clavamox', 'Monitor hydration', 'gastritis', 'reduced appetite', 'tender abdomen', 'mild dehydration', 'bland diet', '34 kg', 'BCS 3/5', 'jose']) {
     await search.fill(query)
     await expect(cards).toHaveCount(query === 'jose' ? 2 : 1)
@@ -111,10 +113,10 @@ try {
   await expect(cards.locator('.soap-grid')).toContainText('Tender abdomen')
   await expect(cards.locator('.soap-grid')).toContainText('Mild dehydration')
   await openAdvanced()
-  await page.getByLabel('Filter reason or service').selectOption('Follow-up')
-  await page.getByLabel('Filter care status').selectOption('In progress')
-  await page.getByLabel('Filter veterinarian').selectOption('Dr. José')
-  await page.getByLabel('Filter clinical details').selectOption('prescription')
+  await chooseSelectOption(page.getByLabel('Filter reason or service'), 'Follow-up')
+  await chooseSelectOption(page.getByLabel('Filter care status'), 'In progress')
+  await chooseSelectOption(page.getByLabel('Filter veterinarian'), 'Dr. José')
+  await chooseSelectOption(page.getByLabel('Filter clinical details'), 'prescription')
   await page.getByLabel('Visit date from').fill('2026-10-18')
   await page.getByLabel('Visit date to').fill('2026-10-18')
   await expect(cards).toHaveCount(1)
@@ -123,7 +125,7 @@ try {
   await expect(advanced).toHaveAttribute('aria-expanded', 'false')
   await expect(advanced).toContainText('7')
   await expect(search).toHaveValue('gastritis')
-  await expect(page.getByLabel('Filter veterinarian')).toHaveValue('Dr. José')
+  await expect(selectControl(page.getByLabel('Filter veterinarian'))).toHaveValue('Dr. José')
   await expect(cards).toHaveCount(1)
   await page.getByRole('button', { name: 'Vaccinations and Deworming', exact: true }).click()
   await expect(filters).toHaveCount(0)
@@ -131,13 +133,13 @@ try {
   await expect(search).toHaveValue('gastritis')
   await expect(cards).toHaveCount(1)
   await openAdvanced()
-  await page.getByLabel('Filter reason or service').selectOption('Emergency')
+  await chooseSelectOption(page.getByLabel('Filter reason or service'), 'Emergency')
   await expect(cards).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'No matching records' })).toBeVisible()
   await page.getByRole('button', { name: 'Show all records' }).click()
   await expect(cards).toHaveCount(3)
   for (const [detail, count] of [['prescription', 2], ['follow-up', 1], ['correction', 1], ['finalized', 1], ['open', 2]]) {
-    await page.getByLabel('Filter clinical details').selectOption(detail)
+    await chooseSelectOption(page.getByLabel('Filter clinical details'), detail)
     await expect(cards).toHaveCount(count)
   }
   await clearFilters()
@@ -146,7 +148,7 @@ try {
   await page.getByLabel('Visit date to').fill('2026-10-16')
   await expect(filters.getByRole('alert')).toContainText('end date must be on or after')
   await clearFilters()
-  await page.goto(app.origin + `/patients/${pet}?tab=history#prescription-rx-old`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=history#prescription-rx-old`))
   await expect(page.locator('#prescription-rx-old')).toBeFocused()
   await search.fill('gastritis')
   await expect(search).toBeFocused()
@@ -226,7 +228,7 @@ try {
   await expect(cards).toHaveCount(3)
   await expect(calendar).toHaveCount(0)
   await page.getByRole('button', { name: 'Calendar', exact: true }).click()
-  await page.goto(app.origin + `/patients/${pet}?tab=history&historyView=calendar#prescription-rx-old`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=history&historyView=calendar#prescription-rx-old`))
   await expect(calendar).toHaveCount(0)
   await expect(page.locator('#prescription-rx-old')).toBeFocused()
   await page.getByRole('button', { name: 'Calendar', exact: true }).click()
@@ -245,17 +247,17 @@ try {
   await page.screenshot({ path: 'test-artifacts.local/clinical-history-desktop.png', fullPage: true })
   // Checkups, queued services and historical services share one ordered list and calendar.
   raw.patient_service_records = [{ id: 'recent', pet_id: pet, service_name: 'Nail trim', performed_at: '2026-10-18T01:00:00Z', performed_by_name: 'Dok sa Bukid', service_notes: 'Historical nail care' }]
-  await page.goto(app.origin + `/patients/${pet}?tab=history`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=history`))
   await expect(page.getByRole('button', { name: 'Care timeline', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Service history', exact: true })).toHaveCount(0)
   await expect(page.locator('.clinical-timeline > article')).toHaveCount(10)
   assert.deepEqual(await page.locator('.clinical-timeline > article').evaluateAll((elements) => elements.slice(0, 3).map((element) => element.id)), ['service-groomed', 'service-recent', 'preventive-rabies'])
   await page.locator('.record-main').screenshot({ path: 'test-artifacts.local/combined-history-desktop.png' })
   await openAdvanced()
-  await page.getByLabel('Filter record type').selectOption('service')
+  await chooseSelectOption(page.getByLabel('Filter record type'), 'service')
   await expect(page.locator('.service-history-card')).toHaveCount(4)
   await expect(cards).toHaveCount(0)
-  await page.getByLabel('Filter care status').selectOption('Record only')
+  await chooseSelectOption(page.getByLabel('Filter care status'), 'Record only')
   await expect(page.locator('.service-history-card')).toHaveCount(1)
   await expect(page.locator('.service-history-card')).toContainText('Historical nail care')
   await expect(page.locator('.service-history-card').getByRole('button', { name: 'Edit service record' })).toBeVisible()
@@ -274,7 +276,7 @@ try {
   await expect(preview.getByRole('button', { name: 'Edit checkup', exact: true })).toHaveCount(1)
   await expect(preview.getByRole('button', { name: 'Edit service record', exact: true })).toHaveCount(1)
   await preview.getByRole('button', { name: 'Close', exact: true }).click()
-  await page.goto(app.origin + `/patients/${pet}?tab=services&serviceQuery=Bath&serviceStatus=Completed&serviceView=calendar#service-groomed`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=services&serviceQuery=Bath&serviceStatus=Completed&serviceView=calendar#service-groomed`))
   await expect(page).toHaveURL(/tab=history/)
   await expect(page.locator('#service-groomed')).toBeFocused()
   await expect(search).toHaveValue('Bath')
@@ -291,7 +293,7 @@ try {
     raw.visits.push({ ...raw.visits[2], id, visited_at: at })
     raw.visit_vitals.push({ id: `${id}-vitals`, visit_id: id, measured_at: at, weight_kg: 6.7 })
   }
-  await page.goto(app.origin + `/patients/${pet}?tab=growth`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=growth`))
   const vitalsTable = page.getByRole('region', { name: 'Visit vitals table', exact: true })
   await expect(vitalsTable.locator('tbody tr')).toHaveCount(5)
   await expect(vitalsTable.locator('tbody tr').first()).toContainText('1 Jan 2027, 01:00')
@@ -315,7 +317,7 @@ try {
   await page.keyboard.press('Enter')
   await expect(page.locator('#recent')).toBeFocused()
   raw.visits = []
-  await page.goto(app.origin + `/patients/${pet}?tab=growth`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=growth`))
   await expect(page.getByRole('heading', { name: 'No visit weights recorded' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'No visit vitals recorded' })).toBeVisible()
   await expect(page.locator('.patient-baseline-weight')).toContainText('9 kg')
@@ -326,7 +328,7 @@ try {
     { button: 'Vaccinations and Deworming', label: 'Vaccinations and Deworming', row: '.preventive-history-card', query: 'Nobivac RAB-001', field: 'Filter record type', value: 'Vaccination', item: 'record', date: 'Administration date', day: '2026-10-18' },
     { button: 'Clinical history', label: 'Clinical history', row: '.service-history-card', query: 'Bath and trim', field: 'Filter care status', value: 'Completed', item: 'record', date: 'Visit date', day: '2026-10-18' },
   ]) {
-    if (tab.button === 'Clinical history') await page.goto(app.origin + `/patients/${pet}?tab=history`)
+    if (tab.button === 'Clinical history') await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=history`))
     else await page.getByRole('button', { name: tab.button, exact: true }).click()
     const toolbar = page.getByRole('region', { name: `${tab.label} search and filters`, exact: true })
     const tabSearch = toolbar.getByRole('searchbox')
@@ -338,7 +340,7 @@ try {
     await tabSearch.fill(tab.query)
     await expect(rows).toHaveCount(1)
     await toolbar.getByRole('button', { name: /^Advanced/ }).click()
-    await page.getByLabel(tab.field, { exact: true }).selectOption(tab.value)
+    await chooseSelectOption(page.getByLabel(tab.field, { exact: true }), tab.value)
     await expect(rows).toHaveCount(1)
     await page.getByLabel(`${tab.date} from`, { exact: true }).fill(tab.day)
     await expect(page.getByLabel(`${tab.date} from`, { exact: true })).toHaveValue(tab.day)
@@ -407,14 +409,14 @@ try {
     await tabCalendar.screenshot({ path: `test-artifacts.local/${tab.item}-month-grid-desktop.png` })
   }
   // A direct vaccination citation still opens its record even with calendar selected.
-  await page.goto(app.origin + `/patients/${pet}?tab=vaccines&vaccineView=calendar#vaccination-dhpp`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=vaccines&vaccineView=calendar#vaccination-dhpp`))
   await expect(page.locator('#vaccination-dhpp')).toBeFocused()
   await expect(page.getByRole('region', { name: 'Vaccinations and Deworming calendar', exact: true })).toHaveCount(0)
   assert.equal(writes.length, 0, 'Browsing calendar previews wrote to the API')
 
   // Edits replace the preview dialog, then return to the refreshed day preview.
   const openDay = async (tab, scope, day = '2026-10-18') => {
-    await page.goto(app.origin + `/patients/${pet}?tab=${tab}&${scope}View=calendar&${scope}Day=${day}`)
+    await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=${tab}&${scope}View=calendar&${scope}Day=${day}`))
     const month = page.locator('.clinical-history-calendar')
     await month.locator(`[data-day="${day}"] button`).click()
     await expect(preview).toBeVisible()
@@ -491,7 +493,7 @@ try {
   await expect(preview).toContainText('Another staff update')
   await preview.getByRole('button', { name: 'Close', exact: true }).click()
 
-  await page.goto(app.origin + `/patients/${pet}?tab=timeline&timelineView=calendar&timelineDay=2026-10-18&timelineKind=Prescription`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${pet}?tab=timeline&timelineView=calendar&timelineDay=2026-10-18&timelineKind=Prescription`))
   await expect(page).toHaveURL(/tab=history/)
   await expect(page.locator('.clinical-history-calendar')).toHaveCount(0)
   await openDay('history', 'history')

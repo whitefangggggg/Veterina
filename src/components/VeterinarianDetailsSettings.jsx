@@ -1,3 +1,4 @@
+import { SelectField } from './VeterinaSelect'
 import { useState } from 'react'
 import { Info, MagnifyingGlass, PencilSimple, Stethoscope, UserPlus, Users, WarningCircle } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
@@ -24,7 +25,7 @@ export default function VeterinarianDetailsSettings({ onRegister }) {
     <div className="veterinarian-settings-body">
       <div className="veterinarian-toolbar">
         <div className="veterinarian-search"><MagnifyingGlass size={19} aria-hidden="true" /><Field label="Search veterinarian details"><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name, PRC, PTR or TIN" /></Field></div>
-        <Field label="Show profiles"><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All clinic accounts</option><option value="veterinarians">Veterinarians</option></select></Field>
+        <Field label="Show profiles"><SelectField value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All clinic accounts</option><option value="veterinarians">Veterinarians</option></SelectField></Field>
       </div>
       <div className="veterinarian-directory-heading">
         <h3>Clinic directory <span aria-live="polite">{entries.length} {entries.length === 1 ? 'profile' : 'profiles'}</span></h3>

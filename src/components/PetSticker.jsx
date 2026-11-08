@@ -29,6 +29,7 @@ export default function PetSticker({ pet, size = 'medium', className = '' }) {
       aria-hidden="true"
     >
       {photo && failedPhoto !== photo ? <img src={photo} alt="" decoding="async" onError={() => setFailedPhoto(photo)} /> : <Icon weight="duotone" />}
+      {pet?.species && <span className="pet-species-badge"><Icon weight="fill" /></span>}
     </span>
   )
 }

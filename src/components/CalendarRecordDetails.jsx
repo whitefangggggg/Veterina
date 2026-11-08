@@ -9,6 +9,7 @@ import { calendarEditActions } from '../lib/calendarRecordEditing'
 import PrescriptionActions from './PrescriptionActions'
 import PreventiveCareCard from './PreventiveCareCard'
 import { clinicalAssessmentText, clinicalObservationRows } from '../lib/clinicalObservations'
+import { HospitalizationDetails } from './HospitalizationHistoryCard'
 
 const statusName = (value) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' })[value] || value
 const dayLabel = (value, timezone) => { const date = dateInClinic(value, timezone); return date ? format(parseISO(date), 'd MMM yyyy') : 'Not recorded' }
@@ -135,6 +136,10 @@ export default function CalendarRecordDetails({ records, kind, onEdit }) {
   const { profile } = useAuth()
   if (kind === 'clinical') return records.map((record) => <CalendarRecordDetails key={record.historyKey} records={[record.sourceRecord]} kind={record.historyKind} onEdit={onEdit} />)
   if (kind === 'preventive') return records.map((record) => <div className="calendar-preview-record" key={record.id}><PreventiveCareCard record={record} onEdit={onEdit ? (record) => onEdit({ type: 'vaccine', record, petId: record.petId }) : undefined} /></div>)
+  if (kind === 'hospitalization') return records.map((record) => {
+    const encounter = data.visits.find((visit) => visit.id === record.visit_id)
+    return <article className="calendar-preview-record" key={record.id}><header><h3>Hospitalization</h3></header><HospitalizationDetails record={record} timezone={data.timezone} />{encounter && <CheckupDetails visit={encounter} data={data} />}</article>
+  })
   return records.map((record) => <article className="calendar-preview-record" key={record.id} style={kind === 'checkup' && record.cardColor ? { '--preview-color': record.cardColor } : undefined}>
     <header><h3>{kind === 'checkup' ? record.diagnosis || record.complaint || record.type : kind === 'vaccination' ? record.vaccine : kind === 'service' ? record.service : record.title}</h3>
       {kind === 'timeline' && <Badge tone="blue">{record.kind} · {record.status}</Badge>}

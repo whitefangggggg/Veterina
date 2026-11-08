@@ -1,5 +1,6 @@
 import { dateInClinic, isClinicDate } from './dailyWorkflow'
 import { prescriptionMedications } from './prescriptions'
+import { admissionStatuses, clinicalConditions } from './admissions'
 
 export const clinicalHistoryParams = {
   query: 'historySearch', kind: 'historyKind', type: 'historyType', status: 'historyStatus',
@@ -10,8 +11,14 @@ const normalize = (value) => String(value ?? '').normalize('NFKD').replace(/\p{M
 
 export const serviceStatus = (status) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled', record_only: 'Record only' })[status] || status || 'Recorded'
 
-export function combinedClinicalHistory(visits, services, preventive = []) {
-  const records = [...visits.map((visit) => ({ ...visit, historyKind: 'checkup', historyKey: `checkup:${visit.id}`, sourceRecord: visit })),
+export function combinedClinicalHistory(visits, services, preventive = [], admissions = []) {
+  const admissionVisitIds = new Set(admissions.map((admission) => admission.visit_id))
+  const records = [...visits.filter((visit) => !admissionVisitIds.has(visit.id)).map((visit) => ({ ...visit, historyKind: 'checkup', historyKey: `checkup:${visit.id}`, sourceRecord: visit })),
+    ...admissions.map((admission) => ({ ...visits.find((visit) => visit.id === admission.visit_id), ...admission,
+      historyKind: 'hospitalization', historyKey: `hospitalization:${admission.id}`, sourceRecord: admission,
+      visitedAt: admission.admitted_at, type: 'Hospitalization', complaint: admission.reason,
+      veterinarian: admission.veterinarianName || 'Not recorded', careStatus: admissionStatuses[admission.status] || admission.status,
+      conditionLabel: clinicalConditions[admission.condition] || admission.condition })),
     ...preventive.map((record) => ({ ...record, historyKind: 'preventive', historyKey: `preventive:${record.id}`, sourceRecord: record, visitedAt: record.administeredAt, type: record.kind === 'deworming' ? 'Deworming' : 'Vaccination', veterinarian: record.veterinarianName || 'Not recorded', clinicalNotes: record.items.map((item) => [item.vaccine,item.brand,item.dose,item.lotNumber].filter(Boolean).join(' ')).join(' ') })),
     ...services.map((service) => ({ ...service, historyKind: 'service', historyKey: `service:${service.id}`, sourceRecord: service,
       visitedAt: service.arrivedAt, type: service.service, careStatus: serviceStatus(service.status),
@@ -41,13 +48,14 @@ export function filterClinicalHistory(visits, filters = {}, timezone = 'Asia/Man
     const kind = visit.historyKind || 'checkup'
     if (filters.kind && kind !== filters.kind) return false
     if (filters.type && visit.type !== filters.type) return false
-    const status = visit.recordingPurpose === 'record_only' ? 'Record only' : visit.careStatus || 'Recorded'
+    const status = kind === 'hospitalization' ? visit.careStatus : visit.recordingPurpose === 'record_only' ? 'Record only' : visit.careStatus || 'Recorded'
     if (filters.status && status !== filters.status) return false
     if (filters.veterinarian && visit.veterinarian !== filters.veterinarian) return false
     const date = dateInClinic(visit.visitedAt, timezone)
     if (isClinicDate(filters.from) && (!date || date < filters.from)) return false
     if (isClinicDate(filters.to) && (!date || date > filters.to)) return false
     if (filters.details && kind === 'service' && !['service-notes', 'no-service-notes'].includes(filters.details)) return false
+    if (['finalized', 'open'].includes(filters.details) && kind !== 'checkup') return false
     if (['service-notes', 'no-service-notes'].includes(filters.details) && (kind !== 'service' || Boolean(visit.serviceNotes?.trim()) !== (filters.details === 'service-notes'))) return false
     if (filters.details === 'prescription' && !visit.prescriptions?.length) return false
     if (filters.details === 'follow-up' && !visit.followUpDate) return false
@@ -58,8 +66,8 @@ export function filterClinicalHistory(visits, filters = {}, timezone = 'Asia/Man
 
     const text = normalize([
       visit.type, visit.serviceName, visit.service, visit.serviceNotes, visit.notes, visit.queueNumber, visit.historyKind, visit.complaint, visit.diagnosis, visit.subjective, visit.objective,
-      visit.assessment, visit.plan, visit.clinicalNotes, visit.veterinarian, status,
-      visit.finalizedAt ? 'Finalized' : '', date, visit.followUpDate, visit.hydration,
+      visit.assessment, visit.plan, visit.clinicalNotes, visit.veterinarian, status, visit.reference, visit.conditionLabel, visit.unitName,
+      visit.finalizedAt ? 'Finalized' : '', visit.is_historical ? 'Historical' : '', date, visit.followUpDate, visit.hydration,
       visit.careQueue?.queueNumber,
       visit.weightKg != null ? `${visit.weightKg} kg` : '',
       visit.temperatureC != null ? `${visit.temperatureC} °C` : '',

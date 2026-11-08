@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './helpers/select.mjs'
 import { openNewVisit, reviewRecord } from './helpers/new-visit.mjs'
 // This suite writes only to a dedicated, loopback Supabase stack. No API mocks.
 import assert from 'node:assert/strict'
@@ -59,13 +60,13 @@ try {
     await page.goto(app.origin + '/patients/' + patient.id)
     await openNewVisit(page, 'Vaccination')
     await page.getByRole('button', { name: /Queue processing/ }).click()
-    await page.getByLabel('Record type', { exact: true }).selectOption(kind)
+    await chooseSelectOption(page.getByLabel('Record type', { exact: true }), kind)
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     const count = kind === 'vaccination' ? 2 : 1
     for (let index = 1; index <= count; index++) {
       if (index > 1) await page.getByRole('button', { name: 'Add another vaccine' }).click()
-      await page.getByLabel(`Inventory product ${index}`, { exact: true }).selectOption(product.id)
-      await page.getByLabel(`Stock batch ${index}`, { exact: true }).selectOption(stockBatch.id)
+      await chooseSelectOption(page.getByLabel(`Inventory product ${index}`, { exact: true }), product.id)
+      await chooseSelectOption(page.getByLabel(`Stock batch ${index}`, { exact: true }), stockBatch.id)
       await page.getByLabel(`Stock quantity ${index}`, { exact: true }).fill('1')
       if (kind === 'vaccination') await page.getByLabel(`Lot number ${index}`, { exact: true }).fill(`MANUAL-DB-${index}`)
       await page.getByLabel(`Dose ${index}`, { exact: true }).fill('Recorded clinical dose')
@@ -144,20 +145,20 @@ try {
     await page.getByRole('button', { name: 'Preview certificate', exact: true }).click()
   }
   await openCertificate()
-  await page.getByLabel('Anti-Rabies evidence', { exact: true }).selectOption('manual')
+  await chooseSelectOption(page.getByLabel('Anti-Rabies evidence', { exact: true }), 'manual')
   await fillManual(1, 'Cancelled vaccine')
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   assert.equal(sql(`select count(*) from public.vaccinations where pet_id='${manualPet.id}'`), '0')
   await openCertificate()
   await fillCertificate('MANUAL-001')
-  await page.getByLabel('Anti-Rabies evidence', { exact: true }).selectOption('manual')
+  await chooseSelectOption(page.getByLabel('Anti-Rabies evidence', { exact: true }), 'manual')
   await fillManual(1, 'Manual Rabies <label>')
   await page.getByLabel('Manual next due date 1', { exact: true }).fill(date(365))
   await page.getByLabel('Manual product expiration 1', { exact: true }).fill(date(60))
   await page.getByRole('button', { name: 'Add vaccine details', exact: true }).click()
   await fillManual(2, 'Manual combination')
   await page.getByLabel('Manual product expiration 2', { exact: true }).fill(date(90))
-  await page.getByLabel('Certificate visibility', { exact: true }).selectOption('public')
+  await chooseSelectOption(page.getByLabel('Certificate visibility', { exact: true }), 'public')
   await confirm()
   const document = page.getByRole('dialog').frameLocator('iframe')
   await expect(document.locator('body')).toContainText('CERT-LOT-1')
@@ -196,7 +197,7 @@ try {
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click()
   await openCertificate()
   await fillCertificate('MIXED-002')
-  await page.getByLabel('Anti-Rabies vaccination record').selectOption(certificates[0].rabies_vaccination_id)
+  await chooseSelectOption(page.getByLabel('Anti-Rabies vaccination record'), certificates[0].rabies_vaccination_id)
   await page.getByRole('button', { name: 'Add vaccine details', exact: true }).click()
   await fillManual(1, 'Additional mixed vaccine')
   await confirm()

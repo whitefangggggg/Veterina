@@ -1,5 +1,136 @@
 # Testing Veterina
 
+## Patient admission and hospitalization (KAN-19)
+
+Admissions are available at `/admissions` and `/admissions/:admissionId`, and from
+the patient profile. The dashboard searches current or closed stays and filters
+status, clinical condition, veterinarian and accommodation. Owners manage wards,
+cages/kennels and archival; approved staff assign/transfer patients and mark
+released accommodation cleaned. Admissions may remain unassigned.
+
+All new writes use `portal_mutation(action, payload, retryKey)`. Facility edits
+and admission actions require `expectedVersion`; task outcomes also require
+`taskVersion`. A receipt binds the original payload and returns the same response
+after a lost acknowledgement. A changed retry payload is rejected. Forms retain
+their input and original version while polling refreshes the background. Saved
+changes whose refresh fails display recovery feedback without implying rollback.
+
+Operational states are Admitted, Under Treatment, Ready for Discharge, Discharged
+and owner-only Cancelled. Clinical condition is independent. Cancellation requires
+a reason and an intake-only Admitted stay. Discharge requires readiness, assessment,
+instructions, final condition, reasons for outstanding overdue tasks and explicit
+acknowledgment of cancelling future tasks. Closure, task outcomes, encounter
+finalization, occupancy release to cleaning-required and the summary commit together.
+
+Monitoring entries retain occurrence and recording times and the author's saved
+name. Owners append reasoned corrections; original evidence remains immutable.
+The `admission_observation_history` security-invoker view indicates superseded
+entries even when a correction is beyond the current UI page. Admission detail
+queries use stable cursors with 100-row pages; open tasks load separately from
+resolved tasks. Active pages refresh every 30 seconds while visible and on focus.
+
+One visit is authoritative for each stay (`recording_purpose=admission` for live
+care, `record_only` for historical stays). Medication details remain in
+`prescriptions`, with `dispensing_mode=on_administration`. Orders generate one-off
+or fixed-hour tasks, with explicit recurrence end times and at most 1,000 tasks.
+Revisions preserve previous schedules and cancel future occurrences with a reason.
+Given, Held, Missed and Delayed actions preserve attribution. Only Given for an
+inventory-backed medication consumes stock; dose and consumed stock quantity are
+separate. Stock validation follows existing item-lock, batch, expiry, fraction and
+immutable-movement conventions. Legacy prescription/finalization APIs reject
+inpatient encounters. Outpatient prescriptions retain `on_save` dispensing.
+
+Discharge stores a version-1 snapshot of patient, clinic, veterinarian, monitoring,
+orders, medication details, care outcomes and occupancy history. Print/Save as PDF
+uses that frozen evidence, with subsequent corrections appended separately. All
+post-discharge addenda are fetched for printing, independently of loaded UI pages.
+Complete-history exports include admission evidence and render the associated
+encounter/prescriptions once. Historical stays accept structured observations and
+medicines without live occupancy, tasks, reminders or stock effects.
+
+Run these checks against the otherwise empty synthetic loopback stack described
+below; they refuse hosted endpoints and unrelated accounts:
+
+```sh
+npm run test:admission-database
+npm run test:admission-concurrency
+npm run test:admissions
+npm run test:admission-upgrade -- --baseline test-artifacts.local/admission-baseline.sql
+```
+
+The upgrade check requires a reviewed **pre-admission schema-only** catalog export
+from `scripts/snapshot-test-schema.mjs` (copy its output to the chosen baseline
+path). It rehearses clean provisioning and a populated upgrade in rolled-back
+transactions. Populated checks fingerprint visits, prescriptions, dispensing
+ledgers, stock movements, vaccine history and an issued travel certificate before
+and after the admissions migrations. No clinic rows are copied from the source.
+
+`test:database` includes admission SQL, real concurrency and real Auth/PostgREST/UI
+acceptance; `test:all` includes that runner. The admission browser suite tests a
+lost creation acknowledgement, retained form input and identical retry keys,
+medication consumption, monitoring, 320/375/1440px layouts and modal focus,
+discharge printing, patient history, structured historical medicine and staff
+cleaning permissions. Screenshots are in ignored `test-artifacts.local/admissions-*`.
+
+The admissions UI follows `UI_UX_PATCH_SPEC.md`: hospital overview counts,
+quick-skim/detailed patient cards, ward and accommodation cards, consistent card
+and form spacing, and clinic-themed selects and checkboxes. The scope is the
+admissions list, selected stay and their dialogs. Dropdowns retain native form
+validation and FormData while exposing searchable lists and keyboard navigation.
+The browser suite verifies required-select errors, search/no-results, arrow and
+Home/End navigation, Escape returning focus without closing the dialog, checkbox
+keyboard operation, filter reset, and both card views. It checks 320/375px layouts,
+light/dark screenshots, and reduced-motion preferences. Screenshots finish finite
+animations before capture. All fixtures remain on the guarded local test stack.
+
+UI refinement validation on 8 November 2026: 258 unit tests, lint, production
+build and the real admissions browser journey passed. Lint retains the existing
+unused `icons` warning in `scripts/create-clinic-infographic.mjs`. The first browser
+passes identified an ambiguous empty-state button label and a checkbox hit target;
+both were corrected. Cold-start route loading uses a 15-second assertion timeout.
+
+Rollout order is `20261108143221_admission_foundation.sql`,
+`20261108143222_inpatient_care.sql`, then
+`20261108143224_admission_history_and_discharge.sql`, and
+`20261108152806_admission_foreign_key_indexes.sql`, followed by the frontend.
+Foundation includes safe discharge; never expose admission creation against a
+partial backend. Local verification includes clean/populated rehearsals and
+Supabase database advisors. Development deployment is recorded below; rollout
+to other environments and clinical acceptance remain separate release steps.
+Follow-up is a recommendation; booking remains an
+explicit existing workflow. Billing, owner messaging and automated dosing are
+outside KAN-19.
+
+Verification on 8 November 2026: 258 unit tests passed; production build and lint
+passed (the existing unused `icons` warning remains). All aggregate component
+suites passed individually, including the updated workspace navigation check and
+a subscription browser check rerun. The complete `test:database` runner passed
+serially, including admission SQL/concurrency/UI and existing Auth/Edge workflows.
+Clean provisioning and populated upgrade rehearsals passed, and local database
+advisors reported no issues. An initial aggregate attempt recorded the outdated
+navigation expectation, a subscription browser failure that passed on rerun,
+and a test-only deadlock caused by overlapping the catalog rehearsal with the
+database runner. Do not run catalog rehearsals alongside other database suites.
+
+Hosted Development rollout on 8 November 2026 fixed frontend `404/PGRST205`
+requests caused by the missing admissions tables. Applied migration names and
+hosted history versions are `admission_foundation` (`20261108152553`),
+`inpatient_care` (`20261108152555`), `admission_history_and_discharge`
+(`20261108152556`), and `admission_foreign_key_indexes` (`20261108152849`).
+The latter covers the new module's foreign-key lookups; clean/populated local
+rehearsals also include it. The earlier repository timestamps above remain the
+source filenames; hosted MCP history records the actual application times.
+
+Approved-member reads of admissions, wards, units, occupancy and observation
+history succeeded under the authenticated database role. The four failing REST
+endpoints now resolve and deny anonymous reads with `401/42501`, preserving the
+existing authentication boundary. All ten admissions tables have RLS, approved
+staff SELECT access and no direct authenticated writes or anonymous SELECT.
+Fingerprints across 19 existing clinic/clinical/stock/document tables matched
+before and after deployment. The hosted security-advisor baseline is unchanged;
+there are no unindexed-foreign-key findings for the admissions module. No test
+patients or care records were created in the hosted project.
+
 ## Add Record steps
 
 Patient Add Record uses one modal for service selection, recording method, the
@@ -731,3 +862,48 @@ Validation on 6 November 2026: 217 unit tests, lint and production build passed,
 along with theme, Add Record, onboarding, clinical-history, checkup-completion,
 appointment, inventory, public/auth frontend and production PWA browser checks.
 No database migration or API change is required.
+
+
+### UI/UX patch specification
+
+`npm run test:ui-refinements` verifies the agenda badge and live refresh, empty
+states and dismissal; task search and keyboard filters; searchable report patient
+selection and control spacing; branded checkbox keyboard use; independent patient
+Call/SMS links; Quick Skim records with full vitals, clinical notes, prescriptions,
+corrections and service details; supplier stock previews and inventory links; and
+404, 403 and crash boundaries with private diagnostic codes.
+
+The suite checks every clinic workspace at 320, 375 and 1440 pixels in light and
+dark mode with reduced motion. Screenshots are saved under `test-artifacts.local`
+as `ui-suppliers-light.png`, `ui-suppliers-dark.png` and `ui-reports-mobile.png`.
+All requests use intercepted fixtures. This suite never writes real clinic data.
+
+Existing browser suites use `scripts/helpers/select.mjs` to operate visible branded
+selects by fixture value. `selectControl()` separately checks the native form
+value. Native backing controls retain required validation, disabled fieldsets,
+FormData serialization and wizard review labels; they are hidden from assistive
+technology and keyboard tab order. Unknown routes now show the mascot 404, and
+unauthorized authenticated platform users see the mascot 403. Workspace navigation
+remains available through the header after removal of dashboard workspace tiles.
+
+Validation on 9 November 2026: 258 unit tests, lint and production build passed.
+UI patch, theme, public/auth frontend, admissions, appointments, clinical history,
+queue, inventory, new-visit wizard, registration, prescriptions, preventive care,
+checkup completion, historical checkups, clinic access, Google auth, travel
+certificates and subscription browser checks passed with intercepted APIs. Lint
+retains the existing unused `icons` warning in `create-clinic-infographic.mjs`.
+The UI patch requires no database migration.
+
+
+Hospital stays appear as Hospitalization records in the clinical timeline,
+sorted alongside checkups, services, vaccinations and deworming. Admission
+encounters are not repeated as separate checkups. Search, type/status filters,
+date filters, calendar entries and previews include these stays. Opening a skim
+card shows admission details and links to monitoring and discharge evidence.
+The standalone Hospitalization history section is no longer rendered.
+
+Quick Skim is the default. Detailed View is available through the view toggle;
+an explicit `historyDensity=detailed` URL preserves that choice across reloads.
+Existing source fragments still open detailed records so cited items can receive
+focus. The UI regression fixture covers the default, both views, hospitalization
+search/filter/calendar behavior, admission links and absence on other tabs.

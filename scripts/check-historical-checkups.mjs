@@ -1,3 +1,5 @@
+import { withDetailedHistory } from './helpers/history.mjs'
+import { chooseSelectOption, selectControl } from './helpers/select.mjs'
 import { openNewVisit, recordStep, reviewRecord } from './helpers/new-visit.mjs'
 // UI acceptance uses intercepted APIs. historical_checkups.sql verifies persistence and isolation.
 import assert from 'node:assert/strict'
@@ -60,7 +62,7 @@ try {
     throw new Error(`Unexpected request ${url.pathname}`)
   })
   const page = await context.newPage(); page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto(`${app.origin}/patients/${petId}`)
+  await page.goto(withDetailedHistory(`${app.origin}/patients/${petId}`))
   const openHistory = async () => {
     await openNewVisit(page)
     await expect(page.getByLabel('Chief complaint')).toHaveCount(0)
@@ -70,14 +72,14 @@ try {
   await expect(page.getByLabel('Attending veterinarian', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Weight (kg)')).toHaveValue('')
   await expect(page.getByLabel('Attending veterinarian', { exact: true })).not.toHaveAttribute('aria-invalid', 'true')
-  await expect(page.getByLabel('Reason for Checkup').locator('option')).toHaveText(['Wellness Check', 'Routine Checkup', 'Follow-up Checkup', 'Medical Concern', 'Other'])
+  await expect(selectControl(page.getByLabel('Reason for Checkup')).locator('option')).toHaveText(['Wellness Check', 'Routine Checkup', 'Follow-up Checkup', 'Medical Concern', 'Other'])
   await expect(page.getByLabel('Clinical notes')).toBeHidden()
   await expect(page.getByRole('button', { name: 'Complete Checkup', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   assert.equal(calls.length, 0)
   await page.getByLabel('Time of care (Asia/Manila)').fill('January 2, 2020')
   await page.getByLabel('Care time', { exact: true }).fill('11:00')
-  await page.getByLabel('Reason for Checkup').selectOption('Medical Concern')
+  await chooseSelectOption(page.getByLabel('Reason for Checkup'), 'Medical Concern')
   await page.getByLabel('Chief complaint').fill('Old handwritten record')
   await page.getByLabel('Attending veterinarian', { exact: true }).fill('Dok Máya sa Bukid')
   await recordStep(page, 'soap')

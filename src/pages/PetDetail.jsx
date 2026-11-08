@@ -3,7 +3,9 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { format, parseISO } from 'date-fns'
 import {
   ArrowLeft,
+  CalendarBlank,
   CalendarPlus,
+  CaretRight,
   FileText,
   Heartbeat,
   MapPin,
@@ -19,7 +21,8 @@ import {
   Warning,
 } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
-import { Badge, SectionCard } from '../components/ui'
+import { Badge, Modal, SectionCard } from '../components/ui'
+import { NotFoundView } from '../components/ErrorViews'
 import PetSticker from '../components/PetSticker'
 import VisitCard from '../components/VisitCard'
 import ClinicalHistoryFilters from '../components/ClinicalHistoryFilters'
@@ -48,6 +51,7 @@ import { recordHistoryFields } from '../lib/patientRecordHistory'
 import { preventiveHistoryRecords } from '../lib/preventiveCare'
 import PreventiveCareCard from '../components/PreventiveCareCard'
 import { clinicalObservationRows } from '../lib/clinicalObservations'
+import HospitalizationHistoryCard from '../components/HospitalizationHistoryCard'
 
 function CareStatus({ record }) {
   if (record.recordingPurpose === 'record_only') return <Badge>Record only</Badge>
@@ -65,8 +69,15 @@ export default function PetDetail() {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile } = useAuth()
-  const { getPet, getOwner, visits, preventiveCare, reminders, alerts, profiles, settings, queueEntries, serviceRecords: historicalServices, today, timezone } = useClinicData()
+  const { getPet, getOwner, visits, admissions, preventiveCare, reminders, alerts, profiles, settings, queueEntries, serviceRecords: historicalServices, today, timezone } = useClinicData()
   const [modal, setModal] = useState(null)
+  const skimMode = searchParams.get('historyDensity') !== 'detailed'
+  const setSkimMode = (skim) => {
+    const next = new URLSearchParams(searchParams)
+    if (skim) next.delete('historyDensity')
+    else next.set('historyDensity', 'detailed')
+    navigate({ search: `?${next}`, hash: skim ? '' : location.hash }, { replace: true, preventScrollReset: true })
+  }
   const normalizedParams = useMemo(() => normalizePatientHistoryParams(searchParams), [searchParams])
   const activeParams = normalizedParams || searchParams
   const tab = ['history', 'vaccines', 'growth'].includes(activeParams.get('tab')) ? activeParams.get('tab') : 'history'
@@ -97,7 +108,7 @@ export default function PetDetail() {
   const owner = getOwner(pet?.ownerId)
   const petVisits = useMemo(() => visits.filter((item) => item.petId === petId).sort((a, b) => b.visitedAt.localeCompare(a.visitedAt)), [visits, petId])
   const maintenance = [...queueEntries.filter((entry) => entry.petId === petId && entry.category === 'maintenance'), ...historicalServices.filter((entry) => entry.petId === petId)]
-  const historyRecords = combinedClinicalHistory(petVisits, maintenance, preventiveCare.filter((record) => record.petId === petId))
+  const historyRecords = combinedClinicalHistory(petVisits, maintenance, preventiveCare.filter((record) => record.petId === petId), admissions.filter((record) => record.petId === petId))
   const historyFilters = Object.fromEntries(Object.entries(clinicalHistoryParams).map(([field, param]) => [field, activeParams.get(param) || '']))
   const filteredVisits = filterClinicalHistory(historyRecords, historyFilters, timezone)
   const historyView = !targetId && searchParams.get('historyView') === 'calendar' ? 'calendar' : 'cards'
@@ -144,7 +155,7 @@ export default function PetDetail() {
   const vaccineFields = recordHistoryFields(vaccineRecords, [['kind', 'Record type', 'Vaccinations and Deworming'], ['status', 'Care status', 'All care statuses'], ['due', 'Next dose status', 'All next dose statuses'], ['veterinarian', 'Veterinarian', 'All veterinarians']])
   const petReminders = reminders.filter((item) => item.petId === petId && !['Completed', 'Cancelled'].includes(item.status))
 
-  if (!pet) return <div className="page"><Link to="/patients" className="text-link"><ArrowLeft size={17} weight="bold" /> Back to patients</Link><div className="not-found"><h1>Patient not found</h1></div></div>
+  if (!pet) return <NotFoundView embedded />
 
   return (
     <div className="page">
@@ -160,6 +171,7 @@ export default function PetDetail() {
           {profile.role === 'owner' && <button className="button button-secondary" disabled={printing} onClick={printHistory}><Printer size={18} weight="duotone" /> {printing ? 'Preparing...' : 'Print history'}</button>}
           <Link className="button button-secondary" to={`/appointments?new=1&petId=${encodeURIComponent(pet.id)}`}><CalendarPlus size={18} weight="duotone" /> Book appointment</Link>
           <Link className="button button-secondary" to={`/travel-certificates?petId=${encodeURIComponent(pet.id)}`}><FileText size={18} weight="duotone" /> Travel certificate</Link>
+          <Link className="button button-secondary" to={`/admissions?petId=${encodeURIComponent(pet.id)}`}>Admit / record hospital stay</Link>
           <button className="button button-secondary" onClick={() => setModal({ type: 'prescription' })}><Pill size={18} weight="duotone" /> Add prescription</button>
           <button className="button button-primary" onClick={() => setModal({ type: 'new-visit' })}><Plus size={18} weight="bold" /> Add Record</button>
         </div>
@@ -193,15 +205,22 @@ export default function PetDetail() {
           </div>
 
           {tab === 'history' && (
-            <>
+            <section className="clinical-history-section" aria-label="Clinical history">
             <ClinicalHistoryFilters combined itemName="record" itemPlural="records" visits={historyRecords} filters={historyFilters} onChange={changeHistoryFilter} onClear={clearHistoryFilters} count={filteredVisits.length} timezone={timezone} view={historyView} onViewChange={changeHistoryView} />
+            <div className="skim-toggle-group" role="group" aria-label="Record detail level"><button type="button" className="view-toggle-btn" aria-pressed={!skimMode || Boolean(targetId)} onClick={() => setSkimMode(false)}>Detailed View</button><button type="button" className="view-toggle-btn" aria-pressed={skimMode && !targetId} onClick={() => setSkimMode(true)}>Quick Skim</button></div>
             {historyView === 'calendar' && <>
               <ClinicalHistoryCalendar itemName="record" itemPlural="records" visits={filteredVisits} month={historyMonth} day={historyDay} today={today} timezone={timezone} onMonthChange={changeHistoryMonth} onDayChange={changeHistoryDay} onDayPreview={(day) => setModal({ type: 'calendar-preview', day })} />
               <div className="clinical-history-day-heading"><h2>{format(parseISO(historyDay), 'd MMMM yyyy')}</h2><span>{visibleVisits.length} record{visibleVisits.length === 1 ? '' : 's'}</span></div>
             </>}
             <div className="clinical-timeline">
               {visibleVisits.map((visit) => {
+                if (skimMode && !targetId) return <button type="button" className="skim-folder-card" key={visit.historyKey} onClick={() => setModal({ type: 'skim-detail', record: visit })}>
+                  <span className="skim-folder-tab"><CalendarBlank size={16} />{format(parseISO(dateInClinic(visit.visitedAt, timezone)), 'd MMM yyyy')}</span>
+                  <span className="skim-main"><span className="skim-headline"><Badge tone="blue">{visit.type}</Badge><strong>{visit.diagnosis || visit.complaint || visit.service || visit.clinicalNotes || 'Clinical record'}</strong>{visit.historyKind === 'hospitalization' && <Badge>{visit.careStatus}</Badge>}</span><span className="skim-vet">{visit.veterinarian || 'Veterinarian not recorded'}{visit.historyKind === 'hospitalization' && <> · {visit.reference}</>}</span></span>
+                  {visit.weightKg != null && <span className="skim-vital-chip">{visit.weightKg} kg</span>}<CaretRight size={16} />
+                </button>
                 if (visit.historyKind === 'preventive') return <PreventiveCareCard key={visit.historyKey} record={visit.sourceRecord} onEdit={(record) => setModal({ type: 'vaccine', record })} />
+                if (visit.historyKind === 'hospitalization') return <HospitalizationHistoryCard key={visit.historyKey} record={visit.sourceRecord} timezone={timezone} />
                 if (visit.historyKind === 'service') return <ServiceHistoryCard key={visit.historyKey} record={visit.sourceRecord} timezone={timezone} onEdit={(record) => setModal({ type: 'historical-service', record })} />
                 const activeQueue = ['Waiting', 'In progress'].includes(visit.careStatus) ? visit.careQueue : null
                 return (
@@ -236,11 +255,11 @@ export default function PetDetail() {
                     {visit.followUpDate && <div className="follow-up-note"><CalendarPlus size={16} weight="duotone" /> {visit.recordingPurpose === 'record_only' ? 'Historical follow-up date' : 'Follow-up due'} {format(parseISO(visit.followUpDate), 'd MMMM yyyy')}</div>}
                 </VisitCard>
               )})}
-              {!historyRecords.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No clinical records yet</h3><p>Record a checkup or service to begin this pet’s history.</p></div>}
+              {!historyRecords.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No clinical records yet</h3><p>Record a checkup, service, or hospital stay to begin this pet’s history.</p></div>}
               {historyRecords.length > 0 && !filteredVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No matching records</h3><p>Try another search or clear the filters to see all records.</p><button type="button" className="button button-secondary" onClick={clearHistoryFilters}>Show all records</button></div>}
               {historyView === 'calendar' && filteredVisits.length > 0 && !visibleVisits.length && <div className="empty-inline"><FileText size={30} weight="duotone" /><h3>No records on this day</h3><p>Select a marked day to see its clinical details.</p></div>}
             </div>
-            </>
+            </section>
           )}
 
           {tab === 'vaccines' && (
@@ -288,6 +307,7 @@ export default function PetDetail() {
         </aside>
       </div>
       {modal?.type === 'calendar-preview' && <CalendarDayPreview label="Clinical history" day={modal.day} count={previewVisits.length} itemName="record" itemPlural="records" timezone={timezone} onClose={() => setModal(null)}><CalendarRecordDetails records={previewVisits} kind="clinical" /></CalendarDayPreview>}
+      {modal?.type === 'skim-detail' && <Modal wide title={`Clinical Record · ${format(parseISO(dateInClinic(modal.record.visitedAt, timezone)), 'd MMMM yyyy')}`} description={`${modal.record.type} · ${modal.record.veterinarian || 'Veterinarian not recorded'}`} onClose={() => setModal(null)}><CalendarRecordDetails records={[modal.record]} kind="clinical" /></Modal>}
       {modal?.type === 'new-visit' && <NewVisitDialog initialWorkflow={modal.workflow} pet={pet} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: modal.workflow === 'vaccination' ? 'Vaccinations and Deworming' : 'Visit' }); setTab(saved.serviceWorkflow === 'vaccination' ? 'vaccines' : 'history') }} onClose={() => setModal(null)} />}
       {modal?.type === 'historical-service' && <ServiceVisitEditor pet={pet} purpose="record_only" record={modal.record} service={{ id: modal.record.serviceTypeId, name: modal.record.service }} onClose={() => setModal(null)} />}
       {modal?.type === 'visit' && <VisitModal pet={pet} record={modal.record} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Checkup' }) }} onClose={() => setModal(null)} />}

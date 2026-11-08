@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient'
 import { prescriptionMedications } from './prescriptions'
 import { clinicalObservationRows } from './clinicalObservations'
+import { admissionSummaryContent } from './admissions'
 
 export async function invokeClinicFunction(name, body, includeResponse = false) {
   const { data, error, response } = await supabase.functions.invoke(name, { body })
@@ -36,6 +37,8 @@ export function historyHtml(history, { clinic, profiles = [] } = {}) {
   const date = (value) => value ? escapeHtml(String(value).replace('T', ' ').replace(/\\+00:00$|Z$/, ' UTC')) : '—'
   const details = (fields) => fields.filter(([, value]) => value !== undefined && value !== null && value !== '').map(([label, value]) => '<p><strong>' + escapeHtml(label) + ':</strong> ' + escapeHtml(value) + '</p>').join('')
   const section = (heading, rows, fields) => '<section><h2>' + heading + '</h2>' + (rows?.length ? rows.map((row) => '<article>' + details(fields(row)) + '</article>').join('') : '<p>No records.</p>') + '</section>'
+  const inpatientVisits = new Set((history.admissions || []).map((entry) => entry.record.visit_id))
+  history = { ...history, visits: (history.visits || []).filter((row) => !inpatientVisits.has(row.id)), prescriptions: (history.prescriptions || []).filter((row) => !inpatientVisits.has(row.visit_id)) }
   const patient = history.patient
   const owner = history.owner
   const byDate = (rows, field) => [...(rows || [])].sort((a, b) => (b[field] || '').localeCompare(a[field] || ''))
@@ -51,6 +54,7 @@ export function historyHtml(history, { clinic, profiles = [] } = {}) {
     + section('Prescriptions', history.prescriptions, (row) => [['Record type', row.is_historical ? 'Historical prescription record' : 'Prescription'], ['Prescribed at', row.prescribed_at], ['Prescribed by', row.prescribed_by_name || (row.prescribed_by ? name(row.prescribed_by) : 'Not recorded')], ...prescriptionMedications(row).flatMap((medication, index) => [[`Medication ${index + 1}`, medication.medicationName], ['Dose', medication.dose], ['Route', medication.route || 'Not recorded'], ['Frequency', medication.frequency], ['Duration', medication.duration], ['Instructions', medication.instructions]])])
     + section('Corrections', byDate(history.corrections, 'created_at'), (row) => [['Recorded at', row.created_at], ['Reason', row.reason], ['Correction', row.correction], ['Recorded by', name(row.recorded_by)]])
     + section('Reminders', byDate(history.reminders, 'due_at'), (row) => [['Title', row.title], ['Due at', row.due_at], ['Status', row.status], ['Notes', row.notes], ['Outcome', row.outcome]])
+    + (history.admissions?.length ? '<section><h2>Hospitalizations</h2>' + history.admissions.map((entry) => admissionSummaryContent(entry.snapshot, entry)).join('') + '</section>' : '')
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Patient history · ' + escapeHtml(patient.name) + '</title><style>html{color-scheme:light;background:#fff}body{background:#fff;font:13px/1.5 system-ui;color:#182c24;margin:30px}h1{font-size:24px}h2{font-size:17px;border-bottom:1px solid #ccc}article{break-inside:avoid;border-bottom:1px solid #eee;padding:8px 0}p{white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0}@page{margin:18mm}</style></head><body>' + (clinic ? '<p><strong>' + escapeHtml(clinic.clinic_name) + '</strong><br>' + escapeHtml(clinic.address) + '<br>' + escapeHtml(clinic.phone) + '</p>' : '') + '<h1>Complete patient history · ' + escapeHtml(patient.name) + '</h1><p>Prepared ' + date(new Date().toISOString()) + '</p>' + content + '</body></html>'
 }
 

@@ -40,6 +40,27 @@ describe('clinical history search and filters', () => {
     expect(matching({ details: 'no-service-notes' })).toEqual(['service:historic'])
     expect(matching({ kind: 'checkup', details: 'service-notes' })).toEqual([])
   })
+  it('merges hospital stays chronologically without repeating their admission encounters', () => {
+    const stay = { id: 'stay', visit_id: 'inpatient', admitted_at: '2026-10-18T03:00:00Z', reason: 'Observation after surgery', reference: 'ADM-123', veterinarianName: 'Dr. Lee', condition: 'under_observation', status: 'under_treatment', unitName: 'Ward A' }
+    const encounter = { id: 'inpatient', visitedAt: stay.admitted_at, prescriptions: [{ medication_name: 'Inpatient medicine' }] }
+    const records = combinedClinicalHistory([...visits, encounter], services, [], [stay, stay])
+    expect(records[0].historyKey).toBe('hospitalization:stay')
+    expect(records[0].sourceRecord).toBe(stay)
+    expect(records.some((record) => record.historyKey === 'checkup:inpatient')).toBe(false)
+    expect(records.filter((record) => record.historyKind === 'hospitalization')).toHaveLength(1)
+    expect(filterClinicalHistory(records, { kind: 'hospitalization', status: 'Under Treatment', veterinarian: 'Dr. Lee', from: '2026-10-18', to: '2026-10-18', query: 'ADM-123 observation Ward A' }).map((record) => record.historyKey)).toEqual(['hospitalization:stay'])
+    expect(filterClinicalHistory(records, { query: 'Inpatient medicine', details: 'prescription' }).map((record) => record.historyKey)).toEqual(['hospitalization:stay'])
+    expect(filterClinicalHistory(records, { kind: 'hospitalization', details: 'open' })).toEqual([])
+    expect(stay.historyKind).toBeUndefined()
+  })
+  it('retains discharged, cancelled and historical stays with no encounter available', () => {
+    const records = combinedClinicalHistory([{ id: 'past-visit', recordingPurpose: 'record_only' }], [], [], [
+      { id: 'past', visit_id: 'past-visit', admitted_at: '2020-01-01T03:00:00Z', status: 'discharged', is_historical: true },
+      { id: 'cancelled', admitted_at: '2026-10-18T03:00:00Z', status: 'cancelled' },
+    ])
+    expect(records.map((record) => record.careStatus)).toEqual(['Cancelled', 'Discharged'])
+    expect(filterClinicalHistory(records, { status: 'Discharged' }).map((record) => record.id)).toEqual(['past'])
+  })
   it('translates removed service tabs and filters without overwriting explicit clinical filters', () => {
     const params = new URLSearchParams('tab=services&serviceQuery=bath&serviceService=Grooming&serviceStatus=Completed&serviceNotes=With+service+notes&serviceView=calendar&serviceDay=2026-10-18&historySearch=trim&appointmentId=a')
     const normalized = normalizePatientHistoryParams(params)

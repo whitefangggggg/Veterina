@@ -13,6 +13,10 @@
     "test:browser": "node scripts/check-frontend.mjs",
     "test:connections": "node scripts/check-connections.mjs",
     "test:database": "node scripts/check-database.mjs",
+    "test:admissions": "node scripts/check-admissions.mjs",
+    "test:admission-database": "node scripts/check-admissions-database.mjs",
+    "test:admission-concurrency": "node scripts/check-admission-concurrency.mjs",
+    "test:admission-upgrade": "node scripts/check-admission-upgrade.mjs",
     "test:all": "node scripts/check-all.mjs",
     "test:schema": "node scripts/snapshot-test-schema.mjs",
     "test:pwa": "node scripts/check-pwa.mjs",
@@ -42,10 +46,12 @@
     "test:subscriptions": "node scripts/check-subscriptions.mjs",
     "test:subscription-api": "node scripts/check-subscription-api.mjs",
     "test:subscription-concurrency": "node scripts/check-subscription-concurrency.mjs",
-    "test:api": "node scripts/check-supabase.mjs"
+    "test:api": "node scripts/check-supabase.mjs",
+    "test:ui-refinements": "node scripts/check-ui-refinements.mjs"
   },
   "dependencies": {
     "@daypicker/react": "^10.0.1",
+    "@floating-ui/react": "^0.27.20",
     "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.111.0",
     "date-fns": "^4.4.0",

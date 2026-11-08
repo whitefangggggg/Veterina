@@ -1,0 +1,12 @@
+.vt-checkbox-label { position: relative; display: inline-flex; align-items: flex-start; gap: 10px; color: var(--ink); font-size: 13px; line-height: 1.5; cursor: pointer; }
+.vt-checkbox-control { position: relative; display: inline-flex; flex: 0 0 20px; margin-top: 1px; }
+.vt-checkbox-native { position: absolute; inset: 0; z-index: 1; width: 20px; height: 20px; margin: 0; opacity: 0; cursor: inherit; }
+.vt-checkbox-box { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: 1px solid var(--muted); border-radius: 6px; background: var(--surface); transition: background 150ms, border-color 150ms; }
+.vt-checkbox-box svg { opacity: 0; color: var(--on-brand, #fff); }
+.vt-checkbox-native:checked + .vt-checkbox-box { background: var(--brand); border-color: var(--brand); }
+.vt-checkbox-native:checked + .vt-checkbox-box svg { opacity: 1; animation: vtCheckPop 140ms ease-out; }
+@keyframes vtCheckPop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+.vt-checkbox-native:focus-visible + .vt-checkbox-box { outline: 2px solid var(--brand-ink); outline-offset: 3px; }
+.vt-checkbox-label:hover .vt-checkbox-box { border-color: var(--brand-ink); }
+.vt-checkbox-label:has(:disabled) { opacity: .6; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .vt-checkbox-box { transition: none; } .vt-checkbox-box svg { animation: none !important; } }

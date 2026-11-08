@@ -1,3 +1,5 @@
+import { withDetailedHistory } from './helpers/history.mjs'
+import { chooseSelectOption, selectControl } from './helpers/select.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Stateful intercepted API checks: UI contracts, never proof of database integrity.
 import { expect as baseExpect } from '@playwright/test'
@@ -81,7 +83,7 @@ try {
   page.on('requestfailed', (request) => failedRequests.push(`${request.url()}: ${request.failure()?.errorText}`))
   await page.clock.install({ time: now })
   if (!process.argv.includes('--daily-only')) {
-  const routes = ['/dashboard', '/queue', '/patients', `/patients/${petId}`, '/appointments', '/travel-certificates', '/inventory', '/suppliers', '/reports', '/settings']
+  const routes = ['/dashboard', '/queue', '/admissions', '/patients', `/patients/${petId}`, '/appointments', '/travel-certificates', '/inventory', '/suppliers', '/reports', '/settings']
   for (const role of ['clinical_staff', 'owner']) {
     profile.role = role
     for (const route of routes) {
@@ -131,12 +133,12 @@ try {
   await page.getByRole('button', { name: /Mochi/ }).click()
   await expect(page).toHaveURL(app.origin + `/patients/${petId}`)
   await page.getByRole('link', { name: 'Book appointment', exact: true }).click()
-  await expect(page.getByLabel('Patient', { exact: true })).toHaveValue(petId)
+  await expect(selectControl(page.getByLabel('Patient', { exact: true }))).toHaveValue(petId)
   await page.reload()
-  await expect(page.getByLabel('Patient', { exact: true })).toHaveValue(petId)
+  await expect(selectControl(page.getByLabel('Patient', { exact: true }))).toHaveValue(petId)
   await page.getByRole('button', { name: 'Create appointment', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Booking interrupted')
-  await expect(page.getByLabel('Patient', { exact: true })).toHaveValue(petId)
+  await expect(selectControl(page.getByLabel('Patient', { exact: true }))).toHaveValue(petId)
   await page.getByRole('button', { name: 'Create appointment', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   const saves = calls.filter((call) => call.action === 'book_appointment')
@@ -155,9 +157,10 @@ try {
   await page.goto(app.origin + '/reminders')
   await page.getByRole('link', { name: 'Mochi', exact: true }).click()
   await expect(page).toHaveURL(app.origin + `/patients/${petId}`)
-  await page.goto(app.origin + '/patients/missing')
-  await expect(page.getByRole('heading', { name: 'Patient not found' })).toBeVisible()
-  await page.getByRole('link', { name: 'Back to patients' }).click()
+  await page.goto(withDetailedHistory(app.origin + '/patients/missing'))
+  await expect(page.getByRole('heading', { name: 'This trail went cold', exact: true })).toBeVisible()
+  await expect(page.locator('main main')).toHaveCount(0)
+  await page.getByRole('link', { name: 'Search Clinic Records', exact: true }).click()
   await page.getByPlaceholder('Search pet, owner, phone or record number...').fill('No such patient')
   await expect(page.getByRole('heading', { name: 'No matching patients' })).toBeVisible()
   console.log('PASS patient booking context, reload, retry keys, invalid/inactive IDs, patient links, missing patients and search empty state')
@@ -175,7 +178,7 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByRole('button', { name: 'Update stock', exact: true }).click()
   await page.getByLabel('Quantity', { exact: false }).fill('8')
-  await page.getByLabel('Reason', { exact: false }).selectOption('Supplier delivery')
+  await chooseSelectOption(page.getByLabel('Reason', { exact: false }), 'Supplier delivery')
   await page.getByRole('button', { name: 'Record movement', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.reload()
@@ -211,8 +214,8 @@ try {
   */
   for (const suffix of ['', '#missing', '#%E0%A4%A']) {
     await page.goto(app.origin + '/knowledge' + suffix)
-    await expect(page).toHaveURL(app.origin + '/dashboard')
-    await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible()
+    await expect(page).toHaveURL(app.origin + '/knowledge' + suffix)
+    await expect(page.getByRole('heading', { name: 'This trail went cold', exact: true })).toBeVisible()
   }
   } else {
     raw.appointments.push({ id: 'new-booking', pet_id: petId, service_type_id: 'service', veterinarian_id: userId, status: 'confirmed', starts_at: '2026-10-17T05:00:00Z', ends_at: '2026-10-17T05:30:00Z' })
@@ -259,14 +262,14 @@ try {
   await expect(stockPanel).toContainText('expiring soon')
   await stockPanel.getByRole('link', { name: 'Review item', exact: true }).first().click()
   await expect(page.locator('#inventory-item-a')).toBeFocused()
-  await page.getByLabel('Stock attention', { exact: true }).selectOption('expired')
+  await chooseSelectOption(page.getByLabel('Stock attention', { exact: true }), 'expired')
   await expect(page.locator('.inventory-record')).toHaveCount(1)
   await page.reload()
-  await expect(page.getByLabel('Stock attention', { exact: true })).toHaveValue('expired')
-  await page.getByLabel('Stock attention', { exact: true }).selectOption('expiring')
+  await expect(selectControl(page.getByLabel('Stock attention', { exact: true }))).toHaveValue('expired')
+  await chooseSelectOption(page.getByLabel('Stock attention', { exact: true }), 'expiring')
   await expect(page.locator('#inventory-item-a')).toBeVisible()
 
-  await page.goto(app.origin + `/patients/${petId}?tab=timeline&timelineKind=Prescription`)
+  await page.goto(withDetailedHistory(app.origin + `/patients/${petId}?tab=timeline&timelineKind=Prescription`))
   await expect(page).toHaveURL(/tab=history/)
   await expect(page.getByRole('button', { name: 'Care timeline', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Service history', exact: true })).toHaveCount(0)
@@ -287,7 +290,7 @@ try {
     await page.reload()
     await expect(page.locator(target)).toBeFocused()
   }
-  await page.goto(app.origin + '/patients/inactive-pet?tab=timeline')
+  await page.goto(withDetailedHistory(app.origin + '/patients/inactive-pet?tab=timeline'))
   await expect(page.getByRole('heading', { name: 'No clinical records yet' })).toBeVisible()
   await page.goto(app.origin + '/dashboard')
   await expect(page.getByRole('heading', { name: 'Care at the clinic (2)', exact: true })).toBeVisible()
@@ -306,7 +309,7 @@ try {
   await page.evaluate(() => sessionStorage.setItem('signed-out', '1'))
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible()
-  await page.goto(app.origin + '/patients/' + petId)
+  await page.goto(withDetailedHistory(app.origin + '/patients/' + petId))
   await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible()
   assert.deepEqual(errors, [])
   console.log('PASS citation focus on click/reload, missing sources, failed database reads/retry, and sign-out isolation; no JavaScript errors')

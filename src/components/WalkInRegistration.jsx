@@ -1,3 +1,4 @@
+import { SelectField } from './VeterinaSelect'
 import { useEffect, useRef, useState } from 'react'
 import { useClinicData } from '../context/ClinicDataContext'
 import { AsyncForm, RecordEditor } from './RecordForm'
@@ -35,7 +36,7 @@ export default function WalkInRegistration({ onClose }) {
       <p>Owner: <strong>{owner?.fullName}</strong> · {owner?.phone}</p>
       <div className="segmented-control"><button type="button" className={petMode === 'existing' ? 'active' : ''} onClick={() => setPetMode('existing')}>Existing pet</button><button type="button" className={petMode === 'new' ? 'active' : ''} onClick={() => setPetMode('new')}>Register pet</button></div>
       <div hidden={petMode !== 'existing'}><AsyncForm submitLabel="Continue to arrival" onSave={() => { if (!availablePets.some((entry) => entry.id === petId)) throw new Error('Select a pet belonging to this owner.'); setStep(3) }}>
-        <Field label="Patient" required><select aria-label="Walk-in patient" required value={petId} onChange={(event) => setPetId(event.target.value)}><option value="">Select an active patient</option>{availablePets.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.recordNumber}</option>)}</select></Field>
+        <Field label="Patient" required><SelectField aria-label="Walk-in patient" required value={petId} onChange={(event) => setPetId(event.target.value)}><option value="">Select an active patient</option>{availablePets.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.recordNumber}</option>)}</SelectField></Field>
         {!availablePets.length && <p>This owner has no active patients. Register their pet to continue.</p>}
       </AsyncForm></div>
       <div hidden={petMode !== 'new'}><PetEditor key={ownerId} initialOwnerId={ownerId} lockOwner embedded onSaved={(saved) => { setPetId(saved.id); setPetMode('existing'); setStep(3) }} /></div>

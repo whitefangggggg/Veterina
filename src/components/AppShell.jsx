@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  BellRinging,
   CalendarDots,
   CaretDown,
   ChartBar,
@@ -23,10 +22,12 @@ import { authErrorMessage } from '../lib/authAccess'
 import PetSticker from './PetSticker'
 import { isClinicLogoDataUrl } from '../lib/clinicLogo'
 import SubscriptionTimer from './SubscriptionTimer'
+import NotificationHub from './NotificationHub'
 import '../pages/PlatformAdmin.css'
 
 const workspaces = [
   { to: '/queue', label: 'In-site queue', detail: 'Arrivals and care in progress', icon: FirstAidKit, color: 'amber' },
+  { to: '/admissions', label: 'Admissions', detail: 'Hospitalization and inpatient care', icon: FirstAidKit, color: 'sage' },
   { to: '/patients', label: 'Patients', detail: 'Owners and clinical records', icon: PawPrint, color: 'sage' },
   { to: '/travel-certificates', label: 'Travel Certificates', detail: 'Pet vaccination and travel documents', icon: FileText, color: 'sage' },
   { to: '/appointments', label: 'Appointments', detail: 'Bookings, due care and owner follow-ups', icon: CalendarDots, color: 'mint' },
@@ -51,9 +52,22 @@ function Brand() {
 
 function WorkspaceSwitcher({ onClose }) {
   const location = useLocation()
+  const dialog = useRef(null)
+  useEffect(() => {
+    const previous = document.activeElement
+    dialog.current?.querySelector('button')?.focus()
+    return () => { if (previous?.isConnected) previous.focus() }
+  }, [])
+  const trapFocus = (event) => {
+    if (event.key !== 'Tab') return
+    const controls = [...dialog.current.querySelectorAll('button,a[href]')]
+    const first = controls[0], last = controls.at(-1)
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+  }
   return (
     <div className="workspace-overlay" onMouseDown={onClose}>
-      <section className="workspace-switcher" role="dialog" aria-modal="true" aria-label="Choose a workspace" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialog} onKeyDown={trapFocus} className="workspace-switcher" role="dialog" aria-modal="true" aria-label="Choose a workspace" onMouseDown={(event) => event.stopPropagation()}>
         <header>
           <div><span className="eyebrow">Clinic workspaces</span><h2>Where would you like to go?</h2><p>Each area has its own focused space.</p></div>
           <button className="icon-button" onClick={onClose} aria-label="Close workspace menu"><X size={20} /></button>
@@ -133,7 +147,7 @@ function GlobalSearch({ onClose }) {
 export default function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
-  const { reminders } = useClinicData()
+  const location = useLocation()
   const { profile, user, signOut, accountAccess } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
@@ -145,7 +159,6 @@ export default function AppShell() {
     try { await signOut() } catch (error) { setSignOutError(authErrorMessage(error)) }
     finally { setSigningOut(false) }
   }
-  const dueCount = reminders.filter((item) => item.status === 'Due' || item.status === 'Overdue').length
   const overlayOpen = searchOpen || workspacesOpen
 
   useEffect(() => {
@@ -181,10 +194,7 @@ export default function AppShell() {
           </button>
           <div className="header-actions">
             {accountAccess?.isPlatformAdmin && <Link className="text-link" to="/admin">Platform admin</Link>}
-            <Link to="/appointments?view=tasks" className="notification-button icon-button" aria-label={`${dueCount} follow-up tasks due`}>
-              <BellRinging size={21} weight="duotone" />
-              {dueCount > 0 && <span>{dueCount}</span>}
-            </Link>
+            <NotificationHub key={location.pathname} />
             <div className="profile-chip" title={`${name} · ${profile.role === 'owner' ? 'Clinic owner' : 'Clinical staff'}`}><span className="avatar small-avatar">{initials}</span><span><strong>{name}</strong><small>{profile.role === 'owner' ? 'Clinic owner' : 'Clinical staff'}</small></span></div>
             <button className="icon-button" onClick={handleSignOut} disabled={signingOut} aria-label={signingOut ? 'Signing out' : 'Sign out'} title="Sign out"><SignOut size={21} /></button>
           </div>
@@ -192,7 +202,7 @@ export default function AppShell() {
       </header>
       {signOutError && <p className="workspace-auth-error" role="alert">{signOutError}</p>}
       <SubscriptionTimer />
-      <main className="main-content spacious-content"><Outlet /></main>
+      <main className="main-content spacious-content"><div key={location.pathname} className="workspace-page-transition"><Outlet /></div></main>
       {workspacesOpen && <WorkspaceSwitcher onClose={() => setWorkspacesOpen(false)} />}
       {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} />}
     </div>

@@ -54,7 +54,7 @@ export function useRecordWizard(steps, formRef, setError) {
       let parent = control.parentElement
       while (parent && parent !== panel) { if (parent.hidden) return false; parent = parent.parentElement }
       return true
-    }).map((control) => ({ label: control.getAttribute('aria-label') || control.labels?.[0]?.querySelector('span')?.textContent || control.labels?.[0]?.textContent || control.name || 'Detail',
+    }).map((control) => ({ label: control.dataset.fieldLabel || control.getAttribute('aria-label') || control.labels?.[0]?.querySelector('span')?.textContent || control.labels?.[0]?.textContent || control.name || 'Detail',
       value: control.tagName === 'SELECT' ? control.selectedOptions[0]?.textContent : control.type === 'checkbox' ? 'Yes' : control.value }))
     return { id: step.id, label: step.label, fields }
   }))

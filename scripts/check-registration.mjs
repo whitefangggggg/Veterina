@@ -1,3 +1,4 @@
+import { chooseSelectOption, selectControl } from './helpers/select.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Stateful browser contracts. Postgres and provider checks run separately.
 import assert from 'node:assert/strict'
@@ -93,7 +94,7 @@ try {
   await owner.press('Enter')
   await dialog.getByLabel('Pet name', { exact: false }).fill('Photo patient')
   await dialog.getByLabel('Breed', { exact: true }).fill('Mixed')
-  await dialog.getByLabel('Sex', { exact: true }).selectOption('Female')
+  await chooseSelectOption(dialog.getByLabel('Sex', { exact: true }), 'Female')
   await expect(dialog.getByLabel('Upload pet photo')).toBeEnabled()
   await dialog.getByLabel('Upload pet photo').setInputFiles({ name: 'invalid.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('<svg/>') })
   await expect(dialog.getByRole('alert')).toContainText('Choose a JPEG')
@@ -160,8 +161,8 @@ try {
   await dialog.getByRole('combobox', { name: 'Walk-in owner', exact: true }).fill('09171234567')
   await dialog.getByRole('option', { name: /^Rivera household/ }).click()
   await dialog.getByRole('button', { name: 'Continue to pet', exact: true }).click()
-  await expect(dialog.getByLabel('Walk-in patient').locator('option')).toHaveCount(2)
-  await dialog.getByLabel('Walk-in patient').selectOption('existing-pet')
+  await expect(selectControl(dialog.getByLabel('Walk-in patient')).locator('option')).toHaveCount(2)
+  await chooseSelectOption(dialog.getByLabel('Walk-in patient'), 'existing-pet')
   await dialog.getByRole('button', { name: 'Continue to arrival', exact: true }).click()
   await dialog.getByLabel('Arrival notes').fill('Existing household arrival')
   await dialog.getByRole('button', { name: 'Back to pet', exact: true }).click()
@@ -181,7 +182,7 @@ try {
   await expect(dialog.getByRole('combobox', { name: 'Owner', exact: true })).toHaveValue('New walk-in owner')
   await dialog.getByLabel('Pet name', { exact: false }).fill('New walk-in pet')
   await dialog.getByLabel('Breed', { exact: true }).fill('Mixed')
-  await dialog.getByLabel('Sex', { exact: true }).selectOption('Male')
+  await chooseSelectOption(dialog.getByLabel('Sex', { exact: true }), 'Male')
   await dialog.getByRole('button', { name: 'Register patient', exact: true }).click()
   await dialog.getByLabel('Arrival notes').fill('New household arrival')
   for (const width of [320, 375, 1440]) { await page.setViewportSize({ width, height: 900 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Walk-in overflows at ${width}px`) }

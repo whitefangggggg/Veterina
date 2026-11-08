@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './helpers/select.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Browser contracts use intercepted APIs; portal_workflows.sql verifies storage.
 import assert from 'node:assert/strict'
@@ -62,7 +63,7 @@ try {
   await initialStock.fill('2.5')
   await page.getByRole('button', { name: 'Save changes', exact: true }).click()
   assert.equal(calls.length, 0, 'Fractional stock was accepted for a whole-unit item')
-  await page.getByLabel('Allow fractional quantities').selectOption('true')
+  await chooseSelectOption(page.getByLabel('Allow fractional quantities'), 'true')
   await expect(initialStock).toHaveAttribute('step', '0.01')
   await initialStock.fill('0.001')
   await page.getByRole('button', { name: 'Save changes', exact: true }).click()

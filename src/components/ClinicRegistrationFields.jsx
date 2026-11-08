@@ -1,3 +1,4 @@
+import { SelectField } from './VeterinaSelect'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { QrCode } from '@phosphor-icons/react'
@@ -22,7 +23,7 @@ export default function ClinicRegistrationFields({ accountType, setAccountType, 
   }, [accountType, veterinaCode])
 
   return <>
-    <div className="account-type-field"><label htmlFor="account-type">Create account as</label><select id="account-type" name="accountType" disabled={lockedAccountType} value={accountType} onChange={(event) => { setAccountType(event.target.value); setScan(false) }} aria-describedby="account-type-help"><option value="owner">Owner</option><option value="staff">Staff</option></select><p className="account-type-help" id="account-type-help">{accountType === 'owner' ? 'Activate a new clinic with a subscription code from the website administrator.' : 'Join an existing clinic after your shop owner approves your account.'}</p></div>
+    <div className="account-type-field"><label htmlFor="account-type">Create account as</label><SelectField id="account-type" name="accountType" disabled={lockedAccountType} value={accountType} onChange={(event) => { setAccountType(event.target.value); setScan(false) }} aria-describedby="account-type-help"><option value="owner">Owner</option><option value="staff">Staff</option></SelectField><p className="account-type-help" id="account-type-help">{accountType === 'owner' ? 'Activate a new clinic with a subscription code from the website administrator.' : 'Join an existing clinic after your shop owner approves your account.'}</p></div>
     {accountType === 'owner' && <label htmlFor="clinic-name">Clinic name<input id="clinic-name" name="clinicName" autoComplete="organization" required maxLength={160} value={clinicName} onChange={(event) => setClinicName(event.target.value)} placeholder="Your clinic name" /></label>}
     {accountType === 'staff' && <div className="registration-code-field">
       <label htmlFor="veterina-code">Veterina Code<input id="veterina-code" name="veterinaCode" required maxLength={60} value={veterinaCode} onChange={(event) => { setVeterinaCode(event.target.value); setClinicInfo(null) }} autoComplete="off" spellCheck={false} placeholder="VET-…" aria-describedby="clinic-code-help" /></label>

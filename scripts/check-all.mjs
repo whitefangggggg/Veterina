@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 
 // Keep browser suites sequential: prescriptions and PWA both own port 5179.
-const suites = ['test', 'lint', 'build', 'test:browser', 'test:connections', 'test:queue', 'test:checkup-completion', 'test:historical-checkups', 'test:historical-vaccinations', 'test:new-visits', 'test:theme', 'test:travel-certificates', 'test:clinical-history', 'test:appointments', 'test:prescriptions', 'test:inventory', 'test:registration', 'test:clinic-access', 'test:google-auth', 'test:owner-onboarding', 'test:subscriptions', 'test:pwa', 'test:api', 'test:database']
+const suites = ['test', 'lint', 'build', 'test:browser', 'test:connections', 'test:queue', 'test:checkup-completion', 'test:historical-checkups', 'test:historical-vaccinations', 'test:new-visits', 'test:theme', 'test:ui-refinements', 'test:travel-certificates', 'test:clinical-history', 'test:appointments', 'test:prescriptions', 'test:inventory', 'test:registration', 'test:clinic-access', 'test:google-auth', 'test:owner-onboarding', 'test:subscriptions', 'test:pwa', 'test:api', 'test:database']
 // Invoke installed Node entrypoints without an extra npm/shell process for each
 // suite, keeping process ownership and exit codes predictable on Windows.
 const commands = {
@@ -13,6 +13,7 @@ const commands = {
   'test:connections': ['scripts/check-connections.mjs'],
   'test:queue': ['scripts/check-queue.mjs'],
   'test:theme': ['scripts/check-theme.mjs'],
+  'test:ui-refinements': ['scripts/check-ui-refinements.mjs'],
   'test:new-visits': ['scripts/check-new-visits.mjs'],
   'test:historical-vaccinations': ['scripts/check-historical-vaccinations.mjs'],
   'test:historical-checkups': ['scripts/check-historical-checkups.mjs'],

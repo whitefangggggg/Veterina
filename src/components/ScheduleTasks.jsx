@@ -1,6 +1,7 @@
+import { SelectField } from './VeterinaSelect'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { CheckCircle, Clock, Phone } from '@phosphor-icons/react'
+import { CheckCircle, Clock, MagnifyingGlass, Phone } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { Badge, EmptyState } from './ui'
@@ -64,9 +65,9 @@ export default function ScheduleTasks({ tasks, onAction, onBook }) {
     <div className="schedule-tasks-heading"><h2>Follow-ups &amp; tasks</h2><p>Manage owner calls, vaccination due dates and contact outcomes alongside your bookings.</p></div>
     <div className="reminder-summary">{['Overdue', 'Due', 'Upcoming', 'Completed'].map((value) => <div key={value}><span className={'summary-icon ' + value.toLowerCase()}><Clock size={22} /></span><span><strong>{tasks.filter((task) => task.status === value).length}</strong> {value === 'Due' ? 'due today' : value.toLowerCase()}</span></div>)}</div>
     <div className="list-toolbar compact">
-      <label>Search<input type="search" aria-label="Search follow-up tasks" placeholder="Patient, owner or task" value={query} onChange={(event) => change('taskSearch', event.target.value)} /></label>
-      <label>Status<select aria-label="Task status" value={status} onChange={(event) => change('status', event.target.value)}>{statuses.map((value) => <option key={value}>{value}</option>)}</select></label>
-      <label>Type<select aria-label="Task type" value={type} onChange={(event) => change('type', event.target.value)}>{['All', 'Follow-up', 'Vaccination', 'Deworming', 'Checkup', 'Custom', 'Medication'].map((value) => <option key={value}>{value}</option>)}</select></label>
+      <div className="table-search"><MagnifyingGlass size={18} aria-hidden="true" /><input type="search" aria-label="Search follow-up tasks" placeholder="Search patient, owner, or task…" value={query} onChange={(event) => change('taskSearch', event.target.value)} /></div>
+      <label>Status<SelectField aria-label="Task status" value={status} onChange={(event) => change('status', event.target.value)}>{statuses.map((value) => <option key={value}>{value}</option>)}</SelectField></label>
+      <label>Type<SelectField aria-label="Task type" value={type} onChange={(event) => change('type', event.target.value)}>{['All', 'Follow-up', 'Vaccination', 'Deworming', 'Checkup', 'Custom', 'Medication'].map((value) => <option key={value}>{value}</option>)}</SelectField></label>
       {patientId && <button className="text-link" onClick={() => change('taskPet', '')}>Show all patients</button>}
     </div>
     <div className="reminder-list">{visible.map((task) => <ScheduleTaskCard key={task.id} task={task} onAction={onAction} onBook={onBook} />)}</div>

@@ -33,6 +33,7 @@ The system supports multiple clinics with separate records, staff access, brandi
 | **Daily operations** | Dashboard action board, stock watch, walk-in arrivals, numbered queue tickets, veterinarian assignments, and resumable care drafts. |
 | **Patients and owners** | Searchable directories, registration, optional private photos, alerts, growth and vitals, and a unified clinical timeline. |
 | **Clinical care** | Checkups, clinical notes, diagnoses, follow-up plans, finalization, retained corrections, and service records. |
+| **Admissions** | Hospitalization dashboard, wards/cages/kennels, transfers, monitoring, scheduled treatments, medication administration, historical stays, and durable discharge summaries. |
 | **Preventive care** | Grouped vaccination records, individual deworming administrations, next-dose reminders, historical records, and inventory-linked completion. |
 | **Scheduling** | Appointments, veterinarian conflict checks, patient arrival, follow-up scheduling, and reminder activity. |
 | **Prescriptions and stock** | Batch-based dispensing, stock movements, expiry tracking, supplier management, and prescription PDF/PNG exports. |
@@ -43,6 +44,10 @@ The system supports multiple clinics with separate records, staff access, brandi
 ### Care that stays connected
 
 Operational care follows **Waiting → In progress → Completed**, with cancellation available. Drafts preserve work without completing care. Historical record entry is separate and creates no queue entry, live reminder, or stock deduction.
+
+Hospitalization uses **Admitted → Under Treatment → Ready for Discharge → Discharged**, independently of clinical condition. Approved staff manage care and authorize discharge; owners configure facilities, cancel intake-only mistakes, and append corrections. Accommodation can remain unassigned. Released cages require cleaning. Inpatient medication orders do not consume stock: each recorded Given dose deducts its selected batch once. Existing outpatient prescriptions continue deducting when saved.
+
+The admissions migrations and follow-up foreign-key indexes are applied to the hosted Development project (`yerrtkosxksacqxznrhk`) as of 8 November 2026. Apply the matching backend migrations before releasing this frontend to another environment. See [admissions testing and rollout](TESTING.md#patient-admission-and-hospitalization-kan-19).
 
 Vaccination records can contain multiple vaccines; deworming records contain one administration. Clinical dose and stock quantity are separate. Waiting entries and drafts do not consume inventory; completion deducts stock atomically. Consumed product, batch, and quantity details remain locked to preserve stock history.
 

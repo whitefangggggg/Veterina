@@ -1,7 +1,9 @@
+import { SelectField } from '../components/VeterinaSelect'
+import VeterinaCheckbox from '../components/VeterinaCheckbox'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { addDays, format, parseISO } from 'date-fns'
-import { Cube, MagnifyingGlass, Package, Plus, Truck, Warning } from '@phosphor-icons/react'
+import { Cube, EnvelopeSimple, MagnifyingGlass, MapPin, Notepad, Package, Phone, Plus, Truck, Warning } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { Badge, EmptyState, Modal, PageHeader, SectionCard, StatCard } from '../components/ui'
@@ -59,9 +61,9 @@ function StockMovementEditor({ item, onClose }) {
       ? execute('record_count_adjustment', { id: item.id, batchId: values.batchId, observedQuantity: values.quantity, reason: values.reason })
       : execute('record_inventory_movement', { id: item.id, batchId: values.batchId, delta: (mode === 'Stock out' ? -1 : 1) * Number(values.quantity), reason: values.reason })}>
       <div className="form-grid">
-        <label className="field"><span>Batch *</span><select name="batchId" required defaultValue={item.batches.find((batch) => batch.is_active)?.id || ''}>{item.batches.filter((batch) => batch.is_active).map((batch) => <option key={batch.id} value={batch.id}>{batch.lot_number || 'Unnumbered batch'} · {batch.quantity} available · {batch.expiration_date || 'No expiry'}</option>)}</select></label>
+        <label className="field"><span>Batch *</span><SelectField name="batchId" required defaultValue={item.batches.find((batch) => batch.is_active)?.id || ''}>{item.batches.filter((batch) => batch.is_active).map((batch) => <option key={batch.id} value={batch.id}>{batch.lot_number || 'Unnumbered batch'} · {batch.quantity} available · {batch.expiration_date || 'No expiry'}</option>)}</SelectField></label>
         <label className="field"><span>{mode === 'Physical count' ? 'Observed batch quantity' : 'Quantity'} *</span><input name="quantity" type="number" min={mode === 'Physical count' ? '0' : item.allowsFraction ? '0.01' : '1'} step={item.allowsFraction ? '0.01' : '1'} required /></label>
-        <label className="field field-span"><span>Reason *</span>{mode === 'Physical count' ? <input name="reason" required placeholder="Why the counted quantity differs" /> : <select name="reason" required defaultValue=""><option value="">Select reason</option>{(mode === 'Stock in' ? ['Supplier delivery', 'Returned to stock'] : ['Dispensed to patient', 'Clinic use', 'Expired / damaged']).map((reason) => <option key={reason}>{reason}</option>)}</select>}</label>
+        <label className="field field-span"><span>Reason *</span>{mode === 'Physical count' ? <input name="reason" required placeholder="Why the counted quantity differs" /> : <SelectField name="reason" required defaultValue=""><option value="">Select reason</option>{(mode === 'Stock in' ? ['Supplier delivery', 'Returned to stock'] : ['Dispensed to patient', 'Clinic use', 'Expired / damaged']).map((reason) => <option key={reason}>{reason}</option>)}</SelectField>}</label>
       </div>
     </AsyncForm>
   </Modal>
@@ -99,9 +101,9 @@ export function Inventory() {
     {supplierId !== null && <p className={invalidSupplier ? 'auth-message auth-error' : 'auth-message'} role={invalidSupplier ? 'alert' : 'status'}>{invalidSupplier ? 'This supplier is unavailable.' : <>Items linked to <Link className="text-link" to={`/suppliers#${encodeURIComponent(supplierId)}`}>{selectedSupplier.name}</Link>.</>} <button className="text-link" onClick={clearSupplier}>Clear supplier filter</button></p>}
     <div className="stats-grid stock-stats"><StatCard icon={Cube} label="Active items" value={active.length} /><StatCard icon={Warning} label="At or below minimum" value={lowStock.length} tone="rose" /><StatCard icon={Warning} label="Expiring in 90 days" value={expiring.length} detail={expired.length + ' items have expired stock'} tone="amber" /><StatCard icon={Truck} label="Active suppliers" value={suppliers.filter((supplier) => supplier.isActive).length} /></div>
     <div className="list-toolbar"><label className="table-search"><MagnifyingGlass size={18} /><input aria-label="Search inventory" placeholder="Search item or SKU..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-      <select aria-label="Inventory category" value={category} onChange={(event) => setCategory(event.target.value)}>{['All', 'Vaccines', 'Medicine', 'Consumables', 'Other'].map((value) => <option key={value}>{value}</option>)}</select>
-      <label>Stock attention <select aria-label="Stock attention" value={attention} onChange={(event) => { const next = new URLSearchParams(searchParams); if (event.target.value) next.set('attention', event.target.value); else next.delete('attention'); setSearchParams(next) }}><option value="">All items</option><option value="all">Needs attention</option><option value="low">At or below minimum</option><option value="expired">Expired stock</option><option value="expiring">Expiring within 30 days</option></select></label>
-      <label><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} /> Include archived</label>
+      <SelectField aria-label="Inventory category" value={category} onChange={(event) => setCategory(event.target.value)}>{['All', 'Vaccines', 'Medicine', 'Consumables', 'Other'].map((value) => <option key={value}>{value}</option>)}</SelectField>
+      <label>Stock attention <SelectField aria-label="Stock attention" value={attention} onChange={(event) => { const next = new URLSearchParams(searchParams); if (event.target.value) next.set('attention', event.target.value); else next.delete('attention'); setSearchParams(next) }}><option value="">All items</option><option value="all">Needs attention</option><option value="low">At or below minimum</option><option value="expired">Expired stock</option><option value="expiring">Expiring within 30 days</option></SelectField></label>
+      <VeterinaCheckbox label="Include archived" checked={showArchived} onChange={setShowArchived} />
     </div>
     <div className="record-directory">{filtered.map((item) => <SectionCard key={item.id} id={`inventory-${item.id}`} className="inventory-record">
       <div className="directory-card"><div><h2>{item.name}</h2><code>{item.sku}</code> <Badge>{item.category}</Badge> {!item.isActive && <Badge>Archived</Badge>}
@@ -146,12 +148,24 @@ export function Suppliers() {
     <PageHeader eyebrow="Purchasing contacts" title="Suppliers" description="Ordering contacts and linked inventory items, saved to your clinic database."
       actions={<button className="button button-primary" onClick={() => setModal({ type: 'edit' })}><Plus size={18} /> Add supplier</button>} />
     <div className="list-toolbar"><label className="table-search"><MagnifyingGlass size={18} /><input aria-label="Search suppliers" placeholder="Search suppliers or contacts..." value={query} onChange={(event) => setQuery(event.target.value)} /></label><span>{filtered.length} suppliers</span></div>
-    <div className="supplier-grid">{filtered.map((supplier) => <SectionCard key={supplier.id} id={supplier.id} className="supplier-card">
-      <div className="supplier-heading"><div className="supplier-mark"><Truck size={22} /></div><div><h2>{supplier.name}</h2><span>{supplier.contactPerson}</span></div><Badge tone={supplier.isActive ? 'success' : 'neutral'}>{supplier.isActive ? 'Active' : 'Archived'}</Badge></div>
-      <div className="supplier-contact"><a href={'tel:' + supplier.phone.replace(/\s/g, '')}>{supplier.phone}</a>{supplier.email && <a href={'mailto:' + supplier.email}>{supplier.email}</a>}<span>{supplier.address}</span></div>
-      <p className="supplier-note">{supplier.notes}</p>
-      <div className="supplier-footer"><Link className="text-link" to={`/inventory?supplierId=${encodeURIComponent(supplier.id)}`}><strong>{inventory.filter((item) => item.supplierIds.includes(supplier.id)).length}</strong> linked items</Link><div className="record-actions"><button className="button button-secondary small-button" onClick={() => setModal({ type: 'edit', record: supplier })}>Edit supplier</button>{profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', record: supplier })}>Delete supplier</button>}</div></div>
-    </SectionCard>)}</div>
+    <div className="supplier-grid">{filtered.map((supplier) => {
+      const linkedItems = inventory.filter((item) => item.supplierIds.includes(supplier.id))
+      return <SectionCard key={supplier.id} id={supplier.id} className="supplier-executive-card">
+        <div className="supplier-top"><div className="supplier-avatar"><Truck size={24} weight="duotone" /></div><div className="supplier-identity"><h2>{supplier.name}</h2><span>{supplier.contactPerson || 'General contact'}</span></div><Badge tone={supplier.isActive ? 'success' : 'neutral'}>{supplier.isActive ? 'Active' : 'Archived'}</Badge></div>
+        <div className="supplier-quick-actions">
+          {supplier.phone && <a className="action-pill" href={`tel:${supplier.phone.replace(/[^+\d]/g, '')}`}><Phone size={14} weight="bold" />{supplier.phone}</a>}
+          {supplier.email && <a className="action-pill" href={`mailto:${supplier.email}`} aria-label={`Email ${supplier.name}`}><EnvelopeSimple size={14} />Email</a>}
+          {supplier.address && <span className="supplier-address"><MapPin size={15} />{supplier.address}</span>}
+        </div>
+        {supplier.notes && <div className="supplier-notes-box"><Notepad size={17} /><p>{supplier.notes}</p></div>}
+        <div className="supplier-inventory-preview"><div className="preview-label"><span>Linked supplies</span><Link className="text-link" to={`/inventory?supplierId=${encodeURIComponent(supplier.id)}`}>{linkedItems.length} linked items</Link></div><div className="preview-chips">
+          {linkedItems.slice(0, 3).map((item) => <Link className="item-chip" key={item.id} to={`/inventory?supplierId=${encodeURIComponent(supplier.id)}#inventory-${encodeURIComponent(item.id)}`}>{item.name}<span className={item.isActive && item.quantity <= item.minimumStock ? 'danger-text' : ''}>{item.quantity} {item.unit}{!item.isActive && ' ? Archived'}</span></Link>)}
+          {linkedItems.length > 3 && <Link className="item-chip more-chip" to={`/inventory?supplierId=${encodeURIComponent(supplier.id)}`}>+{linkedItems.length - 3} more</Link>}
+          {!linkedItems.length && <span className="no-items">No items linked yet</span>}
+        </div></div>
+        <div className="supplier-card-footer"><Link className="button button-secondary small-button" to={`/inventory?supplierId=${encodeURIComponent(supplier.id)}`}>Manage inventory</Link><button className="button button-secondary small-button" onClick={() => setModal({ type: 'edit', record: supplier })}>Edit supplier</button>{profile.role === 'owner' && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete', record: supplier })}>Delete supplier</button>}</div>
+      </SectionCard>
+    })}</div>
     {!filtered.length && <EmptyState icon={Truck} title="No matching suppliers" description="Add a supplier to keep ordering contacts on file." />}
     {modal?.type === 'edit' && <RecordEditor title={modal.record ? 'Edit supplier' : 'Add supplier'} fields={[...supplierFields, ...(modal.record ? [activeField] : [])]} initial={modal.record} onClose={() => setModal(null)}
       onSave={(values) => execute(modal.record ? 'update_supplier' : 'create_supplier', { ...values, ...(modal.record ? { id: modal.record.id } : {}) })} submitLabel="Save supplier" />}

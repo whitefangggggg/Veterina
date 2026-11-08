@@ -1,0 +1,22 @@
+.vt-select-root { position: relative; display: inline-block; width: 100%; min-width: 0; font-weight: 400; }
+.vt-select-native { position: absolute; width: 1px !important; height: 1px !important; min-height: 0 !important; padding: 0 !important; opacity: 0; pointer-events: none; clip-path: inset(50%); }
+.vt-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; transition: border-color 150ms, box-shadow 150ms; }
+.vt-select-trigger > svg { flex-shrink: 0; color: var(--muted); transition: transform 150ms; }
+.vt-select-trigger.is-open > svg { transform: rotate(180deg); }
+.vt-select-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vt-select-trigger:hover:not(:disabled) { border-color: var(--brand-ink); background: var(--surface-soft); }
+.vt-select-trigger:focus-visible, .vt-select-trigger.is-open { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+.vt-select-trigger:disabled { opacity: .6; cursor: not-allowed; }
+.vt-select-popover { z-index: 30; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); color: var(--ink); font-size: 13px; text-align: left; }
+.vt-select-search { display: flex; align-items: center; flex-shrink: 0; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
+.vt-select-search input { width: 100%; min-width: 0; min-height: 32px; border: 0; padding: 4px; border-radius: 4px; background: transparent; color: var(--ink); font: inherit; }
+.vt-select-options { display: block; overflow-y: auto; overscroll-behavior: contain; padding: 5px; }
+.vt-select-option { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 10px; min-height: 44px; border-radius: 7px; cursor: pointer; overflow-wrap: anywhere; }
+.vt-select-option > svg { flex-shrink: 0; }
+.vt-select-option.is-active, .vt-select-option[aria-selected="true"] { color: var(--brand-strong-ink); background: var(--brand-soft); }
+.vt-select-option[aria-selected="true"] { font-weight: 650; }
+.vt-select-option[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.vt-select-empty { display: block; padding: 16px; color: var(--muted); }
+.vt-select-error { display: block; margin-top: 6px; color: var(--rose); font-size: 12px; }
+.vt-select-trigger[aria-invalid="true"] { border-color: var(--rose); }
+@media (prefers-reduced-motion: reduce) { .vt-select-trigger, .vt-select-trigger > svg { transition: none; } }

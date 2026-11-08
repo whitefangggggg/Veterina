@@ -147,7 +147,10 @@ try {
       if (route === '/dashboard') {
         await expect(page.locator('.home-hero')).toHaveCSS('color', 'rgb(255, 255, 255)')
         assert.ok((await page.locator('.home-hero').evaluate((element) => getComputedStyle(element).backgroundImage)).includes(rgb(theme.color)), 'Hero gradient must use the selected clinic color')
+        await expect(page.getByRole('heading', { name: 'Choose a workspace', exact: true })).toHaveCount(0)
+        await page.getByRole('button', { name: 'Open workspaces', exact: true }).click()
         await expect(page.locator('.workspace-icon').first()).toHaveCSS('color', rgb(theme.color))
+        await page.getByRole('button', { name: 'Close workspace menu', exact: true }).click()
         await page.screenshot({ path: `test-artifacts.local/theme-dashboard-${theme.name.split(' ')[0]}.png`, fullPage: true })
         await page.setViewportSize({ width: 375, height: 900 })
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Dashboard theme overflow on mobile')

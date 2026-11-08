@@ -1,3 +1,5 @@
+import VeterinaCheckbox from '../components/VeterinaCheckbox'
+import { SelectField } from '../components/VeterinaSelect'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { FileText, Plus, Printer } from '@phosphor-icons/react'
@@ -103,17 +105,17 @@ function IssueCertificate({ initialPetId, mutate, onIssued, onClose }) {
         <Field label="Planned travel date" required><input type="date" required min={data.today} value={travelDate} onChange={change(setTravelDate)} /></Field>
         <Field label="Certificate valid until" required hint="Must cover the planned travel date and stay within the recorded Anti-Rabies validity."><input type="date" required min={travelDate || data.today} max={vaccination?.nextDueAt || undefined} value={validUntil} onChange={change(setValidUntil)} /></Field>
         <Field label="Destination" required><input required maxLength={300} value={destination} onChange={change(setDestination)} placeholder="City, province or country" /></Field>
-        <Field label="Veterinarian" required><select value={issuerId} required onChange={(event) => { setIssuerId(event.target.value); setPreviewing(false); setError('') }}><option value="">Select veterinarian</option>{data.profiles.filter(isCertificateVeterinarian).map((entry) => <option value={entry.id} key={entry.id}>{entry.full_name}</option>)}</select></Field>
+        <Field label="Veterinarian" required><SelectField value={issuerId} required onChange={(event) => { setIssuerId(event.target.value); setPreviewing(false); setError('') }}><option value="">Select veterinarian</option>{data.profiles.filter(isCertificateVeterinarian).map((entry) => <option value={entry.id} key={entry.id}>{entry.full_name}</option>)}</SelectField></Field>
         <Field label="Veterinarian credentials" hint="Saved in Settings → Veterinarian Details. Changes apply to future certificates."><p className="travel-issuer-details">PRC License No.: {issuer?.prc_license_number || 'Not recorded'}<br />PTR No.: {issuer?.ptr_number || 'Not recorded'}<br />TIN No.: {issuer?.tin_number || 'Not recorded'}<br />License Expiry Date: {issuer?.license_expires_on || 'Not recorded'}</p></Field>
         {licenseWarnings.length > 0 && <div className="travel-license-warnings field-span" role="status"><strong>Veterinarian license details</strong><ul>{licenseWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul><p>Review these details with the clinic owner. You can continue issuing this certificate.</p></div>}
-        <Field label="Anti-Rabies evidence" span><select aria-label="Anti-Rabies evidence" value={rabiesSource} onChange={(event) => {
+        <Field label="Anti-Rabies evidence" span><SelectField aria-label="Anti-Rabies evidence" value={rabiesSource} onChange={(event) => {
           const source = event.target.value; setRabiesSource(source); setRabiesId(''); setManualRabiesItemId(''); setVaccineExpirationDate('')
           if (source === 'manual' && !manualVaccines.length) { const item = emptyManualTravelVaccination(); setManualVaccines([item]); setManualRabiesItemId(item.id) }
-        }}><option value="saved">Select a saved vaccination</option><option value="manual">Enter manually</option></select></Field>
+        }}><option value="saved">Select a saved vaccination</option><option value="manual">Enter manually</option></SelectField></Field>
         {rabiesSource === 'saved' && <><Field label="Anti-Rabies vaccination record" required span hint="Select and confirm the Anti-Rabies record. Valid-through dates use the recorded next-dose date.">
-          <select value={rabiesId} required onChange={(event) => { setRabiesId(event.target.value); setVaccineExpirationDate(''); setRabiesConfirmed(false); setPreviewing(false) }}>
+          <SelectField value={rabiesId} required onChange={(event) => { setRabiesId(event.target.value); setVaccineExpirationDate(''); setRabiesConfirmed(false); setPreviewing(false) }}>
             <option value="">Select a completed vaccination</option>{candidates.map((entry) => <option value={entry.id} key={entry.id}>{entry.vaccine} · {entry.brand || 'Brand not recorded'} · {entry.administeredAt} · valid through {entry.nextDueAt || 'not recorded'}</option>)}
-          </select>
+          </SelectField>
         </Field>
         <Field label="Vaccine product expiration date" hint="Optional. Copy from the vaccination card or vaccine label. This is separate from the recorded next-dose date."><input type="date" min={vaccination?.administeredAt || undefined} value={vaccineExpirationDate} onChange={change(setVaccineExpirationDate)} /></Field></>}
         <ManualTravelVaccines items={manualVaccines} today={data.today} manualRabies={rabiesSource === 'manual'} manualRabiesItemId={manualRabiesItemId}
@@ -128,14 +130,14 @@ function IssueCertificate({ initialPetId, mutate, onIssued, onClose }) {
             })}</div>
           </section>
         </>}
-        <Field label="Certificate visibility" span hint="Public lets anyone with the QR code or link view this certificate, including owner contact details, veterinarian credentials, travel details and patient photo. You can change this after issuance."><select value={isPublic ? 'public' : 'private'} onChange={(event) => { setIsPublic(event.target.value === 'public'); setPreviewing(false) }}><option value="private">Private — clinic staff only</option><option value="public">Public — anyone with the QR or link</option></select></Field>
+        <Field label="Certificate visibility" span hint="Public lets anyone with the QR code or link view this certificate, including owner contact details, veterinarian credentials, travel details and patient photo. You can change this after issuance."><SelectField value={isPublic ? 'public' : 'private'} onChange={(event) => { setIsPublic(event.target.value === 'public'); setPreviewing(false) }}><option value="private">Private — clinic staff only</option><option value="public">Public — anyone with the QR or link</option></SelectField></Field>
       </div>
       {photoKey && !patientPhoto?.dataUrl && <p className="auth-message" role={patientPhoto?.error ? 'alert' : 'status'}>{patientPhoto?.error || 'Loading the patient photo for this certificate…'}{patientPhoto?.error && <button type="button" className="text-link" onClick={() => { setPhoto(null); setPhotoRetry((value) => value + 1) }}>Retry patient photo</button>}</p>}
       {pet && rabiesSource === 'saved' && !candidates.length && <p className="auth-message">No completed vaccination records are available. Select Enter manually to record vaccine evidence here, or record the vaccination on the patient page.</p>}
       {pet && <Link className="text-link" to={`/patients/${encodeURIComponent(pet.id)}?tab=vaccines`}>Review or correct this pet’s vaccination records</Link>}
       <div className="travel-confirmations">
-        <label><input type="checkbox" checked={rabiesConfirmed} required onChange={change(setRabiesConfirmed)} /> I confirm the selected vaccination is Anti-Rabies.</label>
-        <label><input type="checkbox" checked={eligibilityConfirmed} required onChange={change(setEligibilityConfirmed)} /> I have reviewed the pet’s records and eligibility for the stated journey.</label>
+        <VeterinaCheckbox checked={rabiesConfirmed} required onChange={(_, event) => change(setRabiesConfirmed)(event)} label="I confirm the selected vaccination is Anti-Rabies." />
+        <VeterinaCheckbox checked={eligibilityConfirmed} required onChange={(_, event) => change(setEligibilityConfirmed)(event)} label="I have reviewed the pet’s records and eligibility for the stated journey." />
       </div>
       {previewing && <>{errors.length > 0 && <div className="auth-message auth-error" role="alert"><strong>Complete these checks before issuance:</strong><ul>{errors.map((message) => <li key={message}>{message}</li>)}</ul></div>}{document && <DocumentPreview certificate={document} />}</>}
       <div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button>
@@ -178,7 +180,7 @@ function CertificateViewer({ id, reference, mutate, onChanged, onClose }) {
       {certificate.status === 'void' && <p className="auth-message auth-error" role="status"><strong>VOID CERTIFICATE</strong> · {certificate.void_reason}</p>}
       <section className="travel-sharing-panel" aria-label="Certificate sharing">
         <div><h3>QR code &amp; public viewing</h3><p>{certificate.is_public ? 'Anyone with the QR code or link can view this certificate without signing in.' : 'Private. The QR link does not display this certificate publicly.'}</p>
-          <Field label="Certificate visibility" hint="Public shares owner contact details, veterinarian credentials, travel details, vaccination history and patient photo."><select disabled={busy} value={visibility ?? (certificate.is_public ? 'public' : 'private')} onChange={(event) => { setVisibility(event.target.value); setSharingMessage(''); setVisibilityMutation(() => createMutationRunner(supabase)) }}><option value="private">Private — clinic staff only</option><option value="public">Public — anyone with the QR or link</option></select></Field>
+          <Field label="Certificate visibility" hint="Public shares owner contact details, veterinarian credentials, travel details, vaccination history and patient photo."><SelectField disabled={busy} value={visibility ?? (certificate.is_public ? 'public' : 'private')} onChange={(event) => { setVisibility(event.target.value); setSharingMessage(''); setVisibilityMutation(() => createMutationRunner(supabase)) }}><option value="private">Private — clinic staff only</option><option value="public">Public — anyone with the QR or link</option></SelectField></Field>
           <button type="button" className="button button-secondary" disabled={busy || visibility == null || (!sharingUncertain && (visibility === 'public') === Boolean(certificate.is_public))} onClick={async () => {
             setBusy(true); setError(''); setSharingMessage('')
             try {

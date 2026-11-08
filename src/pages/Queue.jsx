@@ -1,3 +1,4 @@
+import { SelectField } from '../components/VeterinaSelect'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Clock, Plus, SignIn } from '@phosphor-icons/react'
@@ -34,8 +35,8 @@ export default function Queue() {
       actions={<><button className="button button-secondary" onClick={() => setModal({ type: 'checkin' })}><SignIn size={18} /> Check in appointment</button><button className="button button-primary" onClick={() => setModal({ type: 'walkin' })}><Plus size={18} /> Add walk-in</button></>} />
     <div className="queue-summary">{['waiting', 'in_progress'].map((value) => <div key={value}><Clock size={21} /><strong>{queueEntries.filter((entry) => entry.status === value).length}</strong><span>{statuses[value]}</span></div>)}</div>
     <div className="list-toolbar compact queue-toolbar">
-      <label>Service <select aria-label="Queue service" value={service} onChange={(event) => setService(event.target.value)}><option>All</option><optgroup label="Workflow"><option value="checkup">Checkup</option><option value="vaccination">Vaccinations and Deworming</option><option value="maintenance">Maintenance</option></optgroup><optgroup label="Services">{[...serviceOptions].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</optgroup></select></label>
-      <label>Status <select aria-label="Queue status" value={status} onChange={(event) => setStatus(event.target.value)}><option>Active</option>{Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option>All</option></select></label>
+      <label>Service <SelectField aria-label="Queue service" value={service} onChange={(event) => setService(event.target.value)}><option>All</option><optgroup label="Workflow"><option value="checkup">Checkup</option><option value="vaccination">Vaccinations and Deworming</option><option value="maintenance">Maintenance</option></optgroup><optgroup label="Services">{[...serviceOptions].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</optgroup></SelectField></label>
+      <label>Status <SelectField aria-label="Queue status" value={status} onChange={(event) => setStatus(event.target.value)}><option>Active</option>{Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option>All</option></SelectField></label>
       {showHistory && <label>History date <input aria-label="Queue history date" type="date" value={date} onChange={(event) => setHistoryDate(event.target.value)} /></label>}
     </div>
     {showHistory && <p className="queue-hint">History shows entries finished on the selected date. Active arrivals remain visible across days.</p>}

@@ -1,3 +1,5 @@
+import VeterinaCheckbox from './VeterinaCheckbox'
+import { SelectField } from './VeterinaSelect'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { ArrowRight, ClockCounterClockwise, Stethoscope, Syringe } from '@phosphor-icons/react'
 import { AsyncForm, RecordEditor } from './RecordForm'
@@ -44,7 +46,7 @@ function BodyConditionField({ record, draft }) {
   const oldDraft = draft.bodyConditionScale === '9' && draft.bodyConditionScore !== ''
   const [mode, setMode] = useState(draft.bodyConditionMode || (legacy ? 'keep' : 'replace'))
   return <div className="field"><span>Body condition (1–5)</span>
-    {legacy && <><span>Previously recorded: {record.bodyConditionScore}/9</span><label className="bcs-replace"><input type="checkbox" checked={mode === 'replace'} onChange={(event) => setMode(event.target.checked ? 'replace' : 'keep')} /> Replace with a new 1–5 assessment</label></>}
+    {legacy && <><span>Previously recorded: {record.bodyConditionScore}/9</span><VeterinaCheckbox className="bcs-replace" checked={mode === 'replace'} onChange={(checked) => setMode(checked ? 'replace' : 'keep')} label="Replace with a new 1–5 assessment" /></>}
     {oldDraft && (!legacy || Number(draft.bodyConditionScore) !== record.bodyConditionScore) && <small>Previous draft: {draft.bodyConditionScore}/9. Enter a new assessment on the 1–5 scale to replace it.</small>}
     <input type="hidden" name="bodyConditionMode" value={mode} />
     <input type="hidden" name="bodyConditionScale" value={legacy && mode === 'keep' ? '9' : '5'} />
@@ -171,7 +173,7 @@ export function PrescriptionEditor({ pet, record, visitId, completingCheckup, on
   const [medications, setMedications] = useState(() => record ? prescriptionMedications(record).map((medication) => ({ ...emptyMedication(), ...medication })) : [emptyMedication()])
   const changeMedication = (key, values) => setMedications((current) => current.map((item) => item.key === key ? { ...item, ...values } : item))
   const dispensedIds = new Set(record ? prescriptionMedications(record).filter((item) => item.inventoryItemId).map((item) => item.medicationId) : [])
-  const openVisits = visits.filter((visit) => visit.petId === pet.id && !visit.finalizedAt)
+  const openVisits = visits.filter((visit) => visit.petId === pet.id && !visit.finalizedAt && !visit.admissionId)
   const [selectedVisitId, setSelectedVisitId] = useState(record?.visit_id || visitId || (openVisits.length === 1 ? openVisits[0].id : ''))
   const selectedVisit = visits.find((visit) => visit.id === selectedVisitId)
   const historical = selectedVisit?.recordingPurpose === 'record_only' || record?.is_historical === true
@@ -187,10 +189,10 @@ export function PrescriptionEditor({ pet, record, visitId, completingCheckup, on
       if (historical) Object.assign(values, { prescribedAt: clinicTimestamp(values.prescribedAt.slice(0, 10), values.prescribedAt.slice(11, 16), timezone) })
       return execute(completingCheckup ? 'prescribe_and_complete_checkup' : record ? 'update_prescription' : 'create_prescription', { ...values, ...items[0], medications: items, ...(visitId ? { visitId } : {}), ...(record ? { id: record.id } : {}), ...(completingCheckup ? { checkup: completingCheckup } : {}) })
     }}>
-      {!record && <Field label="Open encounter" required><select name="visitId" required disabled={Boolean(visitId)} value={selectedVisitId} onChange={(event) => { const next = event.target.value; if (historical !== (visits.find((visit) => visit.id === next)?.recordingPurpose === 'record_only')) setMedications([emptyMedication()]); setSelectedVisitId(next) }}>
+      {!record && <Field label="Open encounter" required><SelectField name="visitId" required disabled={Boolean(visitId)} value={selectedVisitId} onChange={(event) => { const next = event.target.value; if (historical !== (visits.find((visit) => visit.id === next)?.recordingPurpose === 'record_only')) setMedications([emptyMedication()]); setSelectedVisitId(next) }}>
         {visitId && !openVisits.some((visit) => visit.id === visitId) && <option value={visitId}>Current checkup for {pet.name}</option>}
         <option value="">Select an open encounter</option>{openVisits.map((visit) => <option key={visit.id} value={visit.id}>{visit.type} · {clinicDate(new Date(visit.visitedAt), timezone)}</option>)}
-      </select></Field>}
+      </SelectField></Field>}
       {completingCheckup && <p className="auth-message">Saving this prescription completes the checkup. Cancel to leave care In progress.</p>}
       {!record && !visitId && !openVisits.length && <p className="auth-message">Record an open checkup before adding a prescription.</p>}
       {historical ? <HistoricalPrescriptionFields medications={medications} setMedications={setMedications} clinician={historicalClinician} profiles={profiles} careTime={record ? clinicDate(new Date(record.prescribed_at), timezone) + 'T' + clinicTime(record.prescribed_at, timezone) : selectedVisit?.visitedAt ? clinicDate(new Date(selectedVisit.visitedAt), timezone) + 'T' + clinicTime(selectedVisit.visitedAt, timezone) : ''} /> : <>
@@ -205,10 +207,10 @@ export function PrescriptionEditor({ pet, record, visitId, completingCheckup, on
           <PrescriptionMedicationPicker medication={medication} index={index} inventory={inventory} today={today} locked={locked} onChange={(values) => changeMedication(medication.key, values)} />
           {medication.inventoryItemId && <>
             <Field label="Stock batch" required>
-              <select aria-label={`Stock batch ${index + 1}`} value={medication.batchId || ''} required disabled={locked} onChange={(event) => changeMedication(medication.key, { batchId: event.target.value })}>
+              <SelectField aria-label={`Stock batch ${index + 1}`} value={medication.batchId || ''} required disabled={locked} onChange={(event) => changeMedication(medication.key, { batchId: event.target.value })}>
                 <option value="">Select an available batch</option>
                 {locked ? <option value={medication.batchId}>{batch?.lot_number || 'Recorded batch'} · already dispensed</option> : batches.map((entry) => <option key={entry.id} value={entry.id}>{entry.lot_number || 'Unnumbered batch'} · {entry.quantity} {item.unit} · {entry.expiration_date ? `expires ${entry.expiration_date}` : 'no expiry'}</option>)}
-              </select>
+              </SelectField>
             </Field>
             <Field label={`Dispensing quantity (${medication.dispenseUnit || item?.unit || 'units'})`} required hint={locked ? 'Previously deducted from stock.' : 'Deducted when the prescription is saved; separate from the prescribed dose.'}>
               <input aria-label={`Dispensing quantity ${index + 1}`} type="number" required readOnly={locked} min={item?.allowsFraction ? '0.01' : '1'} step={item?.allowsFraction ? '0.01' : '1'} max={locked ? undefined : batch?.quantity} value={medication.dispenseQuantity ?? ''} onChange={(event) => changeMedication(medication.key, { dispenseQuantity: event.target.value })} />

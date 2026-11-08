@@ -1,3 +1,4 @@
+import { SelectField } from './VeterinaSelect'
 import { useState } from 'react'
 import { AsyncForm } from './RecordForm'
 import { Field, Modal } from './ui'
@@ -32,9 +33,9 @@ export default function PreventiveCareEditor({ pet, record: inputRecord, queueEn
     onSaved?.(result)
   }
   const details = <div className="form-grid">
-        <Field label="Record type"><select aria-label="Record type" disabled={Boolean(record)} value={kind} onChange={(event) => { setKind(event.target.value); setItems([emptyPreventiveItem()]) }}><option value="vaccination">Vaccination</option><option value="deworming">Deworming</option></select></Field>
+        <Field label="Record type"><SelectField aria-label="Record type" disabled={Boolean(record)} value={kind} onChange={(event) => { setKind(event.target.value); setItems([emptyPreventiveItem()]) }}><option value="vaccination">Vaccination</option><option value="deworming">Deworming</option></SelectField></Field>
         <Field label="Date administered" required><input aria-label="Date administered" type="date" value={date} max={today} required onChange={(event) => setDate(event.target.value)} /></Field>
-        {historical ? <ClinicianField label="Veterinarian" value={clinician} onChange={setClinician} profiles={profiles} /> : <Field label="Veterinarian" required><select aria-label="Veterinarian" value={clinician.id} required disabled={Boolean(queueEntry)} onChange={(event) => setClinician({ id: event.target.value, name: '' })}><option value="">Select veterinarian</option>{profiles.filter((p) => p.is_active || p.id === clinician.id).map((p) => <option value={p.id} key={p.id}>{p.full_name}</option>)}</select></Field>}
+        {historical ? <ClinicianField label="Veterinarian" value={clinician} onChange={setClinician} profiles={profiles} /> : <Field label="Veterinarian" required><SelectField aria-label="Veterinarian" value={clinician.id} required disabled={Boolean(queueEntry)} onChange={(event) => setClinician({ id: event.target.value, name: '' })}><option value="">Select veterinarian</option>{profiles.filter((p) => p.is_active || p.id === clinician.id).map((p) => <option value={p.id} key={p.id}>{p.full_name}</option>)}</SelectField></Field>}
       </div>
   const itemEditors = items.map((item, index) => {
         const existing = record?.items.find((entry) => entry.id === item.id)
@@ -52,20 +53,20 @@ export default function PreventiveCareEditor({ pet, record: inputRecord, queueEn
               <Field label="Batch / lot number"><input aria-label={`Batch / lot number ${index + 1}`} maxLength={200} value={item.lotNumber || ''} onChange={(e) => change(item.id, { lotNumber: e.target.value })} /></Field>
             </> : <>
               <Field label={kind === 'vaccination' ? 'Vaccine type' : 'Deworming product'} required={!legacy} span>
-                <select aria-label={`Inventory product ${index + 1}`} value={item.inventoryItemId} disabled={locked} required={!legacy} onChange={(e) => { const selected = inventory.find((p) => p.id === e.target.value); change(item.id, { inventoryItemId: e.target.value, vaccine: selected?.name || '', brand: selected?.brand || '', batchId: '', dispenseQuantity: '' }) }}>
+                <SelectField aria-label={`Inventory product ${index + 1}`} value={item.inventoryItemId} disabled={locked} required={!legacy} onChange={(e) => { const selected = inventory.find((p) => p.id === e.target.value); change(item.id, { inventoryItemId: e.target.value, vaccine: selected?.name || '', brand: selected?.brand || '', batchId: '', dispenseQuantity: '' }) }}>
                   <option value="">{legacy ? `Keep historical product: ${existing.vaccine}` : 'Select inventory product'}</option>
                   {existing?.inventoryItemId && !options.some((p) => p.id === existing.inventoryItemId) && <option value={existing.inventoryItemId}>{existing.vaccine} (saved product)</option>}
                   {options.map((p) => <option key={p.id} value={p.id}>{p.name}{p.brand ? ` · ${p.brand}` : ''}</option>)}
-                </select>
+                </SelectField>
                 {!options.length && !legacy && <small>Add an active {category === 'Vaccines' ? 'vaccine with a brand' : 'deworming medicine'} in Inventory first.</small>}
               </Field>
               <Field label="Brand"><input aria-label={`Brand ${index + 1}`} readOnly value={item.brand || product?.brand || ''} /></Field>
               {kind === 'vaccination' && <Field label="Lot number" required={!existing || Boolean(queueEntry)} hint="Copy from the vaccine label. This lot appears on travel certificates; stock is deducted from the selected batch."><input aria-label={`Lot number ${index + 1}`} maxLength={200} required={!existing || Boolean(queueEntry)} pattern={(!existing || queueEntry) ? '.*\\S.*' : undefined} value={item.lotNumber || ''} onChange={(event) => change(item.id, { lotNumber: event.target.value })} /></Field>}
               {!legacy && <>
-                <Field label="Stock batch" required><select aria-label={`Stock batch ${index + 1}`} value={item.batchId} disabled={locked} required onChange={(e) => change(item.id, { batchId: e.target.value })}>
+                <Field label="Stock batch" required><SelectField aria-label={`Stock batch ${index + 1}`} value={item.batchId} disabled={locked} required onChange={(e) => change(item.id, { batchId: e.target.value })}>
                   <option value="">Select available batch</option>
                   {locked ? <option value={item.batchId}>{product?.batches?.find((batch) => batch.id === item.batchId)?.lot_number || 'Saved batch'} · already administered</option> : batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.lot_number || 'Unnumbered'} · {batch.quantity} {product.unit}{batch.expiration_date ? ` · expires ${batch.expiration_date}` : ''}</option>)}
-                </select></Field>
+                </SelectField></Field>
                 <Field label={`Stock quantity (${item.dispenseUnit || product?.unit || 'units'})`} required hint="Inventory units to deduct; enter the clinical dose separately."><input aria-label={`Stock quantity ${index + 1}`} type="number" min={product?.allowsFraction ? '0.01' : '1'} step={product?.allowsFraction ? '0.01' : '1'} value={item.dispenseQuantity} required readOnly={locked} onChange={(e) => change(item.id, { dispenseQuantity: e.target.value })} /></Field>
               </>}
               {legacy && <p className="muted">Existing record: no retroactive stock deduction.</p>}

@@ -1,3 +1,4 @@
+import { chooseSelectOption, selectControl } from './helpers/select.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 // OAuth browser contracts use intercepted Auth responses; no Google account or clinic data is changed.
 import assert from 'node:assert/strict'
@@ -76,12 +77,12 @@ try {
   {
     const { context, page, state } = await scenario({ failSetup: true })
     await page.goto(app.origin + '/create-account?next=%2Fpatients')
-    await page.getByLabel('Create account as').selectOption('owner')
+    await chooseSelectOption(page.getByLabel('Create account as'), 'owner')
     await page.getByLabel('Clinic name', { exact: true }).fill('My Google clinic')
     await page.getByRole('button', { name: 'Continue with Google', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Finish setting up your account' })).toBeVisible()
     await expect(page.getByLabel('Full name', { exact: true })).toHaveValue('Google Clinician')
-    await expect(page.getByLabel('Create account as')).toHaveValue('owner')
+    await expect(selectControl(page.getByLabel('Create account as'))).toHaveValue('owner')
     await expect(page.getByLabel('Clinic name', { exact: true })).toHaveValue('My Google clinic')
     await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0)
     await page.getByLabel('Subscription activation code').fill('VET-ACCESS-' + 'A'.repeat(40))

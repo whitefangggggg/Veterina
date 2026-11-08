@@ -928,7 +928,7 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
   display: flex; align-items: center; width: min(1440px, 100%); height: var(--header-height); gap: 12px;
   margin: 0 auto; padding: 0 max(36px, var(--safe-right)) 0 max(36px, var(--safe-left));
 }
-.header-brand { display: flex; align-items: center; gap: 10px; margin-right: 6px; }
+.header-brand { display: flex; align-items: center; gap: 10px; margin-right: 6px; min-width: 0; }
 .header-brand > span {
   display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px;
   color: #fff; background: linear-gradient(145deg, var(--brand), var(--brand-dark)); box-shadow: 0 6px 14px color-mix(in srgb, var(--brand) 18%, transparent);
@@ -938,6 +938,7 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
 .header-brand small { margin-top: 2px; color: light-dark(#6a7872, var(--muted)); font-size: 11px; font-weight: 500; }
 .header-brand > span > img { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
 .header-brand > div { min-width: 0; }
+.header-brand > span { flex-shrink: 0; }
 .header-brand strong, .header-brand small { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-trigger {
   display: flex; align-items: center; min-height: 40px; gap: 7px; padding: 0 12px;

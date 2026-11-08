@@ -1,0 +1,176 @@
+/* Shared clinic rhythm and elevation, resolved against the active clinic palette. */
+:root {
+  --brand-border: color-mix(in srgb, var(--brand-ink) 22%, var(--line));
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --space-label: 6px;
+  --space-control: 14px;
+  --space-section: 24px;
+  --shadow-subtle: 0 1px 3px rgb(28 43 38 / 4%), 0 4px 12px -2px rgb(28 43 38 / 3%);
+  --shadow-card: 0 2px 6px rgb(28 43 38 / 4%), 0 8px 24px -4px rgb(28 43 38 / 6%);
+  --shadow-popover: 0 4px 16px rgb(28 43 38 / 8%), 0 16px 36px -6px rgb(28 43 38 / 12%);
+  --transition-snappy: 150ms cubic-bezier(.16, 1, .3, 1);
+}
+:root[data-appearance="dark"] {
+  --shadow-subtle: 0 1px 4px rgb(0 0 0 / 15%);
+  --shadow-card: 0 4px 18px rgb(0 0 0 / 24%);
+  --shadow-popover: 0 8px 30px rgb(0 0 0 / 36%);
+}
+.section-card, .stat-card, .reminder-card, .platform-panel {
+  border-color: color-mix(in srgb, var(--brand-ink) 10%, var(--line));
+  box-shadow: var(--shadow-subtle);
+  transition: box-shadow var(--transition-snappy), border-color var(--transition-snappy);
+}
+.section-card > .section-header { border-bottom: 1px solid var(--line); margin-bottom: 18px; padding-bottom: 14px; }
+.section-header h2 { font-size: 18px; font-weight: 700; }
+.form-grid { gap: 18px 20px; }
+.field { gap: var(--space-label); min-width: 0; }
+.form-actions { gap: 12px; }
+.list-toolbar { flex-wrap: wrap; }
+.list-toolbar > .vt-select-root { flex: 0 1 200px; width: auto; }
+.list-toolbar > label:has(> .vt-select-root) { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.list-toolbar label > .vt-select-root { width: 170px; }
+.list-toolbar .vt-checkbox-label { align-items: center; }
+.list-toolbar .table-search { flex: 1 1 260px; width: auto; min-width: 0; }
+.table-search:focus-within { border-radius: var(--radius-sm); outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+.table-search > svg { flex: none; }
+.table-search input { min-width: 0; }
+.vt-select-root .vt-select-native { display: block; visibility: hidden; border: 0; margin: 0; }
+.vt-select-root .vt-select-popover { z-index: 1200; max-width: calc(100vw - 16px); box-shadow: var(--shadow-popover); animation: vtSelectEntrance 140ms ease-out; }
+@keyframes vtSelectEntrance { from { opacity: 0; } to { opacity: 1; } }
+.vt-select-options { min-height: 0; }
+.vt-select-popover .vt-select-option { line-height: 1.5; }
+.medication-options.vt-combobox-options { z-index: 1200; right: auto; border-radius: var(--radius-md); box-shadow: var(--shadow-popover); padding: 5px; }
+.vt-combobox-options button { border-radius: 7px; min-height: 44px; }
+.vt-select-search input { font-size: 16px; }
+.auth-form .vt-select-trigger { min-height: 48px; font-size: 16px; }
+.auth-form label.vt-checkbox-label { display: inline-flex; font-weight: 400; }
+.onboarding-fields label.vt-checkbox-label { display: inline-flex; align-items: center; }
+.auth-form .vt-checkbox-native, .auth-show-password .vt-checkbox-native { width: 20px; height: 20px; }
+
+/* Reports anchor controls and actions to one consistent, spacious footer. */
+.report-grid { margin-top: var(--space-section); gap: 18px; }
+.report-grid .report-card { padding: var(--space-section); min-width: 0; }
+.report-card .report-desc { flex-grow: 1; margin-bottom: 16px; }
+.report-card-footer { display: flex; flex-direction: column; gap: var(--space-control); margin-top: auto; padding-top: 16px; border-top: 1px solid var(--line); width: 100%; }
+.report-card-footer .field { display: grid; gap: var(--space-label); }
+.report-card-footer .report-action-btn { width: 100%; justify-content: center; white-space: normal; }
+
+/* A search input and its filters share a common baseline. */
+.schedule-tasks .list-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.schedule-tasks .list-toolbar > label { display: flex; align-items: center; gap: 8px; }
+.schedule-tasks .table-search { min-height: 44px; padding: 0 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.schedule-tasks .table-search input { width: 100%; min-width: 0; border: 0; background: transparent; padding: 0; border-radius: 0; }
+.schedule-tasks .list-toolbar .vt-select-root { width: 150px; }
+
+/* Nonmodal agenda stays reachable on small screens and from the keyboard. */
+.notification-wrapper { position: relative; }
+.header-actions .notification-button { display: inline-flex; }
+.notification-button.is-active { background: var(--brand-soft); color: var(--brand-ink); }
+.notification-popover { position: absolute; top: calc(100% + 12px); right: 0; width: min(460px, calc(100vw - 24px)); max-height: calc(100dvh - 100px); overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--brand-border); border-radius: var(--radius-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-popover); z-index: 100; }
+.notif-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 20px; background: var(--brand-soft); border-bottom: 1px solid var(--line); }
+.notif-header strong { display: block; font-size: 15px; }
+.notif-header small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.notif-section { padding: 16px 12px; }
+.notif-section + .notif-section { border-top: 1px solid var(--line); }
+.notif-section h2 { display: flex; justify-content: space-between; gap: 8px; margin: 0 8px 10px; color: var(--muted); font-size: 12px; font-weight: 650; }
+.notif-item { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 8px; border-radius: var(--radius-sm); }
+.notif-item time { flex: none; font-size: 12px; color: var(--brand-ink); font-weight: 700; }
+.notif-info { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.notif-info strong { font-size: 13px; }
+.notif-info small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.notif-empty { font-size: 13px; color: var(--muted); margin: 12px 8px 4px; line-height: 1.6; }
+.notif-task-item { display: flex; align-items: center; gap: 10px; padding: 10px 8px; font-size: 13px; border-radius: var(--radius-sm); }
+.notif-task-item > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.task-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); flex: none; }
+.task-dot.overdue { background: var(--rose); }
+.notif-footer { display: flex; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--line); padding: 14px 20px; }
+.notif-item:focus-visible, .notif-task-item:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: -2px; }
+
+/* The animation finishes at transform:none so fixed-position controls stay fixed. */
+.workspace-page-transition { min-width: 0; animation: workspaceFadeIn 180ms cubic-bezier(.16, 1, .3, 1); }
+@keyframes workspaceFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Patient identity and contact actions remain independent, valid links. */
+.patient-table.section-card { border-top: 3px solid var(--brand-ink); }
+.patient-table .clinical-flags { flex-flow: row wrap; align-items: center; gap: 6px; }
+.patient-table .patient-cell { min-width: 0; border-radius: var(--radius-sm); }
+.patient-table .table-row { position: relative; }
+.patient-table .patient-cell::after { content: ''; position: absolute; inset: 0; }
+.patient-table .contact-actions { position: relative; z-index: 1; }
+.patient-cell:focus-visible, .row-chevron:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 4px; }
+.patient-table .row-chevron { display: grid; place-items: center; min-width: 24px; min-height: 44px; }
+.patient-table .cell-owner .contact-actions { margin-top: 6px; }
+.contact-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.action-pill { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 4px 8px; border: 1px solid var(--brand-border); border-radius: 20px; color: var(--brand-strong-ink); background: var(--brand-soft); font-size: 11px; font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
+.action-pill svg { flex: none; }
+.pet-sticker .pet-species-badge { position: absolute; right: 1px; bottom: 1px; z-index: 2; display: grid; place-items: center; width: 19px; height: 19px; background: var(--surface); border: 1px solid var(--brand-border); border-radius: 50%; color: var(--brand-ink); box-shadow: var(--shadow-subtle); }
+.pet-sticker .pet-species-badge svg { width: 12px; height: 12px; }
+.pet-sticker-small .pet-species-badge { display: none; }
+
+/* Folder summaries open the same clinical details used by calendar previews. */
+.skim-toggle-group { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); margin: 0 0 16px; }
+.view-toggle-btn { padding: 9px 12px; min-height: 38px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.view-toggle-btn[aria-pressed="true"] { background: var(--surface); color: var(--brand-ink); box-shadow: var(--shadow-subtle); }
+.skim-folder-card { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; padding: 18px; margin-top: 8px; border: 1px solid var(--line); border-left: 4px solid var(--brand-ink); border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-subtle); text-align: left; font: inherit; cursor: pointer; transition: box-shadow var(--transition-snappy), border-color var(--transition-snappy), transform var(--transition-snappy); }
+.skim-folder-card::before { content: ''; position: absolute; left: -4px; top: -7px; width: 60px; height: 7px; background: var(--brand-soft); border: 1px solid var(--brand-border); border-bottom: 0; border-radius: 5px 5px 0 0; }
+.skim-folder-tab { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; flex: 0 0 116px; }
+.skim-main { display: grid; gap: 8px; flex: 1; min-width: 0; }
+.skim-headline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+.skim-headline strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.skim-vet { color: var(--muted); font-size: 12px; }
+.skim-vital-chip { padding: 3px 8px; border-radius: 12px; background: var(--surface-soft); font-size: 12px; white-space: nowrap; }
+.skim-folder-card > svg { flex: none; color: var(--muted); }
+.skim-folder-card:focus-visible, .view-toggle-btn:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 3px; }
+
+/* Purchasing cards expose real linked stock without additional navigation. */
+.supplier-grid { align-items: stretch; }
+.supplier-executive-card { display: flex; flex-direction: column; gap: 18px; padding: 24px; min-width: 0; }
+.supplier-top { display: flex; align-items: center; gap: 12px; }
+.supplier-avatar { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border: 1px solid var(--brand-border); border-radius: var(--radius-md); color: var(--brand-ink); background: var(--brand-soft); }
+.supplier-identity { flex: 1; min-width: 0; }
+.supplier-identity h2 { margin: 0 0 4px; font-size: 17px; overflow-wrap: anywhere; }
+.supplier-identity > span { color: var(--muted); font-size: 12px; }
+.supplier-quick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.supplier-address { display: flex; align-items: baseline; gap: 6px; width: 100%; color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.supplier-address svg { flex: none; }
+.supplier-notes-box { display: flex; align-items: flex-start; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); color: var(--muted); }
+.supplier-notes-box svg { flex: none; margin-top: 2px; }
+.supplier-notes-box p { margin: 0; font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.supplier-inventory-preview { margin-top: auto; }
+.preview-label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+.preview-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.item-chip { display: inline-flex; flex-direction: column; gap: 3px; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); font-size: 12px; color: var(--ink); overflow-wrap: anywhere; }
+.item-chip > span, .no-items { color: var(--muted); font-size: 11px; }
+.item-chip > span.danger-text { color: var(--rose); }
+.supplier-card-footer { display: flex; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (hover: hover) {
+  .section-card:hover, .stat-card:hover, .reminder-card:hover { box-shadow: var(--shadow-card); }
+  .skim-folder-card:hover { transform: translateY(-1px); border-color: var(--brand-border); box-shadow: var(--shadow-card); }
+  .action-pill:hover, .item-chip:hover, .notif-item:hover, .notif-task-item:hover { background: var(--brand-soft); border-color: var(--brand-ink); }
+}
+@media (max-width: 800px) {
+  .notification-popover { position: fixed; top: 76px; right: 12px; }
+  .skim-folder-card { flex-wrap: wrap; gap: 10px; padding: 14px; }
+  .skim-folder-tab { flex: 1 0 100%; }
+  .supplier-executive-card { padding: 18px; }
+}
+@media (max-width: 600px) {
+  .list-toolbar > .vt-select-root { flex: none; width: 100%; }
+  .list-toolbar > label:has(> .vt-select-root) { justify-content: space-between; width: 100%; }
+  .list-toolbar label > .vt-select-root { flex: 1; width: auto; }
+  .list-toolbar .table-search { flex: none; width: 100%; }
+  .supplier-card-footer .button { flex: 1 1 120px; justify-content: center; }
+  .notif-item { flex-wrap: wrap; }
+  .notif-item .notif-info { flex-basis: calc(100% - 110px); }
+  .notif-footer .button { flex: 1 1 120px; justify-content: center; }
+  .skim-vital-chip { display: none; }
+  .auth-form label.vt-checkbox-label { align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-page-transition { animation: none; }
+  .vt-select-root .vt-select-popover { animation: none; }
+  .section-card, .stat-card, .reminder-card, .platform-panel, .skim-folder-card { transition: none; }
+  .skim-folder-card:hover { transform: none; }
+}
+@media print { .section-card, .stat-card { box-shadow: none; } .skim-toggle-group, .notification-wrapper, .contact-actions { display: none; } }

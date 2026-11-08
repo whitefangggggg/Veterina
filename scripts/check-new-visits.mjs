@@ -1,4 +1,6 @@
+import { withDetailedHistory } from './helpers/history.mjs'
 import { openNewVisit, reviewRecord } from './helpers/new-visit.mjs'
+import { selectControl } from './helpers/select.mjs'
 // UI acceptance uses intercepted APIs. unified_patient_visits.sql verifies persistence and isolation.
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
@@ -60,7 +62,7 @@ try {
     throw new Error(`Unexpected request ${url.pathname}`)
   })
   const page = await context.newPage(); page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto(`${app.origin}/patients/${petId}`)
+  await page.goto(withDetailedHistory(`${app.origin}/patients/${petId}`))
   await expect(page.locator('.pet-hero-actions').getByRole('button', { name: 'Record checkup', exact: true })).toHaveCount(0)
   await expect(page.locator('.pet-hero-actions').getByRole('button', { name: 'Record vaccination', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Add Record', exact: true }).click()
@@ -94,7 +96,7 @@ try {
       await page.keyboard.press('Enter')
       if (service.workflow === 'checkup') {
         await expect(page.getByLabel('Service', { exact: true })).toHaveValue(service.name)
-        await expect(page.getByLabel('Reason for Checkup')).toHaveValue(service.name === 'Follow-up' ? 'Follow-up Checkup' : ['Surgery', 'Sick visit'].includes(service.name) ? 'Medical Concern' : 'Wellness Check')
+        await expect(selectControl(page.getByLabel('Reason for Checkup'))).toHaveValue(service.name === 'Follow-up' ? 'Follow-up Checkup' : ['Surgery', 'Sick visit'].includes(service.name) ? 'Medical Concern' : 'Wellness Check')
         assert.equal(await page.getByLabel('Weight (kg)').evaluate((input) => input.required), purpose === 'Queue processing')
       } else if (service.workflow === 'vaccination') {
         await expect(page.getByLabel(purpose === 'Queue processing' ? 'Inventory product 1' : 'Product name 1', { exact: true })).toBeHidden()

@@ -1,3 +1,5 @@
+import { withDetailedHistory } from './helpers/history.mjs'
+import { selectControl } from './helpers/select.mjs'
 import { openNewVisit, reviewRecord } from './helpers/new-visit.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 import assert from 'node:assert/strict'
@@ -52,7 +54,7 @@ try {
     throw new Error(`Unexpected request ${url.pathname}`)
   })
   const page = await context.newPage(); page.on('pageerror', (failure) => errors.push(failure.message))
-  await page.goto(`${app.origin}/patients/${patient}`)
+  await page.goto(withDetailedHistory(`${app.origin}/patients/${patient}`))
   await openNewVisit(page)
   await page.getByRole('button', { name: /Queue processing/ }).click()
   const veterinarian = page.getByLabel('Attending veterinarian', { exact: true })
@@ -90,7 +92,7 @@ try {
   const encounter = page.getByLabel('Open encounter', { exact: false })
   await expect(encounter).toBeDisabled()
   const visitId = raw.visits.at(-1).id
-  await expect(encounter).toHaveValue(visitId)
+  await expect(selectControl(encounter)).toHaveValue(visitId)
   assert.equal(calls[0].key, calls[1].key, 'Preparation retry changed its key')
   assert.equal(raw.queue_entries[0].status, 'in_progress', 'Opening prescription completed care')
   await page.getByRole('combobox', { name: 'Medication name 1', exact: true }).fill('Custom medication')
@@ -150,7 +152,7 @@ try {
   raw.visits[0].attending_veterinarian_id = assignedVeterinarian
   await page.reload()
   await page.locator('.visit-card').filter({ hasText: 'Older visit' }).first().getByRole('button', { name: 'Edit checkup', exact: true }).click()
-  await expect(page.getByLabel('Reason for Checkup')).toHaveValue('Wellness check')
+  await expect(selectControl(page.getByLabel('Reason for Checkup'))).toHaveValue('Wellness check')
   await expect(veterinarian).toHaveValue('Assigned veterinarian')
   await expect(veterinarian).not.toHaveAttribute('aria-invalid', 'true')
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -167,7 +169,7 @@ try {
   await expect(veterinarian).toHaveValue('Dok sa Bukid')
   await expect(page.locator('input[name=assignedStaffId]')).toHaveValue(assignedVeterinarian)
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
-  await page.goto(`${app.origin}/patients/${patient}`)
+  await page.goto(withDetailedHistory(`${app.origin}/patients/${patient}`))
   await openNewVisit(page)
   await page.getByRole('button', { name: /Queue processing/ }).click()
   await expect(veterinarian).toHaveValue('Assigned veterinarian')

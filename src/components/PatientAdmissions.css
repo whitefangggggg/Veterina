@@ -1,0 +1,15 @@
+.patient-hospitalization-history { margin-bottom: var(--space-section, 24px); }
+.patient-hospitalization-history > .section-header { margin-bottom: 0; }
+.patient-hospitalization-content { display: grid; gap: 20px; padding: 20px 24px 24px; }
+.patient-hospitalization-stays { display: grid; gap: 14px; }
+.patient-hospitalization-stay { display: grid; gap: 10px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md, 12px); background: var(--surface-soft); overflow-wrap: anywhere; }
+.patient-hospitalization-stay h3, .patient-hospitalization-stay p { margin: 0; }
+.patient-hospitalization-stay h3 { line-height: 1.5; }
+.patient-hospitalization-stay p { font-size: 13px; line-height: 1.6; }
+.patient-hospitalization-stay .text-link { width: fit-content; max-width: 100%; }
+.patient-hospitalization-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.patient-hospitalization-meta { color: var(--muted); }
+.hospitalization-record-details { display: grid; gap: 14px; min-width: 0; overflow-wrap: anywhere; }
+.hospitalization-record-details > p, .hospitalization-record-details > dl, .hospitalization-record-details > .record-actions { margin: 0; }
+.patient-hospitalization-timeline { display: grid; gap: 10px; margin: 0; padding-left: 18px; list-style: disc; color: var(--muted); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .patient-hospitalization-content { padding: 16px; } .patient-hospitalization-stay { padding: 14px; } }
