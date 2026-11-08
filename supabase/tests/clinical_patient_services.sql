@@ -78,11 +78,11 @@ begin
   select id into vaccine_batch from public.inventory_batches where item_id=vaccine_item;
   perform public.portal_mutation('record_inventory_movement',jsonb_build_object('id',vaccine_item,'batchId',vaccine_batch,'delta',5,'reason','Delivery'),gen_random_uuid());
   select count(*) into before_stock from public.inventory_movements;
-  clinical:=jsonb_build_object('petId',pet,'veterinarianId',actor,'inventoryItemId',vaccine_item,'batchId',vaccine_batch,'dispenseQuantity',1,'vaccine','Forged name','brand','Forged brand','administeredAt',today,'nextDueAt',today+10);
+  clinical:=jsonb_build_object('petId',pet,'veterinarianId',actor,'inventoryItemId',vaccine_item,'batchId',vaccine_batch,'dispenseQuantity',1,'lotNumber','MANUAL-TEST-LOT','vaccine','Forged name','brand','Forged brand','administeredAt',today,'nextDueAt',today+10);
   replay:=gen_random_uuid(); result:=public.portal_mutation('create_queued_vaccination',clinical,replay);
   vaccine_id:=(result->>'id')::uuid; queue:=(result->>'queueEntryId')::uuid;
   if public.portal_mutation('create_queued_vaccination',clinical,replay)<>result then raise exception 'TEST: vaccine retry'; end if;
-  if not exists(select 1 from public.vaccinations where id=vaccine_id and vaccine_name='Fixture vaccine' and brand='Fixture Brand' and inventory_item_id=vaccine_item and lot_number is null) then raise exception 'TEST: authoritative vaccine snapshots'; end if;
+  if not exists(select 1 from public.vaccinations where id=vaccine_id and vaccine_name='Fixture vaccine' and brand='Fixture Brand' and inventory_item_id=vaccine_item and lot_number='MANUAL-TEST-LOT') then raise exception 'TEST: authoritative vaccine snapshots'; end if;
   if (select status from public.queue_entries where id=queue)<>'waiting' then raise exception 'TEST: vaccine care status'; end if;
   perform public.portal_mutation('update_inventory_item',data||jsonb_build_object('id',vaccine_item,'name','Renamed vaccine','brand','New Brand','isActive','false'),gen_random_uuid());
   perform public.portal_mutation('start_queue_entry',jsonb_build_object('id',queue,'veterinarianId',actor),gen_random_uuid());

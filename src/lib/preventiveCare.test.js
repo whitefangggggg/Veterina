@@ -47,7 +47,7 @@ describe('preventive care projections', () => {
 
   it('separates stock units from clinical dose and excludes stock from history', () => {
     const items = [{ id: 'item', inventoryItemId: 'product', batchId: 'batch', dispenseQuantity: '0.25', dose: ' 1 mL ', vaccine: ' Vaccine ', brand: ' Brand ', lotNumber: 'Lot' }]
-    expect(preventivePayload({ kind: 'vaccination' }, items, false).vaccines[0]).toMatchObject({ id: 'item', dispenseQuantity: 0.25, dose: '1 mL', batchId: 'batch' })
+    expect(preventivePayload({ kind: 'vaccination' }, items, false).vaccines[0]).toMatchObject({ id: 'item', dispenseQuantity: 0.25, dose: '1 mL', batchId: 'batch', lotNumber: 'Lot' })
     expect(preventivePayload({ kind: 'deworming' }, items, true)).toEqual({ kind: 'deworming', deworming: { id: 'item', vaccine: 'Vaccine', brand: 'Brand', lotNumber: 'Lot', dose: '1 mL', nextDueAt: '' } })
   })
 })

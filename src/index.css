@@ -561,7 +561,7 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
 .soap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .soap-grid div { padding: 12px; border: 1px solid light-dark(#e8ece8, var(--line)); border-radius: 9px; background: light-dark(#fbfcfb, var(--surface)); }
 .soap-grid strong { color: var(--brand-strong-ink); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
-.soap-grid p { margin: 5px 0 0; color: light-dark(#54615c, var(--muted)); font-size: 13px; line-height: 1.55; }
+.soap-grid p { white-space: pre-wrap; margin: 5px 0 0; color: light-dark(#54615c, var(--muted)); font-size: 13px; line-height: 1.55; }
 .follow-up-note { display: flex; align-items: center; gap: 7px; margin-top: 12px; padding: 9px 11px; border-radius: 8px; color: var(--blue); background: var(--blue-soft); font-size: 13px; font-weight: 600; }
 .record-sidebar .section-card { padding: 18px; }
 .record-sidebar .section-card > h2 { margin-bottom: 14px; font-size: 14px; }

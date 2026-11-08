@@ -5,7 +5,7 @@
 .travel-license-warnings { padding: 14px 16px; border: 1px solid light-dark(#dbbd80, var(--line)); border-radius: 10px; background: light-dark(#fff8e9, var(--surface-soft)); color: light-dark(#754f17, color-mix(in srgb, #754f17 32%, #ffffff)); font-size: 13px; line-height: 1.5; }
 .travel-license-warnings ul { margin: 8px 0; padding-left: 20px; }
 .travel-license-warnings p { margin: 0; }
-.travel-certificate-form input:not([type="checkbox"]), .travel-certificate-form select { width: 100%; min-width: 0; }
+.travel-certificate-form input:not([type="checkbox"]):not([type="radio"]), .travel-certificate-form select { width: 100%; min-width: 0; }
 .travel-owner-fields { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
 .travel-owner-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .travel-owner-heading h3 { margin: 0; font-size: 15px; }
@@ -27,3 +27,12 @@
 .travel-sharing-qr img { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }
 @media (max-width:600px) { .travel-sharing-panel { grid-template-columns: minmax(0,1fr); padding: 16px; } }
 @media (max-width:600px) { .travel-certificates-page .list-toolbar { align-items: stretch; } .travel-certificates-page .record-actions { width: 100%; } .travel-certificate-preview { height: 65vh; } }
+.manual-travel-vaccines { min-width: 0; }
+.manual-travel-vaccines > h3 { margin: 0 0 8px; color: var(--ink); font-size: 15px; }
+.manual-travel-vaccines > p { font-size: 13px; line-height: 1.6; }
+.manual-travel-vaccines .medication-editor { min-width: 0; margin: 16px 0; }
+.manual-travel-vaccines input:not([type="radio"]) { width: 100%; min-width: 0; }
+.manual-rabies-choice { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; color: var(--ink); font-size: 13px; }
+.manual-rabies-choice input { flex: none; width: 18px; height: 18px; accent-color: var(--brand); }
+.manual-travel-vaccines .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 600px) { .manual-travel-vaccines .form-grid { grid-template-columns: minmax(0, 1fr); } }

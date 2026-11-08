@@ -17,7 +17,7 @@ begin
   person:=(public.portal_mutation('create_owner','{"fullName":"Vaccination household","phone":"09171234567","address":"Test"}',gen_random_uuid())->>'id')::uuid;
   pet:=(public.portal_mutation('create_pet',jsonb_build_object('ownerId',person,'name','Historical vaccine pet','species','Dog','breed','Mixed','sex','Male','reproductiveStatus','Unknown'),gen_random_uuid())->>'id')::uuid;
   perform public.portal_mutation('create_queued_encounter',jsonb_build_object('petId',pet,'type','Wellness Check','complaint','Current care','weightKg',3,'veterinarianId',auth.uid()),gen_random_uuid());
-  perform public.portal_mutation('create_queued_vaccination',jsonb_build_object('petId',pet,'veterinarianId',auth.uid(),'inventoryItemId',current_setting('history.item'),'batchId',current_setting('history.batch'),'dispenseQuantity',1,'administeredAt',current_date,'nextDueAt',current_date+30),gen_random_uuid());
+  perform public.portal_mutation('create_queued_vaccination',jsonb_build_object('petId',pet,'veterinarianId',auth.uid(),'inventoryItemId',current_setting('history.item'),'batchId',current_setting('history.batch'),'dispenseQuantity',1,'lotNumber','MANUAL-TEST-LOT','administeredAt',current_date,'nextDueAt',current_date+30),gen_random_uuid());
   select count(*) into before_queue from public.queue_entries;
   select count(*) into before_reminders from public.reminders;
   select count(*) into before_stock from public.inventory_movements;

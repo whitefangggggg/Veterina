@@ -181,7 +181,7 @@ try {
     await checkTheme(page, theme)
     await page.getByRole('button', { name: 'Add Record', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Add Record', exact: true })
-    const next = dialog.getByRole('button', { name: 'Continue', exact: true })
+    const next = dialog.getByRole('button', { name: 'Next', exact: true })
     await expect(next).toBeDisabled()
     await expect(next).toHaveCSS('cursor', 'not-allowed')
     await expect(dialog.locator('.visit-service-art')).toHaveCSS('color', rgb(theme.color))

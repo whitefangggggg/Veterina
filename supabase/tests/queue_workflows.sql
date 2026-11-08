@@ -115,7 +115,7 @@ begin
   rejected:=false;
   begin perform public.portal_mutation('save_queue_draft',payload||jsonb_build_object('draftVersion',1,'record',jsonb_build_object('petId',pet)),gen_random_uuid()); exception when others then if sqlerrm like 'VALIDATION_FAILED: unsupported draft fields%' then rejected:=true; else raise; end if; end;
   if not rejected then raise exception 'TEST: draft changed patient identity'; end if;
-  record_data:=jsonb_build_object('petId',pet,'veterinarianId',doctor,'inventoryItemId',current_setting('queue_test.vaccine_item'),'batchId',(select id from public.inventory_batches where item_id=current_setting('queue_test.vaccine_item')::uuid limit 1),'dispenseQuantity',1,'administeredAt',today,'nextDueAt',today+10);
+  record_data:=jsonb_build_object('petId',pet,'veterinarianId',doctor,'inventoryItemId',current_setting('queue_test.vaccine_item'),'batchId',(select id from public.inventory_batches where item_id=current_setting('queue_test.vaccine_item')::uuid limit 1),'dispenseQuantity',1,'lotNumber','MANUAL-TEST-LOT','administeredAt',today,'nextDueAt',today+10);
   select count(*) into before_count from public.vaccinations where pet_id=pet;
   rejected:=false;
   begin perform public.portal_mutation('complete_queue_entry',jsonb_build_object('id',walkin,'draftVersion',1,'record',record_data||jsonb_build_object('nextDueAt',today-1)),gen_random_uuid()); exception when others then if sqlerrm like 'VALIDATION_FAILED%' or sqlstate='23514' then rejected:=true; else raise; end if; end;
@@ -222,7 +222,7 @@ begin
   perform public.portal_mutation('cancel_queue_entry',jsonb_build_object('id',queue),gen_random_uuid());
 
   -- Adding a vaccine from the patient page mirrors the checkup workflow.
-  record_data:=jsonb_build_object('petId',pet,'veterinarianId',doctor,'inventoryItemId',current_setting('queue_test.vaccine_item'),'batchId',(select id from public.inventory_batches where item_id=current_setting('queue_test.vaccine_item')::uuid limit 1),'dispenseQuantity',1,'administeredAt',today,'nextDueAt',today+20,'dose','Recorded dose');
+  record_data:=jsonb_build_object('petId',pet,'veterinarianId',doctor,'inventoryItemId',current_setting('queue_test.vaccine_item'),'batchId',(select id from public.inventory_batches where item_id=current_setting('queue_test.vaccine_item')::uuid limit 1),'dispenseQuantity',1,'lotNumber','MANUAL-TEST-LOT','administeredAt',today,'nextDueAt',today+20,'dose','Recorded dose');
   select count(*) into before_count from public.vaccinations where pet_id=pet;
   rejected:=false;
   begin perform public.portal_mutation('create_queued_vaccination',record_data||jsonb_build_object('nextDueAt',today-1),gen_random_uuid()); exception when others then if sqlerrm like 'VALIDATION_FAILED%' or sqlstate='23514' then rejected:=true; else raise; end if; end;

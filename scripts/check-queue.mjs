@@ -1,4 +1,4 @@
-import { openNewVisit } from './helpers/new-visit.mjs'
+import { openNewVisit, recordStep, reviewRecord } from './helpers/new-visit.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 import { saveCheckup } from './helpers/checkup.mjs'
 // Browser acceptance uses intercepted API responses; real database behavior is
@@ -102,7 +102,7 @@ try {
         return reply({ id: visit.id })
       } else if (action === 'create_queued_vaccination') {
         const vaccinationId = `patient-vaccine-${raw.vaccinations.length}`
-        raw.vaccinations.push({ id: vaccinationId, pet_id: payload.petId, vaccine_name: payload.inventoryItemId, inventory_item_id: payload.inventoryItemId, brand: 'Clinic Brand', dose: payload.dose, administered_at: payload.administeredAt, next_due_at: payload.nextDueAt, administered_by: payload.veterinarianId })
+        raw.vaccinations.push({ id: vaccinationId, pet_id: payload.petId, vaccine_name: payload.inventoryItemId, inventory_item_id: payload.inventoryItemId, brand: 'Clinic Brand', lot_number: payload.lotNumber, dose: payload.dose, administered_at: payload.administeredAt, next_due_at: payload.nextDueAt, administered_by: payload.veterinarianId })
         entry = { id: `vaccine-ticket-${raw.queue_entries.length}`, pet_id: payload.petId, category: 'vaccination', service_name: 'Vaccination', source: 'patient_record', vaccination_id: vaccinationId, status: 'waiting', arrived_at: now.toISOString(), veterinarian_id: payload.veterinarianId }
         raw.queue_entries.push(entry)
       } else if (action === 'start_queue_entry') {
@@ -122,7 +122,7 @@ try {
         }
         if (entry.vaccination_id) {
           const vaccine = raw.vaccinations.find((row) => row.id === entry.vaccination_id)
-          Object.assign(vaccine, { vaccine_name: payload.record.inventoryItemId, inventory_item_id: payload.record.inventoryItemId, brand: 'Clinic Brand', dose: payload.record.dose, administered_at: payload.record.administeredAt, next_due_at: payload.record.nextDueAt })
+          Object.assign(vaccine, { vaccine_name: payload.record.inventoryItemId, inventory_item_id: payload.record.inventoryItemId, brand: 'Clinic Brand', lot_number: payload.record.lotNumber, dose: payload.record.dose, administered_at: payload.record.administeredAt, next_due_at: payload.record.nextDueAt })
         }
         entry.service_notes = payload.record.serviceNotes || ''; entry.status = 'completed'; entry.finished_at = now.toISOString()
         entry.care_draft = {}; entry.draft_saved_at = null; entry.draft_saved_by = null; entry.draft_version = (entry.draft_version || 0) + 1
@@ -197,6 +197,7 @@ try {
   await page.getByLabel('Inventory product 1', { exact: true }).selectOption('Rabies')
   await page.getByLabel('Stock batch 1').selectOption('Rabies-batch')
   await page.getByLabel('Stock quantity 1').fill('1')
+  await page.getByLabel('Lot number 1', { exact: true }).fill('MANUAL-QUEUE-LOT')
   await page.getByLabel('Date administered').fill('')
   await page.getByRole('button', { name: 'Save as draft', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Draft save interrupted')
@@ -365,16 +366,17 @@ try {
   await page.getByRole('option', { name: 'Queue clinician', exact: true }).click()
   await page.getByLabel('Chief complaint').fill('Patient-page checkup')
   await expect(page.getByLabel('Body condition (1–5)', { exact: true })).toHaveAttribute('max', '5')
+  await recordStep(page, 'vitals')
   await page.getByLabel('Body condition (1–5)', { exact: true }).fill('5')
   await saveCheckup(page)
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('status').filter({ hasText: 'Visit saved in queue' })).toContainText('Q-004')
   await page.getByRole('button', { name: 'Clinical history', exact: true }).click()
-  await expect(page.locator('.visit-card')).toHaveCount(1)
+  await expect(page.locator('.visit-card:not(.preventive-history-card)')).toHaveCount(1)
   // The picker stays reachable above the card's full-area edit trigger.
   await page.getByLabel('Card color', { exact: true }).fill('#cc5599')
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  await expect(page.locator('.visit-card')).toHaveCSS('border-left-width', '1px')
+  await expect(page.locator('.visit-card:not(.preventive-history-card)')).toHaveCSS('border-left-width', '1px')
   await page.getByRole('button', { name: 'Save color', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Color could not be saved')
   await expect(page.getByLabel('Card color', { exact: true })).toHaveValue('#cc5599')
@@ -384,7 +386,7 @@ try {
   assert.equal(colorCalls[0].key, colorCalls[1].key, 'Color retries must keep their idempotency key')
   await page.reload()
   await expect(page.getByLabel('Card color', { exact: true })).toHaveValue('#cc5599')
-  await expect(page.locator('.visit-card')).toHaveCSS('border-left-width', '1px')
+  await expect(page.locator('.visit-card:not(.preventive-history-card)')).toHaveCSS('border-left-width', '1px')
   await page.setViewportSize({ width: 320, height: 900 })
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Card color controls overflow on mobile')
   await page.setViewportSize({ width: 1440, height: 1000 })
@@ -433,8 +435,8 @@ try {
   assert.equal(raw.visits.length, 1, 'Queue completion created a second checkup')
   assert.equal(raw.queue_entries.at(-1).status, 'completed')
   await page.goto(origin + `/patients/${petId}`)
-  await expect(page.locator('.visit-card')).toHaveCount(1)
-  await expect(page.locator('.visit-card')).toContainText('Completed patient-page checkup')
+  await expect(page.locator('.visit-card:not(.preventive-history-card)')).toHaveCount(1)
+  await expect(page.locator('.visit-card:not(.preventive-history-card)')).toContainText('Completed patient-page checkup')
   await expect(page.locator('.visit-card .record-care-status .badge')).toHaveText('Completed')
   await expect(page.getByRole('button', { name: 'Finalize checkup', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Finalize checkup', exact: true }).click()
@@ -444,10 +446,13 @@ try {
   await page.getByRole('button', { name: 'Vaccinations and Deworming', exact: true }).click()
   await page.getByRole('button', { name: 'Add vaccination or deworming', exact: true }).click()
   await page.getByRole('button', { name: /Queue processing/ }).click()
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
   await page.getByLabel('Inventory product 1', { exact: true }).selectOption('Patient-page vaccine')
   await page.getByLabel('Stock batch 1').selectOption('Patient-page vaccine-batch')
   await page.getByLabel('Stock quantity 1').fill('1')
+  await page.getByLabel('Lot number 1', { exact: true }).fill('MANUAL-QUEUE-LOT')
   await page.getByLabel('Next due date 1').fill('2027-10-17')
+  await reviewRecord(page)
   await page.getByRole('button', { name: 'Save record', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('status').filter({ hasText: 'Vaccinations and Deworming saved in queue' })).toContainText('Q-005')
@@ -476,9 +481,12 @@ try {
   await expect(patientVaccine.getByText('Up to date', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Add vaccination or deworming', exact: true }).click()
   await page.getByRole('button', { name: /Queue processing/ }).click()
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
   await page.getByLabel('Inventory product 1', { exact: true }).selectOption('Cancelled queued vaccine')
   await page.getByLabel('Stock batch 1').selectOption('Cancelled queued vaccine-batch')
   await page.getByLabel('Stock quantity 1').fill('1')
+  await page.getByLabel('Lot number 1', { exact: true }).fill('MANUAL-QUEUE-LOT')
+  await reviewRecord(page)
   await page.getByRole('button', { name: 'Save record', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByRole('link', { name: 'Open queued care', exact: true }).click()
@@ -491,7 +499,7 @@ try {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Vaccine care statuses overflow on mobile')
   raw.visits[0].finalized_at = now.toISOString()
   await page.goto(origin + `/patients/${petId}`)
-  await expect(page.locator('.visit-card')).toContainText('Finalized')
+  await expect(page.locator('.visit-card:not(.preventive-history-card)')).toContainText('Finalized')
   await page.getByLabel('Card color', { exact: true }).fill('#2288cc')
   await page.getByRole('button', { name: 'Save color', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Color saved' })).toBeVisible()
@@ -504,7 +512,7 @@ try {
   raw.visits[0].finalized_at = null
   Object.assign(raw.visit_vitals[0], { body_condition_score: 7, body_condition_scale: 9 })
   await page.reload()
-  await expect(page.locator('.visit-card')).toContainText('BCS 7/9')
+  await expect(page.locator('.visit-card:not(.preventive-history-card)')).toContainText('BCS 7/9')
   await page.getByRole('button', { name: 'Edit checkup', exact: true }).click()
   await expect(page.getByText('Previously recorded: 7/9')).toBeVisible()
   await page.getByRole('button', { name: 'Edit Vitals & condition', exact: true }).click()
@@ -512,7 +520,7 @@ try {
   await page.getByRole('checkbox', { name: 'Replace with a new 1–5 assessment' }).check()
   await page.getByLabel('Body condition (1–5)', { exact: true }).fill('3')
   await saveCheckup(page)
-  await expect(page.locator('.visit-card')).toContainText('BCS 3/5')
+  await expect(page.locator('.visit-card:not(.preventive-history-card)')).toContainText('BCS 3/5')
 
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto(origin + '/queue')

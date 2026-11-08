@@ -50,7 +50,7 @@ try {
       perform public.portal_mutation('record_inventory_movement',jsonb_build_object('id',item,'batchId',batch,'delta',5,'reason','Delivery'),gen_random_uuid());
       for n in 1..2 loop
         patient:=(public.portal_mutation('create_pet',jsonb_build_object('ownerId',person,'name','Concurrent patient '||n,'species','Cat','breed','Mixed','sex','Female','reproductiveStatus','Unknown'),gen_random_uuid())->>'id')::uuid;
-        payload:=jsonb_build_object('kind','vaccination','recordingPurpose','queue','petId',patient,'administeredAt',(now() at time zone 'Asia/Manila')::date,'veterinarianId','${userId}','vaccines',jsonb_build_array(jsonb_build_object('id',gen_random_uuid(),'inventoryItemId',item,'batchId',batch,'dispenseQuantity',4)));
+        payload:=jsonb_build_object('kind','vaccination','recordingPurpose','queue','petId',patient,'administeredAt',(now() at time zone 'Asia/Manila')::date,'veterinarianId','${userId}','vaccines',jsonb_build_array(jsonb_build_object('id',gen_random_uuid(),'inventoryItemId',item,'batchId',batch,'dispenseQuantity',4,'lotNumber','MANUAL-STOCK')));
         response:=public.portal_mutation('create_preventive_care',payload,gen_random_uuid());
         perform public.portal_mutation('start_queue_entry',jsonb_build_object('id',response->>'queueEntryId','veterinarianId','${userId}'),gen_random_uuid());
         records:=records||jsonb_build_array(jsonb_build_object('id',response->>'queueEntryId','draftVersion',0,'record',payload||jsonb_build_object('id',response->>'id','version',0)));

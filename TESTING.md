@@ -1,5 +1,57 @@
 # Testing Veterina
 
+## Add Record steps
+
+Patient Add Record uses one modal for service selection, recording method, the
+relevant form steps, and a final review. Checkups separate visit details, vitals,
+clinical notes, follow-up, and optional historical medicines. Preventive care
+separates shared details from each vaccine/deworming item. The vaccination
+section's add button opens the same flow with its service already selected.
+
+Next validates the current step; Back and visited step labels preserve entered
+values. Review offers an Edit action for each section. Previously opened service
+and recording-method forms stay mounted until the modal closes, keeping their
+unsaved values separate. Only the final save performs the existing mutation.
+Existing record editing and queue drafts keep their original workflows.
+
+`test:new-visits` checks single-dialog navigation, validation, review/edit,
+retained values across service/purpose revisits, cancellation, keyboard focus,
+and mobile layouts in light/dark mode. Preventive-care, historical-checkup,
+checkup-completion, queue, and real database browser suites navigate these steps
+and verify saved payloads, retries, completion, and stock behavior.
+
+## Manual vaccination lots and certificate evidence
+
+Live vaccination entries require a manually entered lot number separate from the
+stock batch. Drafts may remain incomplete. Completed lots can be corrected through
+the audited record editor without changing the stock ledger; issued certificate
+snapshots retain their original evidence. Deworming retains its batch-based lots.
+
+Travel certificates accept saved Anti-Rabies evidence, manual evidence, and mixed
+saved/manual history. Manual rows require a name, lot, and administration date;
+the selected Anti-Rabies row also needs a next-due date covering certificate
+validity. Optional product expiration remains in the certificate snapshot.
+Issuance atomically creates one historical vaccination group per manual row;
+preview/cancel/failure create no rows, queue tickets, reminders, or stock changes.
+
+Deploy `20261107084400_manual_vaccine_lots_and_certificate_entries.sql` before
+this frontend. It is applied to Development; all 18 existing vaccine rows,
+stock movements, and issued snapshots were unchanged, and the security advisor
+baseline was unchanged. Existing saved-record issuance requests remain supported. New
+live vaccination requests must include a nonempty `lotNumber` for each item.
+`issue_travel_certificate` accepts optional `manualVaccinations` and
+`manualRabiesItemId`; a saved `rabiesVaccinationId` and manual selection are
+mutually exclusive. Manual row IDs are stable UUIDs and issuance uses the existing
+payload-bound retry receipt.
+
+`manual_certificate_vaccines.sql` covers manual/mixed issuance, invalid fields,
+rollback, immutable snapshots, history corrections, and private helper access.
+The real `test:preventive-database` browser suite covers manual entry, cancellation,
+preview reset, lost issuance responses, patient history search, public snapshot
+parity, and mobile dialogs in both appearance modes. The travel certificate
+concurrency suite checks simultaneous retries create one certificate and vaccine.
+These SQL checks also run under `test:database`.
+
 Patients use **Vaccinations and Deworming**. A vaccination record contains one
 or more vaccine items; a deworming record contains exactly one administration.
 Live items require active Vaccines/Medicine inventory, an available batch and a

@@ -59,6 +59,19 @@ try {
   assert.match(duplicateResults.find((result) => result.code !== 0).error, /control number already exists/)
   assert.equal(sql('select count(*) from public.travel_certificates'), '7')
   assert.equal(sql('select last_number from private.travel_certificate_counters'), '7', 'Rejected duplicate consumed a reference')
+  const manualKey = randomUUID(), manualId = randomUUID()
+  const manualPayload = { ...payload, controlNumber: 'MANUAL-RETRY', rabiesVaccinationId: null, manualRabiesItemId: manualId,
+    manualVaccinations: [{ id: manualId, vaccine: 'Manual Rabies', lotNumber: 'MANUAL-CONCURRENT', administeredAt: '', nextDueAt: '' }] }
+  const days = JSON.parse(sql("select json_build_object('administered', (now() at time zone 'Asia/Manila')::date-30, 'due', (now() at time zone 'Asia/Manila')::date+365)"))
+  Object.assign(manualPayload.manualVaccinations[0], { administeredAt: days.administered, nextDueAt: days.due })
+  const manualResults = await Promise.all(Array.from({ length: 3 }, () => session(`begin; set local role authenticated;
+    do $$ begin perform set_config('request.jwt.claims','${claims}',true); end $$;
+    select public.portal_mutation('issue_travel_certificate','${JSON.stringify(manualPayload)}','${manualKey}'); commit;`)))
+  for (const result of manualResults) assert.equal(result.code, 0, result.error)
+  assert.deepEqual(manualResults.map(r => r.output.trim()), Array(3).fill(manualResults[0].output.trim()))
+  assert.equal(sql(`select count(*) from public.vaccinations where id='${manualId}'`), '1')
+  assert.equal(sql("select count(*) from public.travel_certificates where control_number='MANUAL-RETRY'"), '1')
+  console.log('PASS simultaneous manual certificate retries create one vaccination and one certificate')
   console.log('PASS concurrent travel issuance: unique references, duplicate-request receipt manual control uniqueness and atomic duplicate rejection')
 } finally {
   await Promise.allSettled(pending)

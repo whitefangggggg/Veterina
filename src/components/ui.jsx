@@ -42,9 +42,10 @@ export function EmptyState({ icon: Icon, title, description, action }) {
   )
 }
 
-export function Modal({ title, description, children, onClose, wide = false, className = '' }) {
+export function Modal({ title, description, children, onClose, wide = false, className = '', embedded = false }) {
   const dialogRef = useRef(null)
   useEffect(() => {
+    if (embedded) return
     const previousFocus = document.activeElement
     document.body.classList.add('overlay-open')
     const firstControl = [...(dialogRef.current?.querySelectorAll('input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),button:not([disabled])') || [])].find((element) => element.getClientRects().length)
@@ -53,7 +54,7 @@ export function Modal({ title, description, children, onClose, wide = false, cla
       document.body.classList.remove('overlay-open')
       if (previousFocus?.isConnected) previousFocus.focus()
     }
-  }, [])
+  }, [embedded])
 
   const onKeyDown = (event) => {
     const busy = Boolean(dialogRef.current?.querySelector('form[aria-busy="true"]'))
@@ -70,6 +71,7 @@ export function Modal({ title, description, children, onClose, wide = false, cla
     if (!dialogRef.current?.querySelector('form[aria-busy="true"]')) onClose()
   }
 
+  if (embedded) return <>{children}</>
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={close}>
       <section

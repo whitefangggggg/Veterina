@@ -30,7 +30,7 @@ export function preventiveHistoryRecords(records) {
 export function preventivePayload(values, items, historical) {
   const prepared = items.map((item) => ({ id: item.id, dose: item.dose.trim(), nextDueAt: item.nextDueAt || '',
     ...(historical ? { vaccine: item.vaccine.trim(), brand: item.brand?.trim() || '', lotNumber: item.lotNumber?.trim() || '' }
-      : { inventoryItemId: item.inventoryItemId || '', batchId: item.batchId || '', dispenseQuantity: item.dispenseQuantity === '' || item.dispenseQuantity == null ? null : Number(item.dispenseQuantity) }),
+      : { inventoryItemId: item.inventoryItemId || '', batchId: item.batchId || '', dispenseQuantity: item.dispenseQuantity === '' || item.dispenseQuantity == null ? null : Number(item.dispenseQuantity), ...(values.kind === 'vaccination' ? { lotNumber: item.lotNumber?.trim() || '' } : {}) }),
   }))
   return { ...values, ...(values.kind === 'deworming' ? { deworming: prepared[0] } : { vaccines: prepared }) }
 }

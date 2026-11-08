@@ -8,7 +8,7 @@ import { emptyPreventiveItem, preventivePayload } from '../lib/preventiveCare'
 import { prescriptionInventoryBatches } from '../lib/prescriptions'
 import './PreventiveCare.css'
 
-export default function PreventiveCareEditor({ pet, record: inputRecord, queueEntry, purpose, service, onSaved, onClose }) {
+export default function PreventiveCareEditor({ pet, record: inputRecord, queueEntry, purpose, service, onSaved, onClose, embedded = false, wizard = false }) {
   const { preventiveCare, execute, profiles, inventory, today } = useClinicData()
   const { user, profile } = useAuth()
   const record = inputRecord?.items ? inputRecord : preventiveCare.find((group) => group.id === (inputRecord?.preventive_record_id || inputRecord?.id))
@@ -31,16 +31,12 @@ export default function PreventiveCareEditor({ pet, record: inputRecord, queueEn
       queueEntry ? { id: queueEntry.id, record: values, draftVersion: queueEntry.draftVersion } : values)
     onSaved?.(result)
   }
-  return <Modal title={`${record ? 'Edit' : 'Record'} ${kind === 'deworming' ? 'deworming' : 'vaccination'} for ${pet.name}`} wide onClose={onClose}
-    description={historical ? 'Record past care without a queue entry, live reminder, or stock deduction.' : queueEntry ? `${queueEntry.queueNumber} · Complete care to deduct stock. Drafts do not deduct stock.` : record ? 'Consumed products, batches and stock quantities are fixed. Additional vaccines deduct stock once.' : 'Saving creates a waiting queue entry. Stock is deducted when care is completed.'}>
-    <AsyncForm onClose={onClose} onSave={save} submitLabel={queueEntry ? 'Save and complete care' : historical ? 'Save historical record' : 'Save record'}
-      onSaveDraft={queueEntry ? async () => { const { serviceId: _serviceId, ...values } = payload(); await execute('save_queue_draft', { id: queueEntry.id, record: values, draftVersion: queueEntry.draftVersion }) } : undefined}>
-      <div className="form-grid">
+  const details = <div className="form-grid">
         <Field label="Record type"><select aria-label="Record type" disabled={Boolean(record)} value={kind} onChange={(event) => { setKind(event.target.value); setItems([emptyPreventiveItem()]) }}><option value="vaccination">Vaccination</option><option value="deworming">Deworming</option></select></Field>
         <Field label="Date administered" required><input aria-label="Date administered" type="date" value={date} max={today} required onChange={(event) => setDate(event.target.value)} /></Field>
         {historical ? <ClinicianField label="Veterinarian" value={clinician} onChange={setClinician} profiles={profiles} /> : <Field label="Veterinarian" required><select aria-label="Veterinarian" value={clinician.id} required disabled={Boolean(queueEntry)} onChange={(event) => setClinician({ id: event.target.value, name: '' })}><option value="">Select veterinarian</option>{profiles.filter((p) => p.is_active || p.id === clinician.id).map((p) => <option value={p.id} key={p.id}>{p.full_name}</option>)}</select></Field>}
       </div>
-      <div className="preventive-items">{items.map((item, index) => {
+  const itemEditors = items.map((item, index) => {
         const existing = record?.items.find((entry) => entry.id === item.id)
         const legacy = existing?.stockTracked === false
         const locked = Boolean(existing?.consumed)
@@ -64,10 +60,11 @@ export default function PreventiveCareEditor({ pet, record: inputRecord, queueEn
                 {!options.length && !legacy && <small>Add an active {category === 'Vaccines' ? 'vaccine with a brand' : 'deworming medicine'} in Inventory first.</small>}
               </Field>
               <Field label="Brand"><input aria-label={`Brand ${index + 1}`} readOnly value={item.brand || product?.brand || ''} /></Field>
+              {kind === 'vaccination' && <Field label="Lot number" required={!existing || Boolean(queueEntry)} hint="Copy from the vaccine label. This lot appears on travel certificates; stock is deducted from the selected batch."><input aria-label={`Lot number ${index + 1}`} maxLength={200} required={!existing || Boolean(queueEntry)} pattern={(!existing || queueEntry) ? '.*\\S.*' : undefined} value={item.lotNumber || ''} onChange={(event) => change(item.id, { lotNumber: event.target.value })} /></Field>}
               {!legacy && <>
                 <Field label="Stock batch" required><select aria-label={`Stock batch ${index + 1}`} value={item.batchId} disabled={locked} required onChange={(e) => change(item.id, { batchId: e.target.value })}>
                   <option value="">Select available batch</option>
-                  {locked ? <option value={item.batchId}>{existing.lotNumber || 'Saved batch'} · already administered</option> : batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.lot_number || 'Unnumbered'} · {batch.quantity} {product.unit}{batch.expiration_date ? ` · expires ${batch.expiration_date}` : ''}</option>)}
+                  {locked ? <option value={item.batchId}>{product?.batches?.find((batch) => batch.id === item.batchId)?.lot_number || 'Saved batch'} · already administered</option> : batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.lot_number || 'Unnumbered'} · {batch.quantity} {product.unit}{batch.expiration_date ? ` · expires ${batch.expiration_date}` : ''}</option>)}
                 </select></Field>
                 <Field label={`Stock quantity (${item.dispenseUnit || product?.unit || 'units'})`} required hint="Inventory units to deduct; enter the clinical dose separately."><input aria-label={`Stock quantity ${index + 1}`} type="number" min={product?.allowsFraction ? '0.01' : '1'} step={product?.allowsFraction ? '0.01' : '1'} value={item.dispenseQuantity} required readOnly={locked} onChange={(e) => change(item.id, { dispenseQuantity: e.target.value })} /></Field>
               </>}
@@ -79,8 +76,15 @@ export default function PreventiveCareEditor({ pet, record: inputRecord, queueEn
           </div>
           {kind === 'vaccination' && items.length > 1 && !locked && (!existing || profile.role === 'owner') && <button type="button" className="text-link danger-text" onClick={() => setItems((current) => current.filter((entry) => entry.id !== item.id))}>Remove vaccine {index + 1}</button>}
         </fieldset>
-      })}</div>
-      {kind === 'vaccination' && <button type="button" className="button button-secondary" disabled={items.length >= 50} onClick={() => setItems((current) => [...current, emptyPreventiveItem()])}>Add another vaccine</button>}
+      })
+  const addVaccine = kind === 'vaccination' && <button type="button" className="button button-secondary" disabled={items.length >= 50} onClick={() => setItems((current) => [...current, emptyPreventiveItem()])}>Add another vaccine</button>
+  return <Modal title={`${record ? 'Edit' : 'Record'} ${kind === 'deworming' ? 'deworming' : 'vaccination'} for ${pet.name}`} wide onClose={onClose} embedded={embedded}
+    description={historical ? 'Record past care without a queue entry, live reminder, or stock deduction.' : queueEntry ? `${queueEntry.queueNumber} · Complete care to deduct stock. Drafts do not deduct stock.` : record ? 'Consumed products, batches and stock quantities are fixed. Additional vaccines deduct stock once.' : 'Saving creates a waiting queue entry. Stock is deducted when care is completed.'}>
+    <AsyncForm steps={wizard ? [{ id: 'details', label: 'Details', description: 'Choose the record type, administration date, and veterinarian.', content: details },
+      ...itemEditors.map((editor, index) => ({ id: items[index].id, label: kind === 'vaccination' ? `Vaccine ${index + 1}` : 'Deworming', content: <div className="preventive-items">{editor}{addVaccine}</div> }))] : undefined} onClose={onClose} onSave={save} submitLabel={queueEntry ? 'Save and complete care' : historical ? 'Save historical record' : 'Save record'}
+      onSaveDraft={queueEntry ? async () => { const { serviceId: _serviceId, ...values } = payload(); await execute('save_queue_draft', { id: queueEntry.id, record: values, draftVersion: queueEntry.draftVersion }) } : undefined}>
+      {!wizard && <>{details}<div className="preventive-items">{itemEditors}</div>{addVaccine}</>}
+
     </AsyncForm>
   </Modal>
 }

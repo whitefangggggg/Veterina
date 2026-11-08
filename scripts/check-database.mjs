@@ -1,4 +1,4 @@
-import { openNewVisit } from './helpers/new-visit.mjs'
+import { openNewVisit, reviewRecord } from './helpers/new-visit.mjs'
 import { saveCheckup } from './helpers/checkup.mjs'
 // This suite writes only to a dedicated, loopback Supabase stack. No API mocks.
 import assert from 'node:assert/strict'
@@ -30,7 +30,7 @@ assert.equal(sql('select count(*) from public.owners'), '0', 'Start with an empt
 const admin = createClient(env.TEST_SUPABASE_URL, env.TEST_SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 const checked = ({ data, error }) => { if (error) throw error; return data }
 await mkdir('test-artifacts.local', { recursive: true })
-for (const suite of ['security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'follow_up_arrivals', 'clinic_rbac', 'owner_staff_signup', 'google_account_registration', 'clinic_logo', 'owner_clinic_onboarding', 'platform_subscriptions', 'checkup_completion', 'historical_checkups', 'historical_vaccinations', 'unified_patient_visits', 'travel_certificates', 'veterinarian_tin_settings', 'veterinarian_professional_details', 'clinic_appearance_theme', 'preventive_care']) {
+for (const suite of ['security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'follow_up_arrivals', 'clinic_rbac', 'owner_staff_signup', 'google_account_registration', 'clinic_logo', 'owner_clinic_onboarding', 'platform_subscriptions', 'checkup_completion', 'historical_checkups', 'historical_vaccinations', 'unified_patient_visits', 'travel_certificates', 'veterinarian_tin_settings', 'veterinarian_professional_details', 'clinic_appearance_theme', 'preventive_care', 'manual_certificate_vaccines']) {
   const result = spawnSync('psql', [env.TEST_DATABASE_URL, '-X', '-v', 'ON_ERROR_STOP=1', '-f', `supabase/tests/${suite}.sql`], { encoding: 'utf8', windowsHide: true })
   await writeFile(`test-artifacts.local/${suite}.log`, (result.stdout || '') + (result.stderr || ''))
   if (result.error) throw result.error
@@ -431,10 +431,12 @@ try {
   await page.goto(app.origin + '/patients/' + patient.id)
   await openNewVisit(page, 'Vaccination')
   await page.getByRole('button', { name: /Record-keeping only/ }).click()
-  await page.getByLabel('Product name 1', { exact: true }).fill('Historical Anti-Rabies')
   await page.getByLabel('Date administered').fill('2020-01-02')
-  await page.getByLabel('Next due date 1').fill('2030-01-02')
   await page.getByLabel('Veterinarian', { exact: true }).fill('Dok Máya sa Bukid')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await page.getByLabel('Product name 1', { exact: true }).fill('Historical Anti-Rabies')
+  await page.getByLabel('Next due date 1').fill('2030-01-02')
+  await reviewRecord(page)
   let loseHistoricalVaccineAcknowledgement = true
   await page.route('**/rest/v1/rpc/portal_mutation', async (route) => {
     if (loseHistoricalVaccineAcknowledgement && route.request().postDataJSON().p_action === 'create_preventive_care') {
@@ -473,15 +475,18 @@ try {
     await openNewVisit(page, 'Vaccination')
     await page.getByRole('button', { name: /Queue processing/ }).click()
     await page.getByLabel('Record type', { exact: true }).selectOption(kind)
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
     const count = kind === 'vaccination' ? 2 : 1
     for (let index = 1; index <= count; index++) {
       if (index > 1) await page.getByRole('button', { name: 'Add another vaccine' }).click()
       await page.getByLabel(`Inventory product ${index}`, { exact: true }).selectOption(product.id)
       await page.getByLabel(`Stock batch ${index}`, { exact: true }).selectOption(stockBatch.id)
       await page.getByLabel(`Stock quantity ${index}`, { exact: true }).fill('1')
+      if (kind === 'vaccination') await page.getByLabel(`Lot number ${index}`, { exact: true }).fill(`MANUAL-DB-${index}`)
       await page.getByLabel(`Dose ${index}`, { exact: true }).fill('Recorded clinical dose')
     }
     if (kind === 'deworming') await expect(page.getByRole('button', { name: 'Add another vaccine' })).toHaveCount(0)
+    await reviewRecord(page)
     await page.getByRole('button', { name: 'Save record', exact: true }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
     const parent = checked(await careClient.from('preventive_care_records').select('*').eq('pet_id', patient.id).eq('kind', kind).eq('recording_purpose', 'queue').order('created_at', { ascending: false }).limit(1).single())
@@ -531,6 +536,7 @@ try {
   await openNewVisit(page, 'Grooming')
   await page.getByRole('button', { name: /Queue processing/ }).click()
   await page.getByLabel('Arrival notes').fill('Current grooming request')
+  await reviewRecord(page)
   await page.getByRole('button', { name: 'Add to queue', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   const beforeHistoricalService = operationalCounts()
@@ -549,8 +555,10 @@ try {
     }
     return route.continue()
   })
+  await reviewRecord(page)
   await page.getByRole('button', { name: 'Save service record' }).click()
   await expect(page.getByRole('alert')).toBeVisible()
+  await reviewRecord(page)
   await page.getByRole('button', { name: 'Save service record' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.unroute('**/rest/v1/rpc/portal_mutation')
@@ -567,6 +575,7 @@ try {
   await expect(page.getByLabel('Work performed / service notes')).toHaveValue('Integration historical grooming')
   await expect(page.getByLabel('Performed by', { exact: true })).toHaveValue('')
   await page.getByLabel('Work performed / service notes').fill('Integration historical grooming corrected')
+  await reviewRecord(page)
   await page.getByRole('button', { name: 'Save service record' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   assert.equal(operationalCounts(), beforeHistoricalService)

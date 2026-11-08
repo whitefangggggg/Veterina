@@ -60,14 +60,16 @@ export function travelCertificateOwnerErrors(details) {
 }
 
 export function travelCertificatePreview({ pet, owner, ownerDetails = travelCertificateOwnerDetails(owner), issuer, vaccinations, rabiesVaccinationId, today, travelDate, destination, clinic, patientPhotoDataUrl, controlNumber, validUntil, vaccineExpirationDate, issuedTime }) {
+  // A refresh after a lost issue response can include these same manual IDs.
+  const evidence = [...new Map(vaccinations.map((vaccine) => [vaccine.id, vaccine])).values()]
   return { reference_number: null, status: 'preview', snapshot: { version: 4, issuedOn: today, issuedTime, timezone: clinic?.timezone || 'Asia/Manila', controlNumber: controlNumber?.trim(), validUntil,
     pet: { name: pet.name, species: pet.species, breed: pet.breed, recordNumber: pet.recordNumber, birthDate: pet.birthDate, birthDateEstimated: pet.birthDateEstimated, color: pet.color, sex: pet.sex, weightKg: pet.latestWeight, microchipNumber: pet.microchip, photoDataUrl: isPatientPhotoDataUrl(patientPhotoDataUrl) ? patientPhotoDataUrl : null },
     owner: Object.fromEntries(Object.entries(ownerDetails).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value])), issuer: { name: issuer.full_name, title: issuer.job_title, prcLicenseNumber: issuer.prc_license_number, ptrNumber: issuer.ptr_number, tinNumber: issuer.tin_number, licenseExpiresOn: issuer.license_expires_on },
     clinic: { name: clinic?.clinic_name, address: clinic?.address, phone: clinic?.phone, email: clinic?.email, logoDataUrl: clinic?.logo_data_url },
     journey: { date: travelDate, destination: destination.trim() }, rabiesVaccinationId,
-    review: { eligible: travelCertificateErrors({ pet, owner, issuer, vaccination: vaccinations.find((entry) => entry.id === rabiesVaccinationId), travelDate, today }).length === 0 },
-    vaccinations: completedTravelVaccinations(vaccinations, pet.id, today).map((vaccine) => ({ id: vaccine.id, name: vaccine.vaccine, brand: vaccine.brand, lotNumber: vaccine.lotNumber,
-      dose: vaccine.dose, administeredOn: vaccine.administeredAt, validThrough: vaccine.nextDueAt, administeredBy: vaccine.administered_by_name,
+    review: { eligible: travelCertificateErrors({ pet, owner, issuer, vaccination: evidence.find((entry) => entry.id === rabiesVaccinationId), travelDate, today }).length === 0 },
+    vaccinations: completedTravelVaccinations(evidence, pet.id, today).sort((a, b) => b.administeredAt.localeCompare(a.administeredAt) || a.id.localeCompare(b.id)).map((vaccine) => ({ id: vaccine.id, name: vaccine.vaccine, brand: vaccine.brand, lotNumber: vaccine.lotNumber,
+      dose: vaccine.dose, administeredOn: vaccine.administeredAt, validThrough: vaccine.nextDueAt, administeredBy: vaccine.administered_by_name, ...(vaccine.expirationDate ? { expirationDate: vaccine.expirationDate } : {}),
       ...(vaccine.id === rabiesVaccinationId ? { type: 'Anti-Rabies', vaccinated: true, expirationDate: vaccineExpirationDate || null } : {}) })),
   } }
 }

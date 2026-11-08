@@ -47,6 +47,7 @@ import { dateInClinic, isClinicDate } from '../lib/dailyWorkflow'
 import { recordHistoryFields } from '../lib/patientRecordHistory'
 import { preventiveHistoryRecords } from '../lib/preventiveCare'
 import PreventiveCareCard from '../components/PreventiveCareCard'
+import { clinicalObservationRows } from '../lib/clinicalObservations'
 
 function CareStatus({ record }) {
   if (record.recordingPurpose === 'record_only') return <Badge>Record only</Badge>
@@ -214,10 +215,7 @@ export default function PetDetail() {
                       {visit.bodyConditionScore && <span>BCS {visit.bodyConditionScore}/{visit.bodyConditionScale}</span>}
                     </div>
                     <div className="soap-grid">
-                      <div><strong>S · Subjective</strong><p>{visit.subjective || '—'}</p></div>
-                      <div><strong>O · Objective</strong><p>{visit.objective || '—'}</p></div>
-                      <div><strong>A · Assessment</strong><p>{visit.assessment || '—'}</p></div>
-                      <div><strong>P · Plan</strong><p>{visit.plan || '—'}</p></div>
+                      {clinicalObservationRows(visit).map(([label, value]) => <div key={label}><strong>{label}</strong><p>{value || '—'}</p></div>)}
                       {visit.clinicalNotes && <div className="field-span"><strong>Clinical notes</strong><p className="service-notes">{visit.clinicalNotes}</p></div>}
                     </div>
                     <div className="record-actions">
@@ -252,7 +250,7 @@ export default function PetDetail() {
                   <span className="preventive-section-icon" aria-hidden="true"><ShieldCheck size={26} weight="duotone" /></span>
                   <div><h2>Vaccinations and Deworming</h2><p>Vaccination records, deworming treatments, and next due dates.</p></div>
                 </div>
-                <button className="button button-primary preventive-add-button" onClick={() => setModal({ type: 'vaccine' })}><Plus size={18} weight="bold" /> Add vaccination or deworming</button>
+                <button className="button button-primary preventive-add-button" onClick={() => setModal({ type: 'new-visit', workflow: 'vaccination' })}><Plus size={18} weight="bold" /> Add vaccination or deworming</button>
               </header>
               <PatientRecordBrowser records={vaccineRecords} scope="vaccine" label="Vaccinations and Deworming" itemName="record" itemPlural="records" fields={vaccineFields} dateLabel="Administration date" placeholder="Search product, brand, dose or lot" emptyTitle="No vaccinations or deworming recorded" emptyDescription="Saved vaccination and deworming records will appear here." previewKind="preventive">
                 {(visible) => visible.map((record) => <PreventiveCareCard key={record.id} record={record} onEdit={(record) => setModal({ type: 'vaccine', record })} onDelete={profile.role === 'owner' ? (record) => setModal({ type: 'delete', entity: 'preventive', record }) : undefined} />)}
@@ -290,7 +288,7 @@ export default function PetDetail() {
         </aside>
       </div>
       {modal?.type === 'calendar-preview' && <CalendarDayPreview label="Clinical history" day={modal.day} count={previewVisits.length} itemName="record" itemPlural="records" timezone={timezone} onClose={() => setModal(null)}><CalendarRecordDetails records={previewVisits} kind="clinical" /></CalendarDayPreview>}
-      {modal?.type === 'new-visit' && <NewVisitDialog pet={pet} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Visit' }); setTab(saved.serviceWorkflow === 'vaccination' ? 'vaccines' : 'history') }} onClose={() => setModal(null)} />}
+      {modal?.type === 'new-visit' && <NewVisitDialog initialWorkflow={modal.workflow} pet={pet} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: modal.workflow === 'vaccination' ? 'Vaccinations and Deworming' : 'Visit' }); setTab(saved.serviceWorkflow === 'vaccination' ? 'vaccines' : 'history') }} onClose={() => setModal(null)} />}
       {modal?.type === 'historical-service' && <ServiceVisitEditor pet={pet} purpose="record_only" record={modal.record} service={{ id: modal.record.serviceTypeId, name: modal.record.service }} onClose={() => setModal(null)} />}
       {modal?.type === 'visit' && <VisitModal pet={pet} record={modal.record} onSaved={(saved) => { if (saved.queueEntryId) setCareReceipt({ ...saved, petId: pet.id, label: 'Checkup' }) }} onClose={() => setModal(null)} />}
       {modal?.type === 'queue-care' && <QueueDialog modal={{ type: 'care', entry: modal.entry }} onClose={() => setModal(null)} />}

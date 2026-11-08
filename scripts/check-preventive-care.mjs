@@ -5,7 +5,7 @@ import { expect } from '@playwright/test'
 import { browserServer, frontendEnvironment } from './helpers/browser.mjs'
 import { mockAccessToken } from './helpers/mock-auth.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
-import { openNewVisit } from './helpers/new-visit.mjs'
+import { openNewVisit, reviewRecord } from './helpers/new-visit.mjs'
 
 const api = new URL(frontendEnvironment().VITE_SUPABASE_URL)
 const actor = '10000000-0000-4000-8000-000000000001', petId = '20000000-0000-4000-8000-000000000001'
@@ -36,7 +36,7 @@ function saveRecord(data, completed = false) {
   for (const item of data.kind === 'vaccination' ? data.vaccines : [data.deworming]) {
     const product = raw.inventory_items.find((entry) => entry.id === item.inventoryItemId)
     const row = table.find((entry) => entry.id === item.id) || { id: item.id, preventive_record_id: id }
-    Object.assign(row, { pet_id: petId, vaccine_name: product?.name || item.vaccine, product_name: product?.name || item.vaccine, brand: product?.brand || item.brand, lot_number: product ? `${product.id}-lot` : item.lotNumber,
+    Object.assign(row, { pet_id: petId, vaccine_name: product?.name || item.vaccine, product_name: product?.name || item.vaccine, brand: product?.brand || item.brand, lot_number: item.lotNumber || (product ? `${product.id}-lot` : ''),
       dose: item.dose, administered_at: data.administeredAt, next_due_at: item.nextDueAt, administered_by: data.veterinarianId || null, administered_by_name: data.veterinarianName || '', recording_purpose: data.recordingPurpose,
       inventory_item_id: item.inventoryItemId, batch_id: item.batchId, dispense_quantity: item.dispenseQuantity, dispense_unit: product?.unit, stock_tracked: data.recordingPurpose === 'queue', consumed_at: completed ? now.toISOString() : row.consumed_at })
     if (!table.includes(row)) table.push(row)
@@ -94,13 +94,14 @@ try {
   await add()
   await expect(page.getByLabel('Date administered')).toHaveValue('')
   await expect(page.getByLabel('Veterinarian', { exact: true })).toHaveValue('')
-  await page.getByRole('button', { name: 'Save historical record' }).click()
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
   assert.equal(calls.length, 0)
+  await page.getByLabel('Date administered').fill('2020-01-02')
+  await page.getByLabel('Veterinarian', { exact: true }).fill('Outside clinician')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
   await page.getByLabel('Product name 1', { exact: true }).fill('Historical Anti-Rabies')
   await page.getByLabel('Brand 1', { exact: true }).fill('Original brand')
   await page.getByLabel('Batch / lot number 1', { exact: true }).fill('OLD-01')
-  await page.getByLabel('Date administered').fill('2020-01-02')
-  await page.getByLabel('Veterinarian', { exact: true }).fill('Outside clinician')
   await page.getByRole('button', { name: 'Add another vaccine' }).focus()
   await page.keyboard.press('Enter')
   await page.getByLabel('Product name 2', { exact: true }).fill('Historical combination')
@@ -116,6 +117,7 @@ try {
     }
   }
   await layouts()
+  await reviewRecord(page)
   await page.getByRole('button', { name: 'Save historical record' }).click()
   await expect(page.getByRole('alert')).toContainText('Save interrupted')
   await expect(page.getByLabel('Product name 2', { exact: true })).toHaveValue('Historical combination')
@@ -144,8 +146,10 @@ try {
   await add()
   await page.getByLabel('Record type', { exact: true }).selectOption('deworming')
   await expect(page.getByRole('button', { name: 'Add another vaccine' })).toHaveCount(0)
-  await page.getByLabel('Product name 1', { exact: true }).fill('Historical dewormer')
   await page.getByLabel('Date administered').fill('2020-02-03')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await page.getByLabel('Product name 1', { exact: true }).fill('Historical dewormer')
+  await reviewRecord(page)
   await page.getByRole('button', { name: 'Save historical record' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   assert.equal(raw.vaccinations.length, 2)
@@ -167,11 +171,14 @@ try {
     await page.getByLabel(`Inventory product ${index}`, { exact: true }).selectOption('vax')
     await page.getByLabel(`Stock batch ${index}`, { exact: true }).selectOption('vax-batch')
     await page.getByLabel(`Stock quantity ${index}`, { exact: true }).fill('1')
+    await page.getByLabel(`Lot number ${index}`, { exact: true }).fill(`MANUAL-LOT-${index}`)
     await page.getByLabel(`Dose ${index}`, { exact: true }).fill('Clinical dose')
   }
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
   await fillStock(1)
   await page.getByRole('button', { name: 'Add another vaccine' }).click()
   await fillStock(2)
+  await reviewRecord(page)
   await page.getByRole('button', { name: 'Save record', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   assert.equal(calls.at(-1).data.vaccines[0].dispenseQuantity, 1)
@@ -196,6 +203,8 @@ try {
   await expect(page.getByLabel('Stock batch 1')).toBeDisabled()
   await expect(page.getByLabel('Stock quantity 1')).toHaveJSProperty('readOnly', true)
   await expect(page.getByLabel('Dose 1', { exact: true })).toBeEditable()
+  await expect(page.getByLabel('Lot number 1', { exact: true })).toHaveValue('MANUAL-LOT-1')
+  await expect(page.getByLabel('Lot number 1', { exact: true })).toBeEditable()
   await expect(page.getByRole('button', { name: 'Remove vaccine 1' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Add another vaccine' }).click()
   await expect(page.getByLabel('Inventory product 3')).toBeEnabled()

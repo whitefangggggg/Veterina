@@ -17,8 +17,9 @@ do $$ declare person uuid;patient uuid;vaccine uuid;batch uuid;medicine uuid;med
   perform public.portal_mutation('record_inventory_movement',jsonb_build_object('id',vaccine,'batchId',batch,'delta',10,'reason','Delivery'),gen_random_uuid());
   perform public.portal_mutation('record_inventory_movement',jsonb_build_object('id',medicine,'batchId',med_batch,'delta',5,'reason','Delivery'),gen_random_uuid());
   select (now() at time zone timezone)::date::text,((now() at time zone timezone)::date+30)::text into today,due from public.clinic_settings limit 1;
-  line:=jsonb_build_object('id',gen_random_uuid(),'inventoryItemId',vaccine,'batchId',batch,'dispenseQuantity',2,'dose','Recorded dose','nextDueAt',due);
+  line:=jsonb_build_object('id',gen_random_uuid(),'inventoryItemId',vaccine,'batchId',batch,'dispenseQuantity',2,'lotNumber','MANUAL-LOT','dose','Recorded dose','nextDueAt',due);
   payload:=jsonb_build_object('petId',patient,'kind','vaccination','recordingPurpose','queue','administeredAt',today,'veterinarianId',auth.uid(),'vaccines',jsonb_build_array(line,line||jsonb_build_object('id',gen_random_uuid(),'dispenseQuantity',1)));
+  perform pg_temp.reject_pc('create_preventive_care',jsonb_set(payload,'{vaccines,0,lotNumber}','"   "'),'VALIDATION_FAILED: lot number required');
   response:=public.portal_mutation('create_preventive_care',payload,key);record_id:=(response->>'id')::uuid;queue_id:=(response->>'queueEntryId')::uuid;
   if public.portal_mutation('create_preventive_care',payload,key)<>response then raise exception 'TEST: retry changed response'; end if;
   if (select count(*) from public.vaccinations where preventive_record_id=record_id)<>2 then raise exception 'TEST: vaccines not grouped'; end if;
@@ -37,11 +38,19 @@ do $$ declare person uuid;patient uuid;vaccine uuid;batch uuid;medicine uuid;med
   perform pg_temp.reject_pc('delete_preventive_care',jsonb_build_object('id',record_id,'reason','Test'),'DISPENSING_LOCKED');
   perform pg_temp.reject_pc('update_vaccination',jsonb_build_object('id',line->>'id','dose','Legacy edit'),'VALIDATION_FAILED');
   perform pg_temp.reject_pc('delete_record',jsonb_build_object('entity','vaccination','id',line->>'id','reason','Legacy delete'),'VALIDATION_FAILED');
+  -- Correcting the clinical lot is audited and does not consume or unlock stock.
+  perform public.portal_mutation('update_preventive_care',jsonb_set(payload||'{"version":2}','{vaccines,0,lotNumber}','"CORRECTED-LOT"'),gen_random_uuid());
+  if (select lot_number from public.vaccinations where id=(line->>'id')::uuid)<>'CORRECTED-LOT' then raise exception 'TEST: completed lot correction ignored'; end if;
+  if (select sum(quantity_delta) from public.inventory_movements where batch_id=batch)<>7 then raise exception 'TEST: lot correction consumed stock'; end if;
+  if not exists(select 1 from public.audit_logs a where a.table_name='vaccinations' and a.record_id=line->>'id' and a.new_data->>'lot_number'='CORRECTED-LOT') then raise exception 'TEST: lot correction not audited'; end if;
+  -- Restore the original lot and version expected by the append checks below.
+  perform public.portal_mutation('update_preventive_care',payload||'{"version":3}',gen_random_uuid());
+  payload:=payload||'{"version":4}';
   -- Adding to completed care consumes only the new stable item and retries safely.
-  payload:=payload||jsonb_build_object('version',2,'vaccines',(payload->'vaccines')||jsonb_build_array(line||jsonb_build_object('id',gen_random_uuid(),'dispenseQuantity',1)));
+  payload:=payload||jsonb_build_object('version',4,'vaccines',(payload->'vaccines')||jsonb_build_array(line||jsonb_build_object('id',gen_random_uuid(),'dispenseQuantity',1)));
   key:=gen_random_uuid();response:=public.portal_mutation('update_preventive_care',payload,key);
   if public.portal_mutation('update_preventive_care',payload,key)<>response or (select sum(quantity_delta) from public.inventory_movements where batch_id=batch)<>6 then raise exception 'TEST: appended vaccine did not consume exactly once'; end if;
-  perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('version',3,'vaccines',jsonb_build_array(line)),'DISPENSING_LOCKED');
+  perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('version',5,'vaccines',jsonb_build_array(line)),'DISPENSING_LOCKED');
 
   -- One deworming item, using Medicine inventory, without entering vaccination evidence.
   payload:=jsonb_build_object('petId',patient,'kind','deworming','recordingPurpose','queue','administeredAt',today,'veterinarianId',auth.uid(),'deworming',jsonb_build_object('id',gen_random_uuid(),'inventoryItemId',medicine,'batchId',med_batch,'dispenseQuantity',1,'dose','Recorded dose','nextDueAt',due));

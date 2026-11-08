@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { calendarEditActions } from '../lib/calendarRecordEditing'
 import PrescriptionActions from './PrescriptionActions'
 import PreventiveCareCard from './PreventiveCareCard'
+import { clinicalAssessmentText, clinicalObservationRows } from '../lib/clinicalObservations'
 
 const statusName = (value) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' })[value] || value
 const dayLabel = (value, timezone) => { const date = dateInClinic(value, timezone); return date ? format(parseISO(date), 'd MMM yyyy') : 'Not recorded' }
@@ -38,7 +39,7 @@ function CheckupDetails({ visit, data, onEdit }) {
       ['Body condition', visit.bodyConditionScore != null ? `${visit.bodyConditionScore}/${visit.bodyConditionScale}` : ''], ['Hydration', visit.hydration],
       ['Follow-up date', visit.followUpDate ? dayLabel(visit.followUpDate, data.timezone) : 'Not scheduled'],
     ]} />
-    <div className="soap-grid">{[['S · Subjective', visit.subjective], ['O · Objective', visit.objective], ['A · Assessment', visit.assessment], ['P · Plan', visit.plan]].map(([label, value]) => <div key={label}><strong>{label}</strong><p>{display(value)}</p></div>)}</div>
+    <div className="soap-grid">{clinicalObservationRows(visit).map(([label, value]) => <div key={label}><strong>{label}</strong><p>{display(value)}</p></div>)}</div>
     {visit.clinicalNotes && <div className="service-notes"><strong>Clinical notes</strong><p>{visit.clinicalNotes}</p></div>}
     {(visit.prescriptions || []).map((prescription) => <PrescriptionDetails key={prescription.id} prescription={prescription} visit={visit} onEdit={onEdit} />)}
     {(visit.corrections || []).map((correction) => <section className="calendar-preview-section" key={correction.id}><h4>Correction · {correction.reason}</h4><p>{correction.correction}</p>{correction.created_at && <small>{timeLabel(correction.created_at, data.timezone)}</small>}</section>)}
@@ -62,10 +63,11 @@ function QueueDetails({ entry, data, onEdit }) {
   const visit = data.visits.find((visit) => visit.id === entry.visit_id)
   const vaccine = data.vaccinations.find((vaccine) => vaccine.id === entry.vaccination_id)
   const preventive = data.preventiveCare.find((record) => record.id === entry.preventive_record_id)
-  const draftLabels = { clinicalNotes: 'Clinical notes', complaint: 'Chief complaint', diagnosis: 'Diagnosis', subjective: 'Subjective', objective: 'Objective', assessment: 'Assessment', plan: 'Plan',
+  const draftLabels = { clinicalNotes: 'Clinical notes', complaint: 'Chief complaint', diagnosis: 'Diagnosis', subjective: 'History', objective: 'Clinical Assessment', plan: 'Treatment Plan',
     weightKg: 'Weight (kg)', temperatureC: 'Temperature (°C)', heartRate: 'Heart rate (bpm)', respiratoryRate: 'Respiratory rate (rpm)', bodyConditionScore: 'Body condition', hydration: 'Hydration',
     followUpDate: 'Follow-up date', serviceNotes: 'Service notes', dose: 'Dose', administeredAt: 'Vaccination date', nextDueAt: 'Next due date' }
-  const draft = Object.entries(entry.careDraft || {}).filter(([key, value]) => draftLabels[key] && value != null && value !== '').map(([key, value]) => [draftLabels[key], value])
+  const draftValues = { ...entry.careDraft, objective: clinicalAssessmentText(entry.careDraft || {}) }
+  const draft = Object.entries(draftValues).filter(([key, value]) => draftLabels[key] && value != null && value !== '').map(([key, value]) => [draftLabels[key], value])
   const draftItems = entry.careDraft?.kind === 'deworming' ? [entry.careDraft.deworming].filter(Boolean) : entry.careDraft?.vaccines || []
   return <>
     <Fields rows={[

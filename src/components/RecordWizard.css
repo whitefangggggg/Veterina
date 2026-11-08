@@ -1,0 +1,52 @@
+.new-record-modal { display: flex; flex-direction: column; height: min(800px, calc(100dvh - 40px - var(--safe-top) - var(--safe-bottom))); overflow: hidden; }
+.new-record-modal > .modal-header { position: static; flex: none; }
+.new-record-modal > .modal-body { min-height: 0; overflow-y: auto; padding-top: 0; padding-bottom: 0; }
+.record-stepper { position: sticky; top: 0; z-index: 2; margin-bottom: 22px; border-bottom: 1px solid var(--line); background: var(--surface); overflow-x: auto; scrollbar-width: thin; }
+.record-stepper ol { display: flex; align-items: center; gap: 8px; margin: 0; padding: 16px 2px; list-style: none; }
+.record-stepper li { display: flex; align-items: center; gap: 8px; flex: 1 0 auto; }
+.record-stepper li:not(:last-child)::after { content: ''; height: 1px; min-width: 8px; flex: 1; background: var(--line); }
+.record-stepper button { display: flex; align-items: center; gap: 8px; padding: 4px 2px; border: 0; background: transparent; color: var(--muted); font-size: 12px; white-space: nowrap; cursor: pointer; }
+.record-stepper button:disabled { cursor: default; opacity: .55; }
+.record-stepper .is-current button, .record-stepper .is-complete button { color: var(--brand-ink); }
+.record-stepper .is-current button { font-weight: 700; }
+.record-step-number { display: grid; place-items: center; width: 25px; height: 25px; flex: none; border: 1px solid var(--line); border-radius: 50%; font-size: 11px; font-weight: 700; }
+.is-current .record-step-number { border-color: var(--brand-ink); background: var(--brand-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-soft) 55%, transparent); }
+.is-complete .record-step-number { background: var(--brand-soft); border-color: var(--brand-soft); }
+.record-stepper button:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 3px; border-radius: 6px; }
+.record-wizard { display: flex; flex-direction: column; min-height: min(620px, calc(100dvh - 180px)); }
+.record-wizard > .record-fieldset { display: flex; flex-direction: column; flex: 1; }
+.record-step-panel { min-width: 0; flex: 1; padding-bottom: 22px; }
+.record-step-panel[hidden], .record-wizard [hidden] { display: none !important; }
+.record-step-panel > h3 { margin: 0 0 8px; color: var(--ink); font-size: 18px; letter-spacing: -.3px; outline: none; }
+.record-step-description { margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.record-wizard .form-section { margin: 0; padding: 0; border: 0; }
+.record-wizard .form-section > header > span { display: none; }
+.record-wizard .form-section > header h3 { font-size: 16px; }
+.record-wizard .form-actions, .new-record-choice-footer { position: sticky; bottom: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: auto; padding: 16px 0; border-top: 1px solid var(--line); background: var(--surface); }
+.record-wizard .form-actions .record-cancel { margin-right: auto; }
+.record-review { display: grid; gap: 14px; }
+.record-review > section { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.record-review header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.record-review h4 { margin: 0; color: var(--ink); font-size: 14px; }
+.record-review header button { min-height: 32px; font-size: 12px; }
+.record-review dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 12px 0 0; font-size: 13px; }
+.record-review dt { color: var(--muted); margin-bottom: 4px; }
+.record-review dd { margin: 0; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.record-review p { color: var(--muted); font-size: 13px; }
+.new-record-modal .visit-service-options { grid-template-columns: repeat(2, minmax(0,1fr)); padding: 0 0 22px; }
+.new-record-modal .visit-service-select { min-width: 0; padding: 0; border: 0; background: transparent; }
+.new-record-modal .visit-service-select > span { display: none; }
+.new-record-modal .visit-service-card { gap: 12px; }
+.new-record-modal .visit-service-footer { padding-inline: 0; }
+.new-record-modal [data-record-pane][hidden] { display: none !important; }
+@media (max-width: 600px) {
+  .new-record-modal > .modal-body { padding-inline: 16px; }
+  .new-record-modal .visit-service-options { grid-template-columns: minmax(0,1fr); }
+  .record-stepper { margin-bottom: 18px; }
+  .record-stepper ol { gap: 9px; }
+  .record-stepper li { gap: 9px; }
+  .record-review dl { grid-template-columns: minmax(0,1fr); }
+  .record-wizard .form-actions .button { min-height: 42px; padding-inline: 12px; }
+}
+
+.record-choice-heading { margin: 0 0 8px; color: var(--ink); font-size: 18px; letter-spacing: -.3px; }
