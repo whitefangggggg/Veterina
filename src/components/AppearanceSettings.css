@@ -1,0 +1,20 @@
+.appearance-settings { display: grid; gap: 20px; }
+.appearance-options, .clinic-theme-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; min-width: 0; margin: 0; border: 0; }
+.clinic-theme-options { padding: 0; }
+.appearance-option, .clinic-theme-option { position: relative; display: flex; gap: 12px; align-items: center; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; min-width: 0; }
+.appearance-option { flex-direction: column; align-items: flex-start; padding-right: 36px; }
+.appearance-option input { position: absolute; top: 18px; right: 14px; }
+.appearance-option strong, .clinic-theme-option strong { font-size: 14px; }
+.appearance-option small { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.appearance-option svg { color: var(--brand-ink); }
+.appearance-option:has(:checked), .clinic-theme-option:has(:checked) { border-color: var(--brand-ink); background: var(--brand-soft); }
+.appearance-option:has(:focus-visible), .clinic-theme-option:has(:focus-visible) { outline: 2px solid var(--brand-ink); outline-offset: 3px; }
+.appearance-options input, .clinic-theme-options input { accent-color: var(--brand); width: 18px; height: 18px; flex: none; }
+.clinic-theme-swatch { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #ffffff66; flex: none; }
+.clinic-theme-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 20px; margin: 24px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.clinic-theme-preview-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--brand-soft); color: var(--brand-ink); font-weight: 700; }
+.clinic-theme-preview strong { color: var(--ink); font-size: 14px; }
+.clinic-theme-preview p { color: var(--muted); font-size: 12px; margin: 5px 0 0; }
+.clinic-theme-preview-button { margin-left: auto; padding: 10px 14px; border-radius: 8px; background: var(--brand); color: white; font-size: 12px; font-weight: 600; }
+@media(max-width:700px) { .clinic-theme-options { grid-template-columns: repeat(2,minmax(0,1fr)); } .appearance-options { grid-template-columns: minmax(0,1fr); } .appearance-option { gap: 8px; } }
+@media(max-width:400px) { .clinic-theme-options { grid-template-columns: minmax(0,1fr); } .clinic-theme-preview-button { margin-left: 0; } }

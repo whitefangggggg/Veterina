@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './helpers/select.mjs'
 import { mockAccountAccess } from './helpers/mock-access.mjs'
 // Browser behavior is intercepted; clinic isolation/approval is tested in Postgres.
 import assert from 'node:assert/strict'
@@ -116,7 +117,7 @@ try {
   console.log('PASS signup and sign-in confirmation resend, cooldown, rate-limit errors, preserved address and no duplicate registration')
   console.log('PASS signup code prefill, invalid code rejection, QR decoding, foreign QR rejection, camera denial, retained values and mobile layout')
   await page.goto(`${app.origin}/create-account`)
-  await page.getByLabel('Create account as', { exact: true }).selectOption('owner')
+  await chooseSelectOption(page.getByLabel('Create account as', { exact: true }), 'owner')
   await expect(page.getByLabel('Veterina Code', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Scan QR code', exact: true })).toHaveCount(0)
   await page.getByLabel('Clinic name', { exact: true }).fill('New owner clinic')
@@ -124,10 +125,10 @@ try {
   await page.getByLabel('Email address', { exact: true }).fill('owner@example.org')
   await page.getByLabel('Password', { exact: true }).fill('Browser-test-87!')
   await page.getByLabel('Confirm password', { exact: true }).fill('Browser-test-87!')
-  await page.getByLabel('Create account as', { exact: true }).selectOption('staff')
+  await chooseSelectOption(page.getByLabel('Create account as', { exact: true }), 'staff')
   await expect(page.getByLabel('Clinic name', { exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Veterina Code', { exact: true })).toBeVisible()
-  await page.getByLabel('Create account as', { exact: true }).selectOption('owner')
+  await chooseSelectOption(page.getByLabel('Create account as', { exact: true }), 'owner')
   await expect(page.getByLabel('Clinic name', { exact: true })).toHaveValue('New owner clinic')
   await expect(page.getByLabel('Full name', { exact: true })).toHaveValue('New owner')
   await page.setViewportSize({ width: 320, height: 812 })
@@ -176,6 +177,7 @@ try {
   await expect(ownerPage).toHaveURL(app.origin + '/settings')
   await expect(ownerPage.getByRole('heading', { name: 'Verify your sign-in' })).toHaveCount(0)
   console.log('PASS enrolled authenticator no longer blocks password sign-in')
+  await ownerPage.getByRole('button', { name: 'Staff accounts', exact: true }).click()
   await expect(ownerPage.locator('.clinic-registration-code')).toHaveText(originalCode)
   const qrImage = ownerPage.getByAltText("Scan to register as staff with this shop's Veterina Code prefilled")
   await expect(qrImage).toBeVisible()

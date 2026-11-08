@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './helpers/select.mjs'
 // Browser contracts are intercepted; subscription authorization is tested separately in Postgres.
 import assert from 'node:assert/strict'
 import { expect } from '@playwright/test'
@@ -105,9 +106,9 @@ try {
     await expect(page.locator('tbody tr')).toHaveCount(1)
     await expect(page.locator('tbody')).toContainText('Expired clinic')
     await page.getByRole('searchbox').fill('')
-    await page.getByLabel('Filter subscription status').selectOption('soon')
+    await chooseSelectOption(page.getByLabel('Filter subscription status'), 'soon')
     await expect(page.locator('tbody tr')).toHaveCount(1)
-    await page.getByLabel('Filter subscription status').selectOption('all')
+    await chooseSelectOption(page.getByLabel('Filter subscription status'), 'all')
     await page.locator('tbody tr').filter({ hasText: 'Paws clinic' }).getByRole('button', { name: 'Add time' }).click()
     await page.getByLabel('Admin note').fill('Payment received')
     await page.getByRole('dialog').getByRole('button', { name: 'Add time', exact: true }).click()
@@ -119,8 +120,8 @@ try {
     await page.getByRole('button', { name: 'Close', exact: true }).click()
     await page.getByRole('tab', { name: 'Activation codes' }).click()
     await page.getByLabel('Code label').fill('Clinic partners')
-    await page.getByLabel('Code availability window', { exact: true }).selectOption('90')
-    await page.getByLabel('Subscription per clinic', { exact: true }).selectOption('custom')
+    await chooseSelectOption(page.getByLabel('Code availability window', { exact: true }), '90')
+    await chooseSelectOption(page.getByLabel('Subscription per clinic', { exact: true }), 'custom')
     await page.getByLabel('Subscription per clinic in days').fill('45')
     await page.getByRole('button', { name: 'Generate code' }).click()
     await expect(page.getByRole('status')).toContainText(code)
@@ -140,8 +141,8 @@ try {
   for (const role of ['owner', 'clinical_staff']) {
     const { context, page, state } = await scenario({ role })
     await page.goto(app.origin + '/admin')
-    await expect(page).toHaveURL(app.origin + '/admin/sign-in')
-    await expect(page.getByRole('heading', { name: 'Administrator access required' })).toBeVisible()
+    await expect(page).toHaveURL(app.origin + '/admin')
+    await expect(page.getByRole('heading', { name: 'Authorized paws only', exact: true })).toBeVisible()
     assert.deepEqual(state.calls, [])
     assert.deepEqual(state.clinicReads, [])
     await context.close()

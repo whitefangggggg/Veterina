@@ -1,311 +1,236 @@
-# Veterina
+﻿<div align="center">
+  <img src="public/brand/veterina-logo.png" alt="Veterina logo" width="180" />
+  <h1>Veterina</h1>
+  <p><strong>Every patient. Every visit. One connected clinic.</strong></p>
+  <p>A veterinary clinic workspace for patient records, daily care, scheduling, and inventory.</p>
+  <p>
+    <img src="https://img.shields.io/badge/React-19-149ECA?logo=react&amp;logoColor=white" alt="React 19" />
+    <img src="https://img.shields.io/badge/Vite-8-646CFF?logo=vite&amp;logoColor=white" alt="Vite 8" />
+    <img src="https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase&amp;logoColor=white" alt="Supabase and Postgres" />
+    <img src="https://img.shields.io/badge/PWA-Installable-173F37" alt="Installable PWA" />
+  </p>
+  <p>
+    <a href="#overview">Overview</a> &middot;
+    <a href="#architecture">Architecture</a> &middot;
+    <a href="#getting-started">Getting started</a> &middot;
+    <a href="#testing">Testing</a> &middot;
+    <a href="#documentation">Documentation</a>
+  </p>
+</div>
 
-Website administrators use `/admin/sign-in` and `/admin` to manage clinic
-subscriptions and activation codes. `moronaldrin3@gmail.com` is the initial
-administrator, bound to its verified Auth UUID through trusted migration setup.
-Clinic owners do not automatically have platform-administrator permissions.
-Payments are recorded outside Veterina; administrators can add subscription
-time with an optional reference note and review each clinic's history.
+---
 
-Subscription activation codes (`VET-ACCESS-...`) are reusable across clinics,
-once per clinic. Administrators choose separate availability-window and
-subscription-term durations (30/90/365 days or custom). Unused codes have no
-deadline; the first successful redemption starts the availability window.
-Every clinic receives its complete independent term. Revoking a code prevents
-future redemption and preserves existing subscriptions. Only the hash and
-suffix are stored; copy the complete code when it is generated.
+## Overview
 
-Owners activate a new clinic after verifying their account, then enter clinic
-personalization. Owners renew at `/subscription` with a different valid code.
-Renewals and administrator extensions add time from the later of the existing
-expiry and database time. The workspace shows a server-synchronized countdown.
-Expired clinics retain their records, but database policies, Storage policies
-and verified-auth Edge Functions deny clinic access until renewal. Staff see a
-notice directing them to their owner. The staff-joining **Veterina Code** remains
-separate from subscription activation codes.
+Veterina brings the clinic's daily work into a shared, installable web app. Owners and approved clinical staff can follow a patient from registration and arrival through treatment, prescriptions, preventive care, and follow-up.
 
-Deploy `20261103150007_platform_subscriptions.sql`, `platform-admin`,
-`clinic-activation`, and the updated shared-auth consumers (`admin-staff`,
-`export-report`, `assistant-query`, `embed-worker`, `pet-photo`, and
-`google-registration`) together with this frontend. The migration gives every
-existing clinic a 30-day transition subscription while retaining disabled
-clinic and inactive-account restrictions. New Supabase Storage uploads to the
-clinic-file and knowledge-base buckets must use `<clinic UUID>/<path>`;
-unprefixed legacy files remain accessible exclusively to the original clinic.
+The system supports multiple clinics with separate records, staff access, branding, and subscriptions. Clinic pages load saved database records; empty clinics show empty states without demo-data fallbacks.
 
-Google provider checks now pass against Development: the provider is enabled
-and hosted authorization redirects to Google. A real interactive Google login,
-callback to Veterina, correct account/admin/subscription restoration and
-persistent session after reload are still required for final OAuth acceptance.
-The interactive check was deferred by the user.
+### What you can do
 
-Google authentication is available on **Sign in** and **Create account** through
-**Continue with Google**. Existing approved accounts return to the requested
-workspace. New Google accounts finish Owner/Staff setup after authentication:
-owners redeem a subscription activation code to create a separate clinic, while staff enter a current Veterina Code and
-wait for owner approval. Google signup does not require a Veterina password.
+| Workspace | Capabilities |
+| --- | --- |
+| **Daily operations** | Dashboard action board, stock watch, walk-in arrivals, numbered queue tickets, veterinarian assignments, and resumable care drafts. |
+| **Patients and owners** | Searchable directories, registration, optional private photos, alerts, growth and vitals, and a unified clinical timeline. |
+| **Clinical care** | Checkups, clinical notes, diagnoses, follow-up plans, finalization, retained corrections, and service records. |
+| **Admissions** | Hospitalization dashboard, wards/cages/kennels, transfers, monitoring, scheduled treatments, medication administration, historical stays, and durable discharge summaries. |
+| **Preventive care** | Grouped vaccination records, individual deworming administrations, next-dose reminders, historical records, and inventory-linked completion. |
+| **Scheduling** | Appointments, veterinarian conflict checks, patient arrival, follow-up scheduling, and reminder activity. |
+| **Prescriptions and stock** | Batch-based dispensing, stock movements, expiry tracking, supplier management, and prescription PDF/PNG exports. |
+| **Documents and reporting** | Printable patient histories, filtered CSV exports, and travel certificates with public verification. |
+| **Clinic administration** | Staff approval, services, clinic and veterinarian details, branding, six clinic palettes, and Light/Dark/System appearance. |
+| **Platform administration** | Clinic subscriptions, activation codes, extensions, and subscription history. |
 
-Apply `20261103131556_google_account_registration.sql` and deploy the
-`google-registration` Edge Function before using Google signup. Enable Google
-under Supabase Authentication → Sign In / Providers using the web client ID and
-secret. In Google Cloud, allow the Supabase callback
-`https://<project-ref>.supabase.co/auth/v1/callback`. In Supabase URL Configuration,
-allow the app's `/sign-in` callback on each deployed origin and the development
-origins (`http://localhost:5173/**` and `http://127.0.0.1:5173/**` when using the
-default Vite port). Keep the Google client secret in Supabase's provider settings.
+### Care that stays connected
 
-For complete regression checks and isolated database setup, see [TESTING.md](TESTING.md).
-Run `npm run test:all` for an aggregate report, including real local persistence checks.
+Operational care follows **Waiting → In progress → Completed**, with cancellation available. Drafts preserve work without completing care. Historical record entry is separate and creates no queue entry, live reminder, or stock deduction.
 
-The dashboard includes a daily action board and stock watch. Patient records include
-a unified care timeline with links to each original record. See
-[Daily workflow improvements](DAILY-WORKFLOW-PLAN.md) for the implemented behavior.
+Hospitalization uses **Admitted → Under Treatment → Ready for Discharge → Discharged**, independently of clinical condition. Approved staff manage care and authorize discharge; owners configure facilities, cancel intake-only mistakes, and append corrections. Accommodation can remain unassigned. Released cages require cleaning. Inpatient medication orders do not consume stock: each recorded Given dose deducts its selected batch once. Existing outpatient prescriptions continue deducting when saved.
 
-Patient registration and editing include an optional Environment field (Indoor,
-Outdoor, or Indoor & outdoor), displayed in Patient details. Apply the
-`20261020143919_patient_environment.sql` migration before deploying this frontend.
-Existing patients show "Not recorded" until an environment is selected.
+The admissions migrations and follow-up foreign-key indexes are applied to the hosted Development project (`yerrtkosxksacqxznrhk`) as of 8 November 2026. Apply the matching backend migrations before releasing this frontend to another environment. See [admissions testing and rollout](TESTING.md#patient-admission-and-hospitalization-kan-19).
 
-Staff-only veterinary clinic management for a single clinic in the Philippines. Supabase Auth and Postgres back the portal. Clinic pages load real database rows; there is no fixture fallback. Empty tables show empty states. The backend requirements are in [PRD.md](PRD.md); the frontend requirements are preserved in [PRD.frontend.md](PRD.frontend.md).
+Vaccination records can contain multiple vaccines; deworming records contain one administration. Clinical dose and stock quantity are separate. Waiting entries and drafts do not consume inventory; completion deducts stock atomically. Consumed product, batch, and quantity details remain locked to preserve stock history.
 
-## Run locally
+## Architecture
 
-```sh
-npm install
-npm run dev
+Veterina is a React single-page application backed by Supabase. The browser handles presentation and workflow state; Postgres and authenticated Edge Functions enforce access and perform server-side operations.
+
+```mermaid
+flowchart TB
+    User[Clinic owner / Clinical staff / Platform administrator]
+
+    subgraph Frontend[React application · Vite]
+        Routes[React Router · Lazy-loaded pages]
+        Context[AuthContext · ClinicDataContext · AppearanceContext]
+        Domain[Domain helpers · Clinic repository]
+        PWA[Service worker · Public app assets only]
+        Routes --> Context
+        Context --> Domain
+    end
+
+    subgraph Backend[Supabase]
+        Auth[Auth · Email / Google]
+        API[Data API · Tenant-scoped reads]
+        RPC[Postgres RPC · portal_mutation]
+        DB[(Postgres · RLS · Constraints · Audit / Retry receipts)]
+        Edge[Edge Functions · Staff / Reports / Photos / Certificates / Subscriptions]
+        Storage[Storage · Clinic files / Knowledge assets]
+        API --> DB
+        RPC --> DB
+        Edge --> DB
+        Edge --> Storage
+    end
+
+    Photos[Cloudinary · Private patient photos]
+    User --> Routes
+    Routes --- PWA
+    Context --> Auth
+    Domain --> API
+    Domain --> RPC
+    Routes --> Edge
+    Edge --> Auth
+    Edge --> Photos
 ```
 
-Copy `.env.example` to `.env.local` and configure:
+### How data moves
+
+1. **Authenticate:** Supabase Auth establishes the session. Workspace access also checks the active staff profile, clinic membership, and subscription.
+2. **Read:** `ClinicDataContext` loads records through `clinicRepository`, which normalizes database rows for the UI. Database policies restrict access to the caller's clinic.
+3. **Write:** Core clinical changes use `portal_mutation` with an action, payload, and retry key. Database transactions enforce workflow rules and protect related record, reminder, and stock updates.
+4. **Refresh:** After a successful mutation, the context reloads saved data. Failed refreshes offer recovery without silently presenting the save as undone.
+5. **Run specialized operations:** Edge Functions handle staff administration, exports, subscriptions, private photos, and travel certificates, with explicit authentication and authorization.
+
+### Access model
+
+| Role | Responsibility |
+| --- | --- |
+| **Clinical staff** | Approved access to patient care, queues, appointments, prescriptions, and inventory workflows. |
+| **Clinic owner** | Clinical workspace access plus clinic administration, staff approvals, reports, and permitted permanent deletions. |
+| **Platform administrator** | Separate platform access for clinic subscriptions and activation codes; clinic ownership does not grant this role. |
+
+New owners activate their own clinic with a subscription activation code. Staff join an existing clinic using its **Veterina Code** and wait for owner approval. These are separate codes with separate purposes.
+
+### PWA behavior
+
+The app supports installation, update prompts, and offline status messaging. The service worker caches public build assets. Clinic records, authentication requests, mutations, and private patient photos are not cached by the service worker. Loading or saving clinic data requires an internet connection.
+
+### Technology
+
+| Layer | Tools |
+| --- | --- |
+| UI | React 19, React Router 7, Phosphor icons, Recharts, DayPicker, date-fns |
+| Styling | CSS custom properties, component styles, Tailwind CSS 4 |
+| Build and installation | Vite 8, `vite-plugin-pwa`, Workbox |
+| Backend | Supabase Auth, Postgres, Storage, and TypeScript Edge Functions |
+| Private photo delivery | Cloudinary through authenticated Edge Functions |
+| Verification | Vitest, Playwright with Chrome, Oxlint, SQL and concurrency suites |
+
+## Getting started
+
+### Prerequisites
+
+- Node.js **22.12+** and npm, or another Node version supported by Vite 8.
+- Access to a Supabase project with Veterina's matching schema and Edge Functions deployed.
+- An approved clinic account, or the credentials and codes needed to complete registration.
+
+### Run locally
+
+```sh
+npm ci
+```
+
+Copy `.env.example` to `.env.local`, then set the browser configuration:
 
 ```dotenv
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
-`VITE_SUPABASE_ANON_KEY` remains a fallback for existing deployments. Restart Vite after changing environment variables, and set the same variables in the hosting build environment. Never put a service-role or secret key in a `VITE_` variable.
-
-The connected development project is `yerrtkosxksacqxznrhk`. It already contains the backend migrations from October 8, 2026 and the portal migrations from October 17, 2026. **Do not replay local migrations `001`–`008` against this project.** They describe an earlier backend snapshot, not a clean rebuild of the connected database. Take a schema export before creating a separate staging/production environment.
-
-## Account creation and first owner
-
-New clinic owners complete a four-step clinic setup after signing in with email
-or Google: clinic contact details, image/logo and brand color, timezone/reminder
-preferences and optional opening hours, then review. Progress is saved between
-steps and can be resumed after reloading. The saved name, tagline, image and
-color personalize the workspace; the image also appears on prescriptions.
-Owners can reopen setup from **Settings → Personalize clinic**. Existing clinics
-retain access without being forced through setup. Apply
-`20261103143412_owner_clinic_onboarding.sql` before using this feature.
-
-Create a login at `/create-account` and choose **Owner** or **Staff**, then sign in at `/sign-in`. Owners enter a clinic name and verify their email, then redeem a valid subscription activation code. Activation atomically creates an isolated clinic, subscription, default services, staff Veterina Code and active owner profile. Email confirmation alone does not provision a clinic. Owners cannot use signup to join or take over an existing clinic. Staff enter an existing clinic's Veterina Code and wait for that clinic's owner to approve access. Every clinic page requires an active `public.profiles` row with role `owner` or `clinical_staff`. Staff awaiting approval see `/access-pending` with a retry and sign-out control. Apply `20261031090803_owner_staff_signup.sql` before releasing this signup UI.
-
-Email/password signup is enabled on the connected project; email confirmation is currently disabled. These settings intentionally follow the approved signup-and-staff-approval workflow, overriding the draft PRD's invite-only proposal. If confirmation is enabled later, configure the localhost/deployed `/sign-in` redirect URLs (including the `next` query parameter) in Supabase Authentication → URL Configuration. Registration handles confirmation-required responses.
-
-New clinics get their first owner through the Owner registration flow. For the legacy clinic only, a database administrator can explicitly bootstrap its first owner after verifying the account's identity and email:
-
-```sql
-select id, email, email_confirmed_at
-from auth.users
-where lower(email) = lower('approved.owner@your-clinic.example');
-
--- Only succeeds while public.profiles is empty and this Auth email is confirmed.
-select public.bootstrap_clinic_owner(
-  'approved.owner@your-clinic.example',
-  'Approved owner full name'
-);
+```sh
+npm run dev
 ```
 
-The first registrant is never automatically promoted. Existing registered accounts can also be approved by a database administrator by inserting their verified Auth UUID, approved name, role, and active flag into `public.profiles`. The browser has no direct insert/update grants on profiles.
+Open the local URL printed by Vite, normally `http://localhost:5173`. Restart the dev server after changing environment variables.
 
-After initial setup, the clinic owner can open **Settings → Staff accounts** to see pending staff registrations linked to their shop's Veterina Code. The list loads automatically and has Approve and Reject actions, with no authenticator step or role selection. The deployed `admin-staff` Edge Function and database both verify the active owner role and shop membership. Approval grants only Clinical staff access and requires a confirmed email. Approved accounts disappear from this list. The last active owner cannot be deactivated or demoted. Inactive users lose database access on their next request.
+`VITE_SUPABASE_ANON_KEY` remains a compatibility fallback. Use only the publishable key or legacy anon key in frontend configuration. Service-role keys, provider secrets, and worker credentials belong on the server.
 
-Existing invitation callbacks open password setup. Sign-in uses email and password without an authenticator challenge, including accounts with previously enrolled factors. Existing `/login` links lead into the current account flow; old `/demo` links lead to sign-in.
+### Accounts
 
-## Password recovery
+- **Owner:** Register at `/create-account`, complete any required email verification, redeem an activation code, and personalize the clinic.
+- **Staff:** Register with the clinic's Veterina Code, complete any required email verification, and wait for owner approval.
+- **Existing account:** Sign in at `/sign-in` using email/password or configured Google authentication.
+- **Platform administrator:** Use `/admin/sign-in`; administrator access must be provisioned separately.
 
-Choose **Forgot your password?** on `/sign-in`, or open `/forgot-password`. Supabase sends the recovery email with a link back to `/reset-password`, where the user enters and confirms a new password (at least 8 characters; the server also enforces its configured password policy). The request page gives the same success message whether an account exists. Expired links, rate limits, weak/reused passwords, and failed requests have retry instructions.
+Email delivery and Google sign-in depend on the target project's Auth configuration. Configure callback and recovery URLs for each deployed origin.
 
-Supabase handles token verification and session creation. The recovery page waits for the URL exchange and verifies the user with Auth before enabling the form; clinic-profile approval is not required to reset a password. Recovery callbacks arriving at another app route are sent to the password form. A user with an existing valid session can also open `/reset-password` to change their password. Resetting a password never changes staff roles or approval.
-
-In Supabase **Authentication → URL Configuration**, allow the app's reset destination, including its `next` query parameter. The connected development project accepts `http://localhost:5173/reset-password?next=%2Fdashboard` and `http://127.0.0.1:5173/reset-password?next=%2Fdashboard` (verified against the Auth redirect endpoint). Local-development patterns such as `http://localhost:5173/**` can cover other safe return paths. For deployment, set the Site URL to the real application origin and add that origin's `/reset-password` destinations. Keep the standard recovery email link using `{{ .ConfirmationURL }}` so Supabase verifies the one-time token before redirecting. Do not point the email directly at the form without verification.
-
-Email delivery uses the project's existing SMTP configuration. Supabase's default mail service only sends to organization team addresses and has low send limits; configure custom SMTP for other clinic staff. See [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls) and [SMTP setup](https://supabase.com/docs/guides/auth/auth-smtp). No email-confirmation, SMTP, or authorization settings are changed by this frontend feature.
-
-## Saved workflows
-
-- Shop logo: owners upload, preview, replace or remove a logo in Settings → Clinic profile → Shop logo, then choose **Save logo**. PNG, JPEG and WebP files up to 5 MB are resized with their proportions and transparency preserved. The clinic's saved logo appears on prescription print/PDF and PNG exports for owners and staff. Logos are embedded in clinic settings and exported documents, so no public image URL is required. Apply `20261031091223_clinic_prescription_logo.sql` before releasing this feature.
-
-- Owners: create, search (including normalized Philippine phone numbers), edit, deactivate, and owner-only deletion after linked pets are removed or reassigned.
-- Patients: register with a server-generated record number, search/filter species, edit identity/status/owner, and owner-only permanent deletion of clinical history. Empty microchips are null; supplied microchips must be unique 15-digit identifiers.
-- Registration and patient edits require Male or Female. Birth information can be an exact date or age in years/months; age is converted using the server's clinic date and marked estimated. Diet/feeding notes are retained in the profile and exports.
-- Checkups: atomic encounter/vitals/follow-up saves, actual time of care in the clinic timezone, editing before finalization, finalization, and owner corrections with retained snapshots. After Start care, Visit details and Vitals & condition open read-only. Each section has an Edit button and a Done button to lock it again; reopening a record or draft restores the locks. Clinical observations and Diagnosis & follow-up are visible and editable only while the checkup is In progress; saved values are preserved when hidden. Clinician names are captured with the original record. Finalized notes and prescriptions cannot be overwritten.
-- Creating a checkup from a patient's page also adds that patient to the queue as Waiting and displays the ticket number. An existing active checkup ticket without a record or draft is reused. Queued care loads and updates the same saved checkup; completing it never creates a second encounter or follow-up reminder. Complete or cancel the ticket before finalizing the record. Existing historical records are not automatically queued.
-- Adding a vaccine from the patient page also creates a Waiting ticket, or reuses an active vaccination ticket without a record/draft. Completing queued vaccination updates the same record and keeps one live next-dose reminder. Both checkups and vaccines show their saved queue status (Waiting, In progress, Completed, or Cancelled) and ticket in patient history; unlinked historical records show Recorded. Vaccine next-dose status is displayed separately.
-- Vaccinations: create/edit/delete, optional next-due dates, one live next-dose reminder, and retained history for superseded reminders. Next-dose badges show Up to date, Due today, Overdue, or No next dose scheduled using the configured clinic date.
-- New body-condition assessments use 1–5; historical 1–9 assessments retain their scale until explicitly replaced. Vaccine selection comes from active Vaccines inventory items with a brand. Vaccinations retain name/brand snapshots and historical lot values; selecting a product does not deduct stock. The vaccination editor displays its queue care status.
-- In-site queue (`/queue`): add registered patients as walk-ins or check in today's booked appointments, assign a veterinarian, start care, and save a checkup/vaccination to complete the arrival atomically. Calendar states stay synchronized. Active entries carry over across midnight; finished entries can be filtered by date. The queue refreshes every 30 seconds while open.
-- Queue numbers: each arrival receives a database-assigned ticket such as **Q-001**, shared across all services and reset each clinic date. Tickets and their dates appear in the queue, calendar, and care dialogs. Existing entries are numbered by arrival order. Draft saves, status changes, cancellations, and deleting another entry never renumber a ticket.
-- Queue care drafts: use **Save as draft** in an in-progress checkup or vaccination form to persist partial fields without completing the arrival or creating clinical records/reminders. **Resume checkup/vaccination** restores the saved draft from either the queue or calendar, including after reload/sign-in. Version checks prevent overwriting a newer staff draft. Completing care clears the live draft; cancellation retains unfinished notes in the queue history.
-- Scheduling: service-based durations, persisted rescheduling, appointment status transitions, and database-enforced overlap prevention per veterinarian. Booking and rescheduling require a future date/time in the configured clinic timezone. The hour/minute selectors omit elapsed times today and refresh while the dialog is open; future dates offer the full day. Supabase also enforces the rule using its server clock. Existing historical appointments remain available for viewing and status updates.
-- Appointment cards open the linked patient with the selected appointment's date/time, service, staff, status and notes in view. Saved checkup follow-up dates for active patients automatically appear in Appointments from today onward as "Time not set" entries and link to their source checkup. Editing or removing the checkup date updates the calendar; these date-only plans do not reserve a veterinarian's time or create duplicate bookings. Patient details also show upcoming appointments and follow-ups.
-- Patient schedule cards open the existing appointment/checkup editors and include **Patient arrived**. Appointments and follow-ups can arrive only on their scheduled clinic date. A wrong-day follow-up opens a warning with **Reschedule to today**; a separate **Reschedule** action accepts today or a future date. Schedule changes preserve the original clinical follow-up date and finalized notes. Follow-up arrivals require a current complaint, measured weight and staff assignment, then atomically create a new checkup, vitals and Waiting ticket. The prior checkup's SOAP, prescriptions and vitals are retained. Repeated or simultaneous arrivals reuse the linked record and ticket. Arrived plans disappear from the upcoming schedule; their new records appear in clinical history and the queue.
-- Prescriptions can be printed / saved as PDF or downloaded as a PNG photo from patient history and record previews. The image uses the same escaped prescription document, including all medications and Routes, patient details, prescriber credentials and clinic information. Image generation happens locally in the browser and does not upload the prescription or deduct stock.
-- Reminders: independent type/status filters, current clinic-date display status, custom reminders, edit/snooze/cancel/complete, and multiple contact attempts without prematurely completing a reminder.
-- Inventory: items, supplier links, batches, expiry dates, stock-in/out and owner count adjustments. New items receive a database-generated SKU such as `SKU-000001` on save; existing SKUs stay unchanged and cannot be edited. Number allocation is safe for simultaneous saves; cancelled transactions can leave gaps. Balances come from the immutable ledger. Negative balances, wrong batches, fractional whole-unit stock, non-finite quantities, and expired dispensing are rejected. Archive depleted batches and items with stock history; movements cannot be erased.
-- Suppliers: create, search, edit, archive, and owner-only deletion while preserving historic stock entries.
-- Settings: persisted clinic identity, timezone, retention, reminder lead time, and professional details.
-- Settings → Services lets owners create, edit and archive services with a 5–480 minute duration and Checkup, Vaccination or Maintenance workflow. Surgery and Grooming start at 60 minutes. Used workflows are immutable; existing arrivals retain their service names. Surgery shares the Checkup queue category. Grooming uses maintenance notes, drafts and atomic completion without required clinical vitals; completed service notes appear in patient history and reports.
-- Reports: server-authorized exports with patient, due-date, reminder status, category, archive, and low-stock filters. The database logs the applied filters and row count. CSV files stream from the server with spreadsheet formulas neutralized. Full printable patient histories always include every encounter and escape record text.
-
-Forms wait for database acknowledgement before closing, block repeated submissions, retain input on errors, and reuse idempotency keys for retrying failed saves. The refresh control reloads saved data. Signing out clears the workspace; the next login fetches the same persisted database records.
-
-Permanent deletion requires an owner and a recorded reason. Patient deletion removes dependent clinical rows and retrieval chunks. Patients with pre-existing stored attachments are protected from deletion until their files have been removed; this portal does not yet include attachment upload/removal controls.
-
-## Installable app (PWA)
-
-The production build includes a web app manifest, Veterina home-screen icons, and a service worker that precaches the app's static files. Installed apps open `/dashboard` in a standalone window and keep the existing staff sign-in and approval checks.
-
-Choose the **Install Veterina** button in the lower-right corner on any page. It opens the browser's installation prompt when available, or displays installation instructions. The button stays available after dismissing a prompt and is hidden inside the installed app. On iPhone/iPad, open the site in Safari, choose **Share → Add to Home Screen**, and enable **Open as Web App** when available. Installation requires HTTPS in production; localhost is supported for testing.
-
-The app shell and sign-in pages can reopen offline after the first successful service-worker installation. Clinic records, authentication requests, reports, and saves require an internet connection. The worker does not cache API responses or queue clinical writes. An offline notice asks staff to keep unsaved entries open. New versions display **Reload and update**; staff should save work in all open Veterina tabs before accepting, or choose **Later**.
-
-The install button, manifest, and a lightweight development service worker are available in `npm run dev`, including on localhost. The development worker does not intercept page navigation, app modules, or hot reload. Full offline app caching is available in production builds. To verify the production build:
+### Build and deployment
 
 ```sh
 npm run build
-npm run test:pwa
 npm run preview
 ```
 
-The PWA browser check uses installed Chrome and port 5179. It checks offline reloads, unvisited lazy routes, install controls, cache contents, and the real service-worker update lifecycle. iOS guidance is checked with an emulated user agent; validate installation on a physical iPhone/iPad before release. Regenerate PNG icons from `public/favicon.svg` with `npm run pwa:icons` after changing the brand artwork. Netlify is configured to revalidate the service worker, manifest, and HTML; preserve those cache headers and the SPA fallback on other hosts.
+The production build is written to `dist/`. Serve it over HTTPS with SPA fallback to `index.html` so direct links such as `/patients/:petId` work. Configure the same public environment variables before building, and set server-side secrets using [the Edge Function environment template](supabase/functions/.env.example).
 
-## Verification
+Frontend and backend releases must use matching migrations and Edge Functions. The current theme and preventive-care features depend on:
 
-```sh
-npm run test
-npm run lint
-npm run build
-npm run test:browser
-npm run test:queue
-npm run test:api
+- `20261107025039_clinic_appearance_theme.sql`
+- `20261107043221_preventive_care_records.sql`
+- `20261107043602_preventive_care_explicit_grants.sql`
+- `20261107043603_preventive_care_service_role_read.sql`
+
+These are additions to the existing backend, not a complete bootstrap sequence. The early `001`–`008` migrations describe a historical snapshot and must not be replayed over an existing deployment. Follow [the isolated database setup](TESTING.md#isolated-database-setup) when preparing a separate environment.
+
+## Project structure
+
+```text
+Veterina/
+├── public/                  # Brand assets, icons, and public files
+├── src/
+│   ├── App.jsx              # Routes and lazy-loaded pages
+│   ├── main.jsx             # Application entry and global providers
+│   ├── pages/               # Clinic, account, public, and admin screens
+│   ├── components/          # UI, record editors, cards, and workflow dialogs
+│   ├── context/             # Authentication, clinic data, and appearance
+│   ├── lib/                 # Data access, domain helpers, and unit tests
+│   ├── utils/               # Shared clinic rules and utilities
+│   ├── index.css            # Global styles
+│   └── appearance.css       # Light and dark theme tokens
+├── supabase/
+│   ├── functions/           # Edge Functions and shared server helpers
+│   ├── migrations/          # Database schema and workflow changes
+│   └── tests/               # SQL workflow and security checks
+├── scripts/                 # Browser acceptance, integration, and tooling
+├── docs/                    # Design and historical deployment references
+└── TESTING.md               # Test setup, coverage, and verification limits
 ```
 
-Use `npm.cmd` in Windows PowerShell if script execution is restricted. Unit tests cover authentication/access transitions, password recovery and session verification, session races, internal return URLs, record mapping, timezone boundaries, retry keys, pagination, CSV safety, and complete print payloads. The browser check uses installed Chrome on port 5177 and verifies protected routes, account pages, recovery validation, and mobile layouts. The API check verifies anonymous access is denied without creating clinic data.
+## Testing
 
-Run `supabase/tests/portal_workflows.sql` and `supabase/tests/queue_workflows.sql` as a database administrator against the connected development schema (for example with the Supabase MCP `execute_sql` tool). They use the actual `authenticated` role and **roll back every fixture and stock movement**. They check record integrity, queue/appointment synchronization, atomic care completion, retries, vaccine reminders, deletion, and staff/pending/inactive access. `test:queue` exercises signed-in browser workflows with intercepted API responses; it does not write clinical data to Supabase.
+| Command | Purpose |
+| --- | --- |
+| `npm test` | Unit tests for domain logic and shared server helpers. |
+| `npm run lint` | Static checks with Oxlint. |
+| `npm run build` | Production compilation and PWA generation. |
+| `npm run test:preventive-care` | Browser acceptance for grouped vaccines, deworming, drafts, filters, calendar views, and responsive layouts. |
+| `npm run test:theme` | Appearance modes, clinic palettes, persistence, permissions, and accessibility checks. |
+| `npm run test:pwa` | Installability, service worker, caching, and update behavior checks. |
+| `npm run test:database` | Real persistence checks against an isolated local backend. |
+| `npm run test:all` | Aggregate unit, build, browser, API, and database checks. |
 
-Also run `supabase/tests/clinical_patient_services.sql` for age/sex/diet, both score scales, authoritative inventory snapshots, unchanged stock, archived products, service management, and maintenance/calendar completion. Apply the new `clinical_patient_services` and `inventory_queue_notes` migrations before deploying the matching frontend. Existing legacy migrations remain historical snapshots.
+Browser suites use installed Chrome. Database suites need additional local services, credentials, and tools; follow [TESTING.md](TESTING.md) before running them. Some suites contact configured APIs. Aggregate reports and screenshots are written to ignored `test-artifacts.local/`.
 
-Browser acceptance should also verify signup → pending approval → approved workspace, invalid credentials, password-reset request → emailed link → new password → sign-in, expired recovery links (including with an existing session), reload persistence, CRUD forms, profile-query failures, sign-out, keyboard navigation, and mobile layouts. Use dedicated test accounts and remove their clinical records after the run.
+Intercepted browser tests verify UI behavior separately from database persistence. Interactive OAuth, recovery-email delivery, physical-device installation, hosted infrastructure, and production load require their own acceptance checks.
 
-## Deployment boundaries
+## Documentation
 
-Pet registration and editing support optional JPEG, PNG and WebP photos up to
-5,000,000 bytes. Camera access starts only when Capture photo is clicked and needs
-HTTPS or localhost. Registration is saved before photo upload; Retry photo reuses
-that patient, and Continue without photo keeps the saved patient and previous photo.
-Owners use searchable ID selection, and Add walk-in guides staff through owner,
-pet and arrival. Already registered owners/pets remain if an arrival is cancelled.
+| Reference | Contents |
+| --- | --- |
+| [Testing and verification](TESTING.md) | Feature coverage, isolated backend setup, deployment prerequisites, and acceptance limits. |
+| [Daily workflows](DAILY-WORKFLOW-PLAN.md) | Daily action board, stock watch, and connected patient history. |
+| [Clinic access and staff onboarding](docs/veterina-code-rbac-plan.md) | Veterina Code, clinic isolation, roles, and staff approval design. |
+| [Backend requirements](PRD.md) | Backend requirements and planned release gates. |
+| [Frontend requirements](PRD.frontend.md) | Original frontend requirements and product context. |
+| [Historical setup notes](docs/legacy-setup-notes.md) | Preserved deployment instructions and environment observations from the previous README. |
 
-Apply `20261024190342_registration_clinical_fields.sql` and
-`20261024190343_private_pet_photos.sql`, then
-`20261024193248_pet_photo_cleanup_leases.sql` after the inventory dispensing migrations,
-then deploy `pet-photo` and `pet-photo-cleanup` before releasing this UI. Route is
-required on every newly saved medication, including edits to open prescriptions;
-historical missing routes display Not recorded. Clinical notes are optional,
-limited to 10,000 characters, included in drafts/history/printing, and protected by
-the existing finalization rules. Older updates that omit notes preserve them.
-
-Configure server-only settings from `supabase/functions/.env.example` under
-Development project `yerrtkosxksacqxznrhk` → Edge Functions → Secrets. The API key
-alias `CLOUDINARY_API_Key` is accepted for existing configuration. Use a rotated
-secret; none of these settings belong in `VITE_` variables. Preset `Veterina` must
-allow server-signed authenticated image uploads. The backend normalizes orientation
-and strips embedded metadata. Asset references stay in private tables; active
-staff receive image bytes through `pet-photo` with no-store caching. The service
-worker has no runtime image caching.
-
-Photo URLs are reused in a staff-account-scoped memory cache across navigation,
-with five-minute idle expiry and a 12 MB budget for cached photos. Signing out,
-switching accounts, replacing or removing a photo clears its cached reference.
-Directory photos load near the viewport. The Edge Function validates staff access
-and the current photo metadata before using a five-minute, 16 MB in-memory byte
-cache. On a cache miss, it retrieves the versioned original through Cloudinary's
-signed CDN delivery internally; delivery URLs never reach the browser. New photos
-are normalized once on upload to WebP within 512 × 512 pixels at quality 75.
-Reading a photo requests no extra transformations. Older stored formats remain
-compatible and benefit from the caches. A full browser reload starts a new memory
-cache; no patient photos are persisted in local storage or the service worker.
-
-Photos remain disabled until the worker-only `{ "action": "verify" }` request to
-`pet-photo-cleanup` succeeds. It tests a disposable authenticated upload, private
-read, and unsigned-read denial, then removes the probe and enables the private
-readiness flag. Invoke it with the existing Vault worker secret used by the
-indexing worker. Its worker-only `{ "action": "diagnose" }` request checks credential
-and preset access using fixed status/category responses without exposing provider
-messages or credentials. If ping succeeds but uploading is denied with HTTP 403,
-check the API key's role and folder access for `veterina/pet-photos` and preset
-`Veterina` in Cloudinary. The hourly `veterina-photo-cleanup` job uses that same service
-authentication and retries orphaned, replaced, removed and deleted-patient assets.
-Set `CLOUDINARY_PHOTOS_ENABLED=false` for an emergency pause. Missing configuration
-leaves registration available without photos.
-
-The `supabase/functions/` directory contains staff administration, export, indexing, and assistant function sources. Handlers verify authentication explicitly. Configure `APP_ORIGIN` to the deployed frontend origin for production CORS. No privileged credentials belong in browser environment variables.
-
-Record checkup includes **Complete Checkup**. Its confirmation offers Complete
-Checkup, Cancel, and Add Prescription. Cancel returns to the entered checkup;
-Add Prescription saves care In progress, then opens the medication form
-locked to that checkup. Cancelling or failing to save the prescription leaves care
-In progress. Saving the prescription completes care atomically with dispensing.
-Completion does not finalize the
-clinical record, so the existing prescribing and finalization rules still apply.
-The patient form's Save clinical entry continues to save a waiting queue entry;
-queued care uses the completion confirmation. Apply
-`20261025071619_complete_checkup_action.sql` and
-`20261025073448_checkup_prescription_progress.sql` before releasing this UI.
-
-Staff registration requires the shop's Veterina Code. Owners can copy or rotate
-their code and download a registration QR from Settings → Clinic profile. QR
-links prefill the code; the signup page can scan a camera or an uploaded QR image.
-Staff registrations require email confirmation and owner approval in Settings → Staff
-accounts, where owners can approve or reject pending requests without an
-authenticator challenge. Staff registrations can only become Clinical staff.
-Approved staff retain clinical, patient, queue, appointment and inventory work;
-owners manage staff, settings, exports and permanent deletion. Records and RPCs
-are isolated by clinic, and suspension takes effect without waiting for a JWT
-refresh. Existing owners and records remain together in the original shop.
-
-New owners use Owner registration to create a separate clinic after email
-confirmation. Administrative provisioning also remains available through the
-service-only function from a trusted backend or SQL editor:
-
-```sql
-select public.provision_vetshop(
-  p_owner_id := 'verified-auth-user-uuid',
-  p_shop_name := 'Shop name',
-  p_owner_name := 'Owner name',
-  p_timezone := 'Asia/Manila'
-);
-```
-
-Use an account without an existing clinic profile; each account belongs to one
-shop. No service key belongs in the browser. Apply the `clinic_tenancy_rbac`,
-`veterina_staff_onboarding`, `clinic_rbac_policy_indexes`, and
-`pending_staff_approval_without_mfa` migrations and deploy
-`admin-staff` before releasing the registration UI. Enable email signup and email
-confirmation in the Auth configuration. The design and rollout are in
-[docs/veterina-code-rbac-plan.md](docs/veterina-code-rbac-plan.md).
-
-Keep **Confirm email** enabled in Development's Auth email provider settings
-(`mailer_autoconfirm = false`); auto-confirm skips sending a signup confirmation.
-The signup confirmation screen and unconfirmed sign-in offer a resend action
-with a 60-second cooldown and actionable delivery/rate-limit errors. Resending
-uses Auth's signup resend endpoint and never registers another account. Accounts
-created while auto-confirm was enabled are already confirmed and still require
-owner approval. The hosted API check asserts confirmation remains enabled.
-
-The upstream Knowledge workspace and patient record recall remain available inside the approved workspace. Owners can create, publish, and archive text documents and index pending sources. Only published document versions are retrieved. Patient recall uses the caller's identity and patient scope; answers contain citations and conservatively decline diagnosis or dosing questions. The clinic owner controls `ai_enabled` in Settings; merging code does not change the stored setting. PDF/DOCX parsing and document revision editing remain outside the current frontend.
-
-The existing worker supports Vault-authenticated scheduled indexing with leases and retries. After the clinic approves an embedding model, `node scripts/prepare-hybrid.mjs APPROVED_DIMENSION APPROVED_MODEL_IDENTIFIER` prepares an unapplied migration for model-specific vectors, HNSW, hybrid retrieval, and ingestion backfill. Review that migration before applying it through Supabase MCP. Configure Edge secrets `EMBEDDING_GATEWAY_URL` and `EMBEDDING_GATEWAY_KEY` for the approved gateway, which accepts `{model, inputs: string[]}` and returns `{embeddings: number[][]}`. A generative provider, streaming answers, spending limits, retrieval evaluations, and clinical AI approval remain separate work.
-
-The draft `PRD.md` also describes operational release gates such as isolated environments, CI drift checks, backup/restore rehearsals, performance tests, clinical/privacy review, and RAG evaluations. Wiring persistent portal workflows does not certify those release gates. Complete them before entering production clinical data.
+Knowledge and assistant implementation remains in the repository, but the Knowledge workspace route is currently paused. Product requirements and historical notes may describe planned or earlier behavior; use the current routes, source, and verification guide to establish what is available.

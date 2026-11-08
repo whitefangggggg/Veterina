@@ -18,6 +18,14 @@ describe('clinic dates and persisted record projection', () => {
     const snapshot = normalizeClinicData({ visits: [{ id: 'visit', visited_at: '2026-10-01' }], vaccinations: [{ id: 'vaccine', administered_at: '2026-10-01' }] })
     for (const record of [snapshot.visits[0], snapshot.vaccinations[0]]) expect(record).toMatchObject({ careStatus: 'Recorded', careQueue: null })
   })
+  it('keeps historical vaccine dates and clinician names without live due status', () => {
+    const snapshot = normalizeClinicData({ vaccinations: [
+      { id: 'historical', administered_at: '2020-01-02', next_due_at: '2021-01-02', recording_purpose: 'record_only', administered_by_name: 'Dok Máya' },
+      { id: 'unknown', administered_at: '2019-01-02', recording_purpose: 'record_only' },
+    ] })
+    expect(snapshot.vaccinations[0]).toMatchObject({ recordingPurpose: 'record_only', careStatus: 'Recorded', careQueue: null, nextDueAt: '2021-01-02', nextDoseStatus: 'Historical record', veterinarianName: 'Dok Máya' })
+    expect(snapshot.vaccinations[1].veterinarianName).toBe('')
+  })
   it('formats assigned tickets without changing their saved clinic date at midnight', () => {
     const raw = { queue_entries: [
       { id: 'early', arrived_at: '2026-10-16T15:30:00Z', queue_date: '2026-10-16', queue_number: 1 },
@@ -87,6 +95,12 @@ describe('clinic dates and persisted record projection', () => {
     expect(snapshot.vaccinations.map((row) => row.id)).toEqual(['new', 'old'])
   })
 
+  it('preserves unknown historical measurements and clinicians without substituting staff or baseline weight', () => {
+    const snapshot = normalizeClinicData({ pets: [{ id: 'pet', baseline_weight: 5 }], visits: [{ id: 'historic', pet_id: 'pet', visited_at: '2020-01-01', recording_purpose: 'record_only', attending_veterinarian_id: null }] })
+    expect(snapshot.visits[0]).toMatchObject({ recordingPurpose: 'record_only', veterinarian: 'Not recorded', weightKg: null, careQueue: null })
+    expect(snapshot.pets[0].latestWeight).toBe(5)
+  })
+
   it('computes reminder display state from the clinic date and keeps terminal states', () => {
     const raw = { reminder_worklist: [
       { id: 'old', due_at: '2026-10-15T16:00:00Z', status: 'upcoming', reminder_type: 'appointment' },
@@ -123,7 +137,7 @@ describe('database transport', () => {
   it('paginates past the API limit and respects the supplier link composite key', async () => {
     const ordering = []
     const client = { from: (table) => {
-      const query = { select: () => query, order: (column) => { ordering.push([table, column]); return query }, range: async (start) => ({ data: table === 'pets' && start === 0 ? Array.from({ length: 500 }, (_, id) => ({ id })) : table === 'pets' ? [{ id: 500 }] : [], error: null }) }
+      const query = { select: () => query, is: () => query, order: (column) => { ordering.push([table, column]); return query }, range: async (start) => ({ data: table === 'pets' && start === 0 ? Array.from({ length: 500 }, (_, id) => ({ id })) : table === 'pets' ? [{ id: 500 }] : [], error: null }) }
       return query
     } }
     const result = await fetchClinicData(client)
@@ -133,7 +147,7 @@ describe('database transport', () => {
   })
 
   it('propagates failed reads instead of substituting fixtures', async () => {
-    const query = { select: () => query, order: () => query, range: async () => ({ data: null, error: { message: 'Permission denied' } }) }
+    const query = { select: () => query, is: () => query, order: () => query, range: async () => ({ data: null, error: { message: 'Permission denied' } }) }
     await expect(fetchClinicData({ from: () => query })).rejects.toMatchObject({ message: 'Permission denied' })
   })
 })

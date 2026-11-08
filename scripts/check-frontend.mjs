@@ -20,12 +20,18 @@ try {
   page.on('request', (request) => {
     if (/supabase\.co\/(rest|functions)\//.test(request.url())) clinicCalls.push(request.url())
   })
-  for (const route of ['/dashboard', '/queue', '/patients', '/patients/pet-1', '/appointments', '/reminders', '/inventory', '/suppliers', '/reports', '/settings', '/knowledge']) {
+  for (const route of ['/dashboard', '/queue', '/patients', '/patients/pet-1', '/appointments', '/reminders', '/inventory', '/suppliers', '/reports', '/settings']) {
     await page.goto(origin + route)
     await page.getByRole('heading', { name: 'Welcome back', exact: true }).waitFor()
     const url = new URL(page.url())
     assert.equal(url.pathname, '/sign-in')
     assert.equal(url.searchParams.get('next'), route)
+  }
+  for (const route of ['/knowledge', '/unknown-page']) {
+    await page.goto(origin + route)
+    await page.getByRole('heading', { name: 'This trail went cold', exact: true }).waitFor()
+    assert.equal(new URL(page.url()).pathname, route)
+    await page.getByRole('link', { name: 'Return to Dashboard', exact: true }).waitFor()
   }
   for (const legacy of ['/login', '/demo']) {
     await page.goto(origin + legacy)

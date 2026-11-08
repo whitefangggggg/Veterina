@@ -1,0 +1,15 @@
+.vt-pixel-patient{position:relative;width:190px;z-index:1}.vt-pixel-patient svg{display:block;width:100%;height:auto;image-rendering:pixelated;overflow:visible}.vt-sleepy-cat{margin-top:32px;margin-bottom:-42px;width:190px}.vt-excited-dog{display:inline-block;vertical-align:bottom;width:144px;margin-top:26px;margin-right:12px}.vt-patient-toggle{display:block;margin:5px auto 0;padding:4px 6px;background:transparent;border:0;color:#537366;font:inherit;font-size:9px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}.vt-patient-toggle:focus-visible{outline:2px solid #2a6f62;outline-offset:3px}.vt-cat-breathe{transform-origin:44px 34px}.vt-patient-dog-tail{transform-box:view-box;transform-origin:46px 54px}.vt-patient-dog-ear{transform-origin:65px 20px}
+.vt-page .vt-pixel-patient.is-playing .vt-cat-breathe{animation:patient-cat-nap 4s ease-in-out infinite!important}
+.vt-page .vt-pixel-patient.is-playing .vt-cat-zzz{animation:patient-cat-dream 4s ease-in-out infinite!important}
+.vt-page .vt-pixel-patient.is-playing .vt-patient-dog-bounce{animation:patient-dog-hop .9s steps(2,end) infinite!important}
+.vt-page .vt-pixel-patient.is-playing .vt-patient-dog-tail{animation:patient-dog-wag .4s steps(2,end) infinite!important}
+
+.vt-page .vt-pixel-patient.is-playing .vt-dog-excitement{animation:patient-dog-joy 1.8s steps(2,end) infinite!important}
+@keyframes patient-cat-nap{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.025)}}
+@keyframes patient-cat-dream{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-2px);opacity:1}}
+@keyframes patient-dog-hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@keyframes patient-dog-wag{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+@keyframes patient-dog-ear{0%,100%{transform:rotate(0)}50%{transform:rotate(-5deg)}}
+@keyframes patient-dog-joy{0%,100%{opacity:.4}50%{opacity:1}}
+@media(max-width:900px){.vt-sleepy-cat{margin-bottom:-28px}.vt-excited-dog{width:136px}.vt-journey-copy .vt-arrow-doodle{width:100px}}
+@media(max-width:620px){.vt-sleepy-cat{width:155px;margin-top:25px;margin-bottom:-22px}.vt-excited-dog{width:136px;margin-top:25px;margin-bottom:14px}.vt-journey-copy .vt-arrow-doodle{width:100px;vertical-align:bottom;margin-bottom:36px}}

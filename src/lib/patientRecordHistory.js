@@ -1,13 +1,13 @@
 import { dateInClinic, isClinicDate } from './dailyWorkflow'
 
 const normalize = (value) => String(value ?? '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
-const statusName = (status) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' })[status] || status
+const statusName = (status) => ({ waiting: 'Waiting', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled', record_only: 'Record only' })[status] || status
 const entry = (record, date, facets, text) => ({ id: record.id, record, date, facets, search: [date, ...Object.values(facets), ...text].filter(Boolean).join(' ') })
 
 export function vaccinationHistoryRecords(vaccinations, profiles, timezone) {
   return vaccinations.map((vaccine) => entry(vaccine, dateInClinic(vaccine.administeredAt, timezone), {
-    vaccine: vaccine.vaccine, brand: vaccine.brand || 'Not recorded', status: vaccine.careStatus || 'Recorded',
-    due: vaccine.nextDoseStatus, veterinarian: vaccine.administered_by_name || profiles.find((profile) => profile.id === vaccine.veterinarianId)?.full_name || 'Clinic staff',
+    vaccine: vaccine.vaccine, brand: vaccine.brand || 'Not recorded', status: vaccine.recordingPurpose === 'record_only' ? 'Record only' : vaccine.careStatus || 'Recorded',
+    due: vaccine.nextDoseStatus, veterinarian: vaccine.administered_by_name || profiles.find((profile) => profile.id === vaccine.veterinarianId)?.full_name || 'Not recorded',
   }, [vaccine.dose, vaccine.lotNumber, vaccine.nextDueAt, vaccine.careQueue?.queueNumber]))
     .sort((a, b) => b.date.localeCompare(a.date))
 }
@@ -46,8 +46,8 @@ const eventTime = (value, timezone) => !value || isClinicDate(value) || !dateInC
 
 export function clinicalCalendarEntries(visits, timezone) {
   return visits.map((visit) => ({
-    id: visit.id, date: dateInClinic(visit.visitedAt, timezone), time: eventTime(visit.visitedAt, timezone),
-    type: visit.type || 'Checkup', title: visit.diagnosis || visit.complaint || 'Checkup', color: visit.cardColor,
+    id: visit.historyKey || visit.id, date: dateInClinic(visit.visitedAt, timezone), time: eventTime(visit.visitedAt, timezone),
+    type: visit.type || 'Checkup', title: visit.historyKind === 'preventive' ? visit.vaccine : visit.historyKind === 'service' ? visit.serviceNotes || statusName(visit.status) : visit.diagnosis || visit.complaint || 'Checkup', color: visit.cardColor,
     timestamp: Date.parse(visit.visitedAt) || 0,
   }))
 }
@@ -56,7 +56,7 @@ export function patientCalendarEntries(records, kind, timezone) {
   return records.map(({ id, date, record }) => {
     const at = kind === 'timeline' ? record.at : kind === 'service' ? record.arrivedAt : record.administeredAt
     const type = kind === 'timeline' ? record.visitType || (record.kind === 'Checkup' ? record.title : record.kind)
-      : kind === 'service' ? record.service : 'Vaccination'
+      : kind === 'service' ? record.service : kind === 'preventive' ? (record.kind === 'deworming' ? 'Deworming' : 'Vaccination') : 'Vaccination'
     const title = kind === 'timeline' ? [record.kind !== type && record.kind !== 'Checkup' ? record.kind : '', record.detail || record.title].filter(Boolean).join(' · ')
       : kind === 'service' ? record.serviceNotes || statusName(record.status) : record.vaccine
     return { id, date, type, title, time: eventTime(at, timezone), timestamp: isClinicDate(at) ? 0 : Date.parse(at) || 0 }

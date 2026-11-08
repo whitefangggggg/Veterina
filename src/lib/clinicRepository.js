@@ -1,8 +1,10 @@
 import { vaccinationStatus } from '../utils/clinicRules'
+import { normalizePreventiveCare } from './preventiveCare'
 
 const tableNames = ['owners', 'pets', 'pet_alerts', 'visits', 'visit_vitals', 'vaccinations', 'appointments', 'queue_entries',
-  'reminder_worklist', 'reminder_activity', 'inventory_items', 'inventory_batches', 'inventory_movements',
-  'item_suppliers', 'suppliers', 'service_types', 'clinic_settings', 'profiles', 'prescriptions', 'visit_corrections', 'kb_documents']
+  'patient_service_records', 'preventive_care_records', 'deworming_administrations', 'reminder_worklist', 'reminder_activity', 'inventory_items', 'inventory_batches', 'inventory_movements',
+  'item_suppliers', 'suppliers', 'service_types', 'clinic_settings', 'profiles', 'prescriptions', 'visit_corrections', 'kb_documents',
+  'admissions', 'admission_wards', 'admission_units', 'admission_occupancy']
 
 export function unwrap({ data, error }) {
   if (error) throw error
@@ -47,11 +49,12 @@ export function normalizeClinicData(raw, now = new Date()) {
   }
   const visits = get('visits').map((row) => {
     const vital = get('visit_vitals').filter((entry) => entry.visit_id === row.id).sort((a, b) => b.measured_at.localeCompare(a.measured_at))[0] || {}
-    return { ...row, ...careMetadata('visit_id', row.id), petId: row.pet_id, type: row.visit_type, complaint: row.chief_complaint, diagnosis: row.diagnosis_summary, clinicalNotes: row.clinical_notes || '',
-      visitedAt: row.visited_at, cardColor: /^#[0-9a-f]{6}$/i.test(row.card_color) ? row.card_color.toLowerCase() : null, followUpDate: row.follow_up_date,
+    const admission = get('admissions').find((entry) => entry.visit_id === row.id)
+    return { ...row, ...careMetadata('visit_id', row.id), admissionId: admission?.id, petId: row.pet_id, type: row.visit_type, complaint: row.chief_complaint, diagnosis: row.diagnosis_summary, clinicalNotes: row.clinical_notes || '',
+      visitedAt: row.visited_at, serviceName: row.service_name || '', serviceTypeId: row.service_type_id || '', cardColor: /^#[0-9a-f]{6}$/i.test(row.card_color) ? row.card_color.toLowerCase() : null, followUpDate: row.follow_up_date,
       followUpScheduledDate: row.follow_up_scheduled_date, followUpArrivedAt: row.follow_up_arrived_at, followUpVisitId: row.follow_up_visit_id, followUpQueueId: row.follow_up_queue_id,
-      veterinarianId: row.attending_veterinarian_id,
-      veterinarian: row.attending_veterinarian_name || staffName(row.attending_veterinarian_id), weightKg: number(vital.weight_kg), temperatureC: number(vital.temperature_c),
+      recordingPurpose: row.recording_purpose || 'queue', veterinarianId: row.attending_veterinarian_id,
+      veterinarian: row.attending_veterinarian_name || (row.attending_veterinarian_id ? staffName(row.attending_veterinarian_id) : 'Not recorded'), weightKg: number(vital.weight_kg), weightMeasuredAt: vital.measured_at, temperatureC: number(vital.temperature_c),
       heartRate: number(vital.heart_rate_bpm), respiratoryRate: number(vital.respiratory_rate_rpm), bodyConditionScore: vital.body_condition_score, bodyConditionScale: vital.body_condition_scale || 9,
       hydration: vital.hydration, finalizedAt: row.finalized_at,
       prescriptions: get('prescriptions').filter((entry) => entry.visit_id === row.id),
@@ -82,16 +85,33 @@ export function normalizeClinicData(raw, now = new Date()) {
   const reminders = get('reminder_worklist').map((row) => {
     const dueDate = clinicDate(new Date(row.due_at), timezone)
     const status = ['completed', 'cancelled'].includes(row.status) ? title(row.status) : dueDate < today ? 'Overdue' : dueDate === today ? 'Due' : 'Upcoming'
-    return { ...row, petId: row.pet_id, type: reminderTypes[row.reminder_type] || title(row.reminder_type), dueDate, status,
+    return { ...row, petId: row.pet_id, type: row.deworming_id ? 'Deworming' : reminderTypes[row.reminder_type] || title(row.reminder_type), dueDate, status,
       assignedTo: row.assigned_to ? staffName(row.assigned_to) : 'Unassigned',
       activity: get('reminder_activity').filter((entry) => entry.reminder_id === row.id).sort((a, b) => b.created_at.localeCompare(a.created_at)) }
   })
-  return { owners, pets, visits, inventory, reminders, settings, profiles, today, timezone, kbDocuments: get('kb_documents'),
+  const vaccinations = get('vaccinations').map((row) => ({ ...row, ...careMetadata(row.preventive_record_id ? 'preventive_record_id' : 'vaccination_id', row.preventive_record_id || row.id), batchId: row.batch_id || '', dispenseQuantity: row.dispense_quantity, dispenseUnit: row.dispense_unit, stockTracked: row.stock_tracked ?? false, consumed: Boolean(row.consumed_at), petId: row.pet_id, vaccine: row.vaccine_name, inventoryItemId: row.inventory_item_id || '', brand: row.brand || '', lotNumber: row.lot_number,
+      administeredAt: row.administered_at, nextDueAt: row.next_due_at, recordingPurpose: row.recording_purpose || 'queue', nextDoseStatus: row.recording_purpose === 'record_only' ? 'Historical record' : vaccinationStatus(row.next_due_at, today), veterinarianId: row.administered_by, veterinarianName: row.administered_by_name || (row.administered_by ? staffName(row.administered_by) : '') })).sort((a, b) => b.administeredAt.localeCompare(a.administeredAt))
+  const admissionUnits = get('admission_units')
+  const admissionWards = get('admission_wards')
+  const admissions = get('admissions').map((row) => {
+    const visit = visits.find((v) => v.id === row.visit_id)
+    const pet = pets.find((p) => p.id === row.pet_id)
+    const owner = owners.find((o) => o.id === pet?.ownerId)
+    const occupancy = get('admission_occupancy').find((o) => o.admission_id === row.id && !o.released_at)
+    const unit = admissionUnits.find((u) => u.id === occupancy?.unit_id)
+    const ward = admissionWards.find((w) => w.id === unit?.ward_id)
+    return { ...row, petId: row.pet_id, patientName: pet?.name || '', ownerName: owner?.fullName || '', reason: visit?.complaint || '',
+      veterinarianId: visit?.veterinarianId, veterinarianName: visit?.veterinarian || '', unitId: unit?.id, unitName: unit ? `${ward?.name || ''} / ${unit.name}` : 'Unassigned' }
+  })
+  return { owners, pets, visits, inventory, reminders, settings, profiles, today, timezone, kbDocuments: get('kb_documents'), admissions, admissionUnits, admissionWards,
     queueEntries,
+    serviceRecords: get('patient_service_records').map((row) => ({ ...row, petId: row.pet_id, recordingPurpose: 'record_only', category: 'maintenance',
+      service: row.service_name, serviceTypeId: row.service_type_id, serviceNotes: row.service_notes || '', status: 'record_only',
+      veterinarianId: row.performed_by || '', veterinarian: row.performed_by_name || 'Not recorded', arrivedAt: row.performed_at,
+      queueDate: clinicDate(new Date(row.performed_at), timezone), queueNumber: '', localPerformedAt: clinicDate(new Date(row.performed_at), timezone) + 'T' + clinicTime(row.performed_at, timezone) })),
     alerts: get('pet_alerts'), allServices: get('service_types'), services: get('service_types').filter((row) => row.is_active),
     suppliers: get('suppliers').map((row) => ({ ...row, contactPerson: row.contact_person || '', notes: row.ordering_notes, isActive: row.is_active })),
-    vaccinations: get('vaccinations').map((row) => ({ ...row, ...careMetadata('vaccination_id', row.id), petId: row.pet_id, vaccine: row.vaccine_name, inventoryItemId: row.inventory_item_id || '', brand: row.brand || '', lotNumber: row.lot_number,
-      administeredAt: row.administered_at, nextDueAt: row.next_due_at, nextDoseStatus: vaccinationStatus(row.next_due_at, today), veterinarianId: row.administered_by })).sort((a, b) => b.administeredAt.localeCompare(a.administeredAt)),
+    vaccinations, preventiveCare: normalizePreventiveCare(raw, vaccinations, queueEntries, profiles, today),
     appointments: get('appointments').map((row) => ({ ...row, petId: row.pet_id, date: clinicDate(new Date(row.starts_at), timezone),
       time: clinicTime(row.starts_at, timezone), service: get('service_types').find((service) => service.id === row.service_type_id)?.name || 'Clinic visit',
       veterinarianId: row.veterinarian_id, veterinarian: staffName(row.veterinarian_id), status: title(row.status),
@@ -103,6 +123,7 @@ export async function fetchClinicData(client) {
     const rows = []
     for (let offset = 0; ; offset += 500) {
       let query = client.from(name).select('*').order(name === 'item_suppliers' ? 'item_id' : 'id')
+      if (name === 'admission_occupancy') query = query.is('released_at', null)
       if (name === 'item_suppliers') query = query.order('supplier_id')
       const { data, error } = await query.range(offset, offset + 499)
       if (error) throw error
@@ -117,19 +138,24 @@ export async function fetchClinicData(client) {
 export function clinicErrorMessage(error) {
   const message = error?.message || 'Unable to reach the clinic database. Please try again.'
   const explanations = {
+    ADMISSION_ACTIVE: 'This patient already has an active admission. Open that stay to continue care.',
+    UNIT_UNAVAILABLE: 'This cage or kennel is no longer available. Refresh and choose an available unit.',
+    UNIT_OCCUPIED: 'This accommodation is occupied. Transfer or discharge the patient before changing its availability.',
+    OPEN_CARE_TASKS: 'Review open care tasks. Explain overdue tasks and acknowledge cancellation of future tasks before discharge.',
+    ADMISSION_WORKSPACE_REQUIRED: 'Manage this hospitalization and its medication orders from the Admissions workspace.',
     FOLLOWUP_NOT_TODAY: 'This follow-up is not scheduled for today. Reschedule it before recording arrival.',
     FOLLOWUP_ALREADY_ARRIVED: 'This follow-up has already arrived. Open its new clinical record or queue entry.',
-    VACCINATION_ALREADY_QUEUED: 'This patient already has a vaccination record or draft in the queue. Open the existing vaccination to continue.',
+    VACCINATION_ALREADY_QUEUED: 'This patient already has a vaccination or deworming record or draft in the queue. Open the existing queued care to continue.',
     CHECKUP_ALREADY_QUEUED: 'This patient already has a checkup record or draft in the queue. Open the existing checkup to continue.',
     CHECKUP_IN_QUEUE: 'Complete or cancel this checkup’s queue entry before finalizing its clinical record.',
     DRAFT_CONFLICT: 'A newer draft was saved by another staff member. Close and reopen this form to load it before saving.',
     RECORD_CHANGED: 'These notes were edited by another staff member. Close and reopen this form to load the latest notes before saving.',
     QUEUE_DUPLICATE: 'This patient already has an active queue entry for this service. Refresh the queue to view it.',
-    CARE_RECORD_REQUIRED: 'Save the checkup or vaccination record from the queue to complete this visit.',
+    CARE_RECORD_REQUIRED: 'Save the clinical record from the queue to complete this visit.',
     APPOINTMENT_CONFLICT: 'This veterinarian already has a booking during that time. Choose another slot.',
     APPOINTMENT_IN_PAST: 'Choose a future appointment date and time. Past dates and times cannot be booked.',
     INSUFFICIENT_STOCK: 'This batch does not have enough stock for that withdrawal.',
-    DISPENSING_LOCKED: 'This prescription has dispensing history. Keep its dispensed medications, batches and quantities unchanged. Use Inventory for stock corrections; prescriptions with dispensing history cannot be deleted.',
+    DISPENSING_LOCKED: 'This record has stock history. Keep administered products, batches and stock quantities unchanged. Use Inventory for stock corrections; records with stock history cannot be deleted.',
     INVENTORY_UNAVAILABLE: 'This inventory item or batch is no longer active or available. Refresh inventory and choose another batch.',
     DUPLICATE_MICROCHIP: 'This microchip is already registered to another patient.',
     EXPIRED_BATCH: 'This batch has expired. Choose another batch or record expired/damaged disposal.',

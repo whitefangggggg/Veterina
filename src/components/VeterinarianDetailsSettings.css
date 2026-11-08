@@ -1,0 +1,70 @@
+.veterinarian-details-settings > .section-header {
+  align-items: center;
+  padding: 26px 28px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.veterinarian-title { display: flex; align-items: center; gap: 12px; }
+.veterinarian-title > span { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border: 1px solid color-mix(in srgb, var(--brand) 15%, var(--line)); border-radius: 12px; color: var(--brand-ink); background: var(--brand-soft); }
+.veterinarian-details-settings > .section-header h2 { font-size: 20px; }
+.veterinarian-details-settings > .section-header p { max-width: 56ch; margin-top: 10px; line-height: 1.6; }
+.veterinarian-details-settings > .section-header > .button { flex: none; min-height: 44px; }
+.veterinarian-settings-body { padding: 24px 28px; }
+.veterinarian-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 280px); align-items: end; gap: 18px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.veterinarian-search { position: relative; min-width: 0; }
+.veterinarian-search > svg { position: absolute; left: 13px; bottom: 13px; color: var(--muted); pointer-events: none; }
+.veterinarian-search .field input { padding-left: 40px; }
+.veterinarian-toolbar .field input, .veterinarian-toolbar .field select { min-height: 46px; }
+.veterinarian-directory-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 26px 0 14px; }
+.veterinarian-directory-heading h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; color: var(--ink); font-size: 14px; font-weight: 650; }
+.veterinarian-directory-heading h3 > span { padding: 3px 9px; border-radius: 6px; color: var(--muted); background: var(--surface-soft); font-size: 12px; font-weight: 500; }
+.veterinarian-active-count { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.veterinarian-directory { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.veterinarian-profile { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.veterinarian-profile-header { display: flex; align-items: flex-start; gap: 13px; padding: 22px 22px 0; }
+.veterinarian-profile-header > div { min-width: 0; }
+.veterinarian-avatar { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 50%; color: var(--brand-ink); background: var(--brand-soft); font-size: 14px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.veterinarian-avatar-neutral { color: var(--muted); background: var(--surface-soft); }
+.veterinarian-profile-header h3 { margin: 0 0 9px; color: var(--ink); font-size: 16px; line-height: 1.4; font-weight: 650; overflow-wrap: anywhere; }
+.veterinarian-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.veterinarian-badges .badge { min-height: 24px; padding: 3px 8px; font-size: 11px; white-space: normal; }
+.veterinarian-credentials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; margin: 24px 22px; }
+.veterinarian-credentials dt { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.veterinarian-credentials dd { margin: 5px 0 0; color: var(--ink); font-size: 14px; font-weight: 550; overflow-wrap: anywhere; }
+.veterinarian-credentials dd.veterinarian-missing { color: var(--muted); font-size: 13px; font-weight: 400; }
+.veterinarian-warnings { display: flex; align-items: flex-start; gap: 8px; margin: 0 22px 20px; padding: 11px 12px; border: 1px solid color-mix(in srgb, var(--amber) 18%, transparent); border-radius: 8px; color: var(--amber); background: var(--amber-soft); }
+.veterinarian-warnings > svg { flex: none; margin-top: 1px; }
+.veterinarian-warnings p { margin: 0; font-size: 12px; line-height: 1.6; }
+.veterinarian-warnings p + p { margin-top: 3px; }
+.veterinarian-profile-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding: 14px 22px; border-top: 1px solid var(--line); }
+.veterinarian-profile-footer > span { color: var(--muted); font-size: 12px; }
+.veterinarian-profile-footer .button { min-height: 40px; padding-inline: 13px; }
+.veterinarian-directory-note { display: flex; align-items: flex-start; gap: 9px; margin-top: 22px; padding: 14px 16px; border-radius: 10px; color: var(--muted); background: var(--surface-soft); }
+.veterinarian-directory-note > svg { flex: none; margin-top: 1px; color: var(--brand-ink); }
+.veterinarian-directory-note p { margin: 0; font-size: 12px; line-height: 1.7; }
+.veterinarian-directory-note button { border: 0; padding: 0; color: var(--brand-ink); background: transparent; font: inherit; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.veterinarian-settings-body > .empty-state { padding: 44px 20px; border: 1px dashed var(--line); border-radius: 12px; }
+.veterinarian-settings-body > .empty-state .button { margin-top: 16px; }
+@media (max-width: 1050px) {
+  .veterinarian-directory { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 650px) {
+  .veterinarian-details-settings > .section-header { align-items: stretch; flex-direction: column; padding: 20px; gap: 18px; }
+  .veterinarian-details-settings > .section-header h2 { font-size: 18px; }
+  .veterinarian-details-settings > .section-header > .button { width: 100%; }
+  .veterinarian-settings-body { padding: 18px; }
+  .veterinarian-toolbar { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 14px; }
+  .veterinarian-toolbar .field input, .veterinarian-toolbar .field select { font-size: 16px; }
+  .veterinarian-profile-header { padding: 18px 16px 0; gap: 10px; }
+  .veterinarian-avatar { width: 38px; height: 38px; font-size: 12px; }
+  .veterinarian-credentials { margin: 22px 16px; gap: 18px 16px; }
+  .veterinarian-warnings { margin-inline: 16px; }
+  .veterinarian-profile-footer { padding: 12px 16px; }
+  .veterinarian-directory-note { padding: 12px; }
+}
+@media (max-width: 360px) {
+  .veterinarian-details-settings > .section-header { padding-inline: 16px; }
+  .veterinarian-settings-body { padding-inline: 12px; }
+  .veterinarian-title { gap: 9px; }
+  .veterinarian-title > span { width: 36px; height: 36px; }
+  .veterinarian-profile-footer { align-items: stretch; flex-direction: column; }
+}

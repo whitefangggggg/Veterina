@@ -1,3 +1,4 @@
+import VeterinaCheckbox from '../components/VeterinaCheckbox'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
@@ -102,7 +103,7 @@ export default function PasswordRecovery({ mode = 'request' }) {
                 <label htmlFor="new-password">New password<input id="new-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required minLength={8} aria-describedby="reset-password-help" /></label>
                 <p className="auth-hint" id="reset-password-help">Use at least 8 characters.</p>
                 <label htmlFor="confirm-new-password">Confirm new password<input id="confirm-new-password" name="confirmPassword" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required minLength={8} /></label>
-                <label className="auth-show-password"><input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />Show passwords</label>
+                <VeterinaCheckbox className="auth-show-password" checked={showPassword} onChange={setShowPassword} label="Show passwords" />
               </>
             ) : (
               <label htmlFor="reset-email">Email address<input id="reset-email" name="email" type="email" autoComplete="email" required maxLength={254} placeholder="you@clinic.com" /></label>

@@ -1,9 +1,10 @@
 /* oxlint-disable react/only-export-components */
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { clinicErrorMessage, createMutationRunner, fetchClinicData, normalizeClinicData } from '../lib/clinicRepository'
 import { useAuth } from './AuthContext'
 import { ClinicDataContext } from './ClinicContext'
+import { clinicThemeStyle } from '../lib/clinicPersonalization'
 
 export function ClinicDataProvider({ children }) {
   const { user, refreshAccess, signOut } = useAuth()
@@ -20,15 +21,17 @@ export function ClinicDataProvider({ children }) {
     setRefreshing(true)
     try {
       const result = await fetchClinicData(supabase)
-      if (!mounted.current || current !== request.current) return
+      if (!mounted.current || current !== request.current) return false
       if (!result.profiles.some((profile) => profile.id === user.id && profile.is_active)) {
         await refreshAccess()
         throw new Error('FORBIDDEN')
       }
       setRaw(result)
       setError('')
+      return true
     } catch (error) {
       if (mounted.current && current === request.current) setError(clinicErrorMessage(error))
+      return false
     } finally {
       if (mounted.current && current === request.current) setRefreshing(false)
     }
@@ -44,10 +47,11 @@ export function ClinicDataProvider({ children }) {
     return () => { mounted.current = false; request.current += 1; clearInterval(tick); window.removeEventListener('focus', onFocus) }
   }, [reload])
 
-  const execute = async (action, payload) => {
+  const execute = async (action, payload, { requireRefresh = false } = {}) => {
     try {
       const result = await mutation(action, payload)
-      await reload()
+      const refreshed = await reload()
+      if (requireRefresh && !refreshed) throw new Error('Your change was saved, but could not be refreshed. Use Retry refresh to load it.')
       return result
     } catch (error) {
       // Refresh concurrent saves while the open editor retains its own inputs.
@@ -57,6 +61,16 @@ export function ClinicDataProvider({ children }) {
     }
   }
   const data = useMemo(() => normalizeClinicData(raw || {}, clock), [raw, clock])
+  const themeColor = data.settings?.brand_color
+  const themeReady = raw !== null
+  useLayoutEffect(() => {
+    if (!themeReady) return
+    // Global controls (including PWA prompts and portals) share the active clinic.
+    const theme = clinicThemeStyle(themeColor)
+    const root = document.documentElement.style
+    Object.entries(theme).forEach(([name, value]) => root.setProperty(name, value))
+    return () => Object.keys(theme).forEach((name) => root.removeProperty(name))
+  }, [themeColor, themeReady])
   const value = { ...data, execute, reload, refreshing,
     manageKb: async (payload) => {
       const { data: result, error } = await supabase.rpc('manage_kb', { p_data: payload })

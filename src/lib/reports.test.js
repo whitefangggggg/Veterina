@@ -4,6 +4,19 @@ import { historyHtml } from './reports'
 import { csvCell, csvStream, reportCsv } from '../../supabase/functions/_shared/csv'
 
 describe('clinical exports', () => {
+  it('prints the current observation headings and preserves historical assessment notes', () => {
+    const html = historyHtml({ patient: { name: 'Pet' }, visits: [{ subjective: 'History <note>', objective: 'Current finding', assessment: 'Legacy finding', plan: 'Treatment <instructions>' }] })
+    for (const text of ['History', 'Clinical Assessment', 'Treatment Plan', 'History &lt;note&gt;', 'Current finding', 'Legacy finding', 'Treatment &lt;instructions&gt;']) expect(html).toContain(text)
+    for (const label of ['Subjective', 'Objective', 'Assessment', 'Plan']) expect(html).not.toContain(`<strong>${label}:</strong>`)
+  })
+  it('prints every vaccine and deworming product on a white document', () => {
+    const html = historyHtml({ patient: { name: 'Pet' }, preventive_care: [
+      { kind: 'vaccination', vaccines: [{ vaccine_name: 'First vaccine', brand: 'First brand' }, { vaccine_name: 'Second vaccine', dose: 'Recorded dose' }] },
+      { kind: 'deworming', deworming: { product_name: 'Dewormer', lot_number: 'Lot <one>' } },
+    ] })
+    for (const text of ['First vaccine', 'Second vaccine', 'Dewormer', 'Lot &lt;one&gt;', 'Vaccinations and Deworming']) expect(html).toContain(text)
+    expect(html).toMatch(/background:\s*#fff/)
+  })
   it('includes every medication in grouped prescriptions alongside historical prescriptions', () => {
     const html = historyHtml({ patient: { name: 'Pet' }, prescriptions: [
       { medication_name: 'Historical medicine', dose: 'Historical dose', frequency: 'Historical frequency' },

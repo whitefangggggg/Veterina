@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation } fr
 import ProtectedWorkspace from './components/ProtectedWorkspace'
 import { useAuth } from './context/AuthContext'
 import { safeAuthReturnTo } from './lib/authAccess'
+import { NotFoundView, RouteErrorView } from './components/ErrorViews'
 
 const Landing = lazy(() => import('./pages/Landing'))
 const Auth = lazy(() => import('./pages/Auth'))
@@ -13,15 +14,19 @@ const PlatformAdmin = lazy(() => import('./pages/PlatformAdmin'))
 const Subscription = lazy(() => import('./pages/Subscription'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Queue = lazy(() => import('./pages/Queue'))
+const Admissions = lazy(() => import('./pages/Admissions'))
+const AdmissionDetail = lazy(() => import('./pages/AdmissionDetail'))
 const Patients = lazy(() => import('./pages/Patients'))
 const PetDetail = lazy(() => import('./pages/PetDetail'))
+const TravelCertificates = lazy(() => import('./pages/TravelCertificates'))
+const PublicTravelCertificate = lazy(() => import('./pages/PublicTravelCertificate'))
 const Appointments = lazy(() => import('./pages/Operations').then((module) => ({ default: module.Appointments })))
-const Reminders = lazy(() => import('./pages/Operations').then((module) => ({ default: module.Reminders })))
 const Inventory = lazy(() => import('./pages/Stock').then((module) => ({ default: module.Inventory })))
 const Suppliers = lazy(() => import('./pages/Stock').then((module) => ({ default: module.Suppliers })))
 const Reports = lazy(() => import('./pages/Admin').then((module) => ({ default: module.Reports })))
 const Settings = lazy(() => import('./pages/Admin').then((module) => ({ default: module.Settings })))
-const Knowledge = lazy(() => import('./pages/Knowledge'))
+// Knowledge workspace is paused; retain its implementation for a later release.
+// const Knowledge = lazy(() => import('./pages/Knowledge'))
 const Login = lazy(() => import('./pages/Login'))
 
 function PageLoader({ children }) {
@@ -41,13 +46,21 @@ function RecoveryRedirect() {
   return <Outlet />
 }
 
-const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
+function LegacyReminderRedirect() {
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  params.set('view', 'tasks')
+  return <Navigate to={{ pathname: '/appointments', search: `?${params}`, hash: location.hash }} replace />
+}
+
+const router = createBrowserRouter([{ element: <RecoveryRedirect />, errorElement: <RouteErrorView />, children: [
   // Marketing-safe paths (/). Clinic workspaces can later live under /:clinicSlug or /app/:clinicSlug.
   {
     path: '/',
     element: load(<Landing />),
   },
   { path: '/sign-in', element: load(<Auth key="sign-in" />) },
+  { path: '/travel-certificate', element: load(<PublicTravelCertificate />) },
   { path: '/admin/sign-in', element: load(<Auth key="admin-sign-in" mode="admin" />) },
   { path: '/admin', element: load(<PlatformAdmin />) },
   { path: '/subscription', element: load(<Subscription />) },
@@ -63,19 +76,22 @@ const router = createBrowserRouter([{ element: <RecoveryRedirect />, children: [
     children: [
       { path: '/dashboard', element: load(<Dashboard />) },
       { path: '/queue', element: load(<Queue />) },
+      { path: '/admissions', element: load(<Admissions />) },
+      { path: '/admissions/:admissionId', element: load(<AdmissionDetail />) },
       { path: '/patients', element: load(<Patients />) },
       { path: '/patients/:petId', element: load(<PetDetail />) },
+      { path: '/travel-certificates', element: load(<TravelCertificates />) },
       { path: '/appointments', element: load(<Appointments />) },
-      { path: '/reminders', element: load(<Reminders />) },
+      { path: '/reminders', element: <LegacyReminderRedirect /> },
       { path: '/inventory', element: load(<Inventory />) },
       { path: '/suppliers', element: load(<Suppliers />) },
       { path: '/reports', element: load(<Reports />) },
       { path: '/settings', element: load(<Settings />) },
       { path: '/clinic-setup', element: <Navigate to="/settings" replace /> },
-      { path: '/knowledge', element: load(<Knowledge />) },
-      { path: '*', element: <Navigate to="/dashboard" replace /> },
+      // { path: '/knowledge', element: load(<Knowledge />) },
     ],
   },
+  { path: '*', element: <NotFoundView /> },
 ]}])
 
 export default function App() {

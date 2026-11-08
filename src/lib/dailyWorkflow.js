@@ -4,9 +4,9 @@ const encoded = (value) => encodeURIComponent(value)
 const terminalReminder = (status) => ['Completed', 'Cancelled'].includes(status)
 const dateFormatters = new Map()
 export const isClinicDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && !Number.isNaN(Date.parse(value)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value
-export const patientSource = (id, tab = 'timeline', fragment = '') => `/patients/${encoded(id)}?tab=${tab}${fragment ? '#' + encoded(fragment) : ''}`
+export const patientSource = (id, tab = 'history', fragment = '') => `/patients/${encoded(id)}?tab=${tab}${fragment ? '#' + encoded(fragment) : ''}`
 export const appointmentSource = (appointment) => `/appointments?date=${encoded(appointment.date)}#appointment-${encoded(appointment.id)}`
-export const reminderSource = (id) => `/reminders?status=All#reminder-${encoded(id)}`
+export const reminderSource = (id) => `/appointments?view=tasks&status=All#reminder-${encoded(id)}`
 export const queueSource = (entry) => `/queue?status=All&date=${encoded(entry.finishedDate || entry.queueDate)}#queue-${encoded(entry.id)}`
 
 export function dateInClinic(value, timezone) {
@@ -37,6 +37,7 @@ export function buildPatientTimeline(data, patientId) {
   }
   for (const visit of data.visits || []) {
     if (visit.petId !== patientId) continue
+    if (visit.admissionId) continue
     add('Checkup', visit.id, visit.visitedAt, visit.type, visit.finalizedAt ? 'Finalized' : visit.careStatus || 'Recorded', visit.diagnosis || visit.complaint, patientSource(patientId, 'history', visit.id), visit.type)
     for (const prescription of visit.prescriptions || []) {
       const medicationNames = prescriptionMedications(prescription).map((medication) => medication.medicationName).filter(Boolean).join(', ')
@@ -46,8 +47,21 @@ export function buildPatientTimeline(data, patientId) {
       add('Correction', correction.id, correction.created_at, 'Clinical correction appended', 'Recorded', correction.reason, patientSource(patientId, 'history', visit.id), visit.type)
     }
   }
+  for (const admission of data.admissions || []) {
+    if ((admission.petId || admission.pet_id) !== patientId) continue
+    const href = `/admissions/${encoded(admission.id)}`
+    add('Admission', admission.id, admission.admitted_at, admission.is_historical ? 'Historical hospitalization' : 'Patient admitted', admission.is_historical ? 'Record only' : 'Admitted', admission.reason, href)
+    if (admission.closed_at) add(admission.status === 'cancelled' ? 'Admission cancellation' : 'Discharge', admission.id, admission.closed_at, admission.status === 'cancelled' ? 'Admission cancelled' : 'Patient discharged', admission.status === 'cancelled' ? 'Cancelled' : 'Discharged', admission.reason, href)
+  }
+  for (const service of data.serviceRecords || []) {
+    if (service.petId === patientId) add('Service', service.id, service.arrivedAt, service.service, 'Record only', service.serviceNotes, patientSource(patientId, 'history', `service-${service.id}`))
+  }
+  for (const record of data.preventiveCare || []) {
+    if (record.petId === patientId) add(record.kind === 'deworming' ? 'Deworming' : 'Vaccination', record.id, record.administeredAt, record.vaccine, record.recordingPurpose === 'record_only' ? 'Record only' : record.careStatus, record.items.map((item) => item.vaccine).join(', '), patientSource(patientId, 'vaccines', `preventive-${record.id}`))
+  }
   for (const vaccine of data.vaccinations || []) {
-    if (vaccine.petId === patientId) add('Vaccination', vaccine.id, vaccine.administeredAt, vaccine.vaccine, vaccine.careStatus || 'Recorded', [vaccine.brand, vaccine.nextDueAt ? `Next dose: ${vaccine.nextDueAt}` : ''].filter(Boolean).join(' · '), patientSource(patientId, 'vaccines', `vaccination-${vaccine.id}`))
+    if (data.preventiveCare?.some((record) => record.items.some((item) => item.id === vaccine.id))) continue
+    if (vaccine.petId === patientId) add('Vaccination', vaccine.id, vaccine.administeredAt, vaccine.vaccine, vaccine.recordingPurpose === 'record_only' ? 'Record only' : vaccine.careStatus || 'Recorded', [vaccine.brand, vaccine.nextDueAt ? `Next dose: ${vaccine.nextDueAt}` : ''].filter(Boolean).join(' · '), patientSource(patientId, 'vaccines', `vaccination-${vaccine.id}`))
   }
   for (const reminder of data.reminders || []) {
     if (reminder.petId !== patientId) continue

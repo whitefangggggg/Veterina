@@ -25,3 +25,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.pet-photo-cleanup]
 verify_jwt = false
+[functions.travel-certificate]
+verify_jwt = false

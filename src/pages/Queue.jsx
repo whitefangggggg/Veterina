@@ -1,3 +1,4 @@
+import { SelectField } from '../components/VeterinaSelect'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Clock, Plus, SignIn } from '@phosphor-icons/react'
@@ -14,7 +15,7 @@ const statuses = { waiting: 'Waiting', in_progress: 'In progress', completed: 'C
 export default function Queue() {
   useHashTarget()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { queueEntries, getPet, getOwner, today, timezone, reload, allServices } = useClinicData()
+  const { queueEntries, preventiveCare, getPet, getOwner, today, timezone, reload, allServices } = useClinicData()
   const [service, setService] = useState('All')
   const status = ['Active', 'All', ...Object.keys(statuses)].includes(searchParams.get('status')) ? searchParams.get('status') : 'Active'
   const setStatus = (value) => { const next = new URLSearchParams(searchParams); next.set('status', value); setSearchParams(next) }
@@ -34,23 +35,24 @@ export default function Queue() {
       actions={<><button className="button button-secondary" onClick={() => setModal({ type: 'checkin' })}><SignIn size={18} /> Check in appointment</button><button className="button button-primary" onClick={() => setModal({ type: 'walkin' })}><Plus size={18} /> Add walk-in</button></>} />
     <div className="queue-summary">{['waiting', 'in_progress'].map((value) => <div key={value}><Clock size={21} /><strong>{queueEntries.filter((entry) => entry.status === value).length}</strong><span>{statuses[value]}</span></div>)}</div>
     <div className="list-toolbar compact queue-toolbar">
-      <label>Service <select aria-label="Queue service" value={service} onChange={(event) => setService(event.target.value)}><option>All</option><optgroup label="Workflow"><option value="checkup">Checkup</option><option value="vaccination">Vaccination</option><option value="maintenance">Maintenance</option></optgroup><optgroup label="Services">{[...serviceOptions].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</optgroup></select></label>
-      <label>Status <select aria-label="Queue status" value={status} onChange={(event) => setStatus(event.target.value)}><option>Active</option>{Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option>All</option></select></label>
+      <label>Service <SelectField aria-label="Queue service" value={service} onChange={(event) => setService(event.target.value)}><option>All</option><optgroup label="Workflow"><option value="checkup">Checkup</option><option value="vaccination">Vaccinations and Deworming</option><option value="maintenance">Maintenance</option></optgroup><optgroup label="Services">{[...serviceOptions].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</optgroup></SelectField></label>
+      <label>Status <SelectField aria-label="Queue status" value={status} onChange={(event) => setStatus(event.target.value)}><option>Active</option>{Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option>All</option></SelectField></label>
       {showHistory && <label>History date <input aria-label="Queue history date" type="date" value={date} onChange={(event) => setHistoryDate(event.target.value)} /></label>}
     </div>
     {showHistory && <p className="queue-hint">History shows entries finished on the selected date. Active arrivals remain visible across days.</p>}
     <div className="queue-list">{visible.map((entry) => {
       const pet = getPet(entry.petId)
       const owner = getOwner(pet?.ownerId)
+      const preventive = preventiveCare.find((record) => record.id === entry.preventive_record_id)
       const active = ['waiting', 'in_progress'].includes(entry.status)
       return <article className="queue-card" key={entry.id} id={`queue-${entry.id}`}>
         <div className="queue-patient"><span className="queue-ticket" aria-label={`Queue number ${entry.queueNumber}, ${entry.queueDate}`}><strong>{entry.queueNumber}</strong><small>{entry.queueDate}</small></span><PetSticker pet={pet} size="small" /><div><Link className="queue-patient-link" to={`/patients/${entry.petId}`} aria-label={`View patient details for ${pet?.name || 'patient'} (${entry.queueNumber})`}><strong>{pet?.name || 'Patient'}</strong></Link><small>{owner?.fullName} · {pet?.recordNumber}</small></div></div>
         <div className="queue-care"><strong>{entry.service}</strong><span>{entry.veterinarian}</span>{entry.notes && <p>{entry.notes}</p>}</div>
-        <div className="queue-arrival"><time dateTime={entry.arrivedAt}>{new Intl.DateTimeFormat('en-PH', { timeZone: timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(entry.arrivedAt))}</time><span>{entry.source === 'appointment' ? 'Booked appointment' : entry.source === 'patient_record' ? entry.category === 'vaccination' ? 'Patient vaccination' : 'Patient checkup' : 'Walk-in'}</span></div>
+        <div className="queue-arrival"><time dateTime={entry.arrivedAt}>{new Intl.DateTimeFormat('en-PH', { timeZone: timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(entry.arrivedAt))}</time><span>{entry.source === 'appointment' ? 'Booked appointment' : entry.source === 'patient_record' ? entry.category === 'vaccination' ? preventive?.kind === 'deworming' ? 'Patient deworming' : 'Patient vaccination' : 'Patient checkup' : 'Walk-in'}</span></div>
         <div className="queue-actions"><Badge tone={entry.status === 'completed' ? 'success' : entry.status === 'in_progress' ? 'blue' : entry.status === 'waiting' ? 'warning' : 'neutral'}>{statuses[entry.status]}</Badge>
           {entry.draftSavedAt && <span className="queue-draft-note"><Badge tone="blue">Draft saved</Badge><small>{entry.draftSavedBy} · {new Intl.DateTimeFormat('en-PH', { timeZone: timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(entry.draftSavedAt))}</small></span>}
           <div className="record-actions">{entry.status === 'waiting' && <button className="button button-primary small-button" onClick={() => setModal({ type: 'start', entry })}>Start care</button>}
-            {entry.status === 'in_progress' && <button className="button button-primary small-button" onClick={() => setModal({ type: 'care', entry })}>{entry.draftSavedAt ? 'Resume' : 'Record'} {entry.category === 'maintenance' ? entry.service : entry.category === 'vaccination' ? 'vaccination' : 'checkup'}</button>}
+            {entry.status === 'in_progress' && <button className="button button-primary small-button" onClick={() => setModal({ type: 'care', entry })}>{entry.draftSavedAt ? 'Resume' : 'Record'} {entry.category === 'maintenance' ? entry.service : entry.category === 'vaccination' ? 'vaccinations / deworming' : 'checkup'}</button>}
             {active && <button className="text-link" onClick={() => setModal({ type: 'cancel', entry })}>Cancel</button>}
             {entry.status === 'completed' && <Link className="text-link" to={`/patients/${entry.petId}`}>View patient record</Link>}
           </div>

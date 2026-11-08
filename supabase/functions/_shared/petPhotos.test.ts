@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { boundedBytes, downloadPhoto, MAX_PHOTO_BYTES, photoFormat, signature, uploadPhoto, validateAsset } from './petPhotos'
+import { boundedBytes, downloadPhoto, MAX_PHOTO_BYTES, photoDataUrl, photoFormat, signature, uploadPhoto, validateAsset } from './petPhotos'
 
 const config = { cloud: 'test-cloud', key: 'test-key', secret: 'test-secret', preset: 'test-preset' }
 const asset = { public_id: 'veterina/pet-photos/test', asset_id: 'asset', version: 1, bytes: 20, format: 'jpg', type: 'authenticated', resource_type: 'image' }
 const jpeg = new Uint8Array([255,216,255,0,1])
 describe('private photo transport', () => {
+  it('embeds supported server-read bytes without accepting external URLs or SVG', () => {
+    expect(photoDataUrl(jpeg)).toBe('data:image/jpeg;base64,/9j/AAE=')
+    const large = new Uint8Array(100000); large.set(jpeg)
+    expect(atob(photoDataUrl(large).split(',')[1]).length).toBe(large.length)
+    expect(() => photoDataUrl(new TextEncoder().encode('<svg>'))).toThrow('PHOTO_INVALID_FORMAT')
+  })
   it('recognizes only supported image signatures', () => {
     expect(photoFormat(jpeg)).toBe('jpg')
     expect(photoFormat(new Uint8Array([137,80,78,71,13,10,26,10]))).toBe('png')

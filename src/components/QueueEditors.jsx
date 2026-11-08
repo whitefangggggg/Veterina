@@ -49,7 +49,7 @@ export function ServiceNotesEditor({ entry, onClose }) {
 }
 
 export function QueueDialog({ modal, onSaved, onClose }) {
-  const { owners, profiles, appointments, queueEntries, visits, vaccinations, today, execute, getPet } = useClinicData()
+  const { owners, profiles, appointments, queueEntries, visits, vaccinations, preventiveCare, today, execute, getPet } = useClinicData()
   const { user } = useAuth()
   const staff = profiles.filter((profile) => profile.is_active).map((profile) => ({ value: profile.id, label: profile.full_name || 'Clinic staff' }))
   const patientLabel = (pet) => `${pet?.name || 'Patient'} — ${owners.find((owner) => owner.id === pet?.ownerId)?.fullName || ''}`
@@ -86,7 +86,7 @@ export function QueueDialog({ modal, onSaved, onClose }) {
     const pet = getPet(entry.petId)
     if (!pet) return null
     if (entry.category === 'maintenance') return <MaintenanceEditor entry={entry} pet={pet} onClose={onClose} />
-    return entry.category === 'vaccination' ? <VaccineEditor pet={pet} record={vaccinations.find((vaccination) => vaccination.id === entry.vaccination_id)} queueEntry={entry} onClose={onClose} /> : <VisitEditor pet={pet} record={visits.find((visit) => visit.id === entry.visit_id)} queueEntry={entry} onClose={onClose} />
+    return entry.category === 'vaccination' ? <VaccineEditor pet={pet} record={preventiveCare.find((record) => record.id === entry.preventive_record_id) || vaccinations.find((vaccination) => vaccination.id === entry.vaccination_id)} queueEntry={entry} onClose={onClose} /> : <VisitEditor pet={pet} record={visits.find((visit) => visit.id === entry.visit_id)} queueEntry={entry} onClose={onClose} />
   }
   return null
 }

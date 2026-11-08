@@ -1,9 +1,11 @@
+import { SelectField } from '../components/VeterinaSelect'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CaretRight, MagnifyingGlass, PawPrint, Plus, UserPlus, UsersThree, WarningCircle } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
 import { Badge, EmptyState, PageHeader } from '../components/ui'
 import PetSticker from '../components/PetSticker'
+import ContactActions from '../components/ContactActions'
 import { OwnerEditor as AddOwnerModal, PetEditor as AddPetModal, OwnerDirectory } from '../components/PatientEditors'
 
 export default function Patients() {
@@ -38,12 +40,12 @@ export default function Patients() {
       />
 
       <div className="list-toolbar">
-        <label className="table-search"><MagnifyingGlass size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pet, owner, phone or record number..." /></label>
+        <label className="table-search"><MagnifyingGlass size={18} /><input aria-label="Search patients and owners" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pet, owner, phone or record number..." /></label>
         <div className="filter-pills">
           {['All', 'Dog', 'Cat', 'Bird', 'Rabbit', 'Other'].map((value) => <button key={value} onClick={() => setSpecies(value)} className={species === value ? 'active' : ''}>{value}</button>)}
         </div>
         <span className="result-count">{filtered.length} patient{filtered.length === 1 ? '' : 's'}</span>
-        <select aria-label="Filter patient status" value={status} onChange={(event) => setStatus(event.target.value)}>{['All', 'Active', 'Inactive', 'Deceased'].map((value) => <option key={value} value={value}>{value === 'All' ? 'All patient statuses' : value}</option>)}</select>
+        <SelectField aria-label="Filter patient status" value={status} onChange={(event) => setStatus(event.target.value)}>{['All', 'Active', 'Inactive', 'Deceased'].map((value) => <option key={value} value={value}>{value === 'All' ? 'All patient statuses' : value}</option>)}</SelectField>
       </div>
 
       {filtered.length ? (
@@ -52,21 +54,21 @@ export default function Patients() {
           {filtered.map((pet) => {
             const owner = owners.find((item) => item.id === pet.ownerId)
             return (
-              <Link to={`/patients/${pet.id}`} className="table-row patient-grid" key={pet.id}>
-                <div className="patient-cell">
+              <div className="table-row patient-grid" key={pet.id}>
+                <Link to={`/patients/${pet.id}`} className="patient-cell">
                   <PetSticker pet={pet} />
                   <span><strong>{pet.name}</strong><small>{pet.breed} · {pet.species}</small><code>{pet.recordNumber}</code></span>
-                </div>
-                <div className="cell-owner"><span className="card-meta-label">Owner</span><strong>{owner?.fullName}</strong><small>{owner?.phone}</small></div>
+                </Link>
+                <div className="cell-owner"><span className="card-meta-label">Owner</span><strong>{owner?.fullName}</strong><small>{owner?.phone}</small><ContactActions contact={owner} /></div>
                 <div className="clinical-flags">
                   {pet.allergies.length > 0 && <Badge tone="danger"><WarningCircle size={13} weight="fill" /> Allergy</Badge>}
                   {pet.alerts.length > 0 && <Badge tone="warning">{pet.alerts.length} alert{pet.alerts.length > 1 ? 's' : ''}</Badge>}
                   {!pet.allergies.length && !pet.alerts.length && <span className="muted">No active alerts</span>}
                 </div>
                 <div className="cell-weight"><span className="card-meta-label">Last weight</span><strong>{pet.latestWeight ? `${pet.latestWeight} kg` : '—'}</strong><small>Latest visit</small></div>
-                <div className="cell-status"><Badge tone="success">{pet.status}</Badge></div>
-                <CaretRight size={19} weight="bold" className="row-chevron" />
-              </Link>
+                <div className="cell-status"><Badge tone={pet.status === 'Active' ? 'success' : 'neutral'}>{pet.status}</Badge></div>
+                <CaretRight size={19} weight="bold" className="row-chevron" aria-hidden="true" />
+              </div>
             )
           })}
         </div>

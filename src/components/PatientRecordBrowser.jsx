@@ -48,7 +48,7 @@ export default function PatientRecordBrowser({ records, scope, label, itemName, 
         label={label} itemName={itemName} itemPlural={itemPlural} onMonthChange={(value) => update({ month: value, day: '' })} onDayChange={(value) => update({ day: value, month: value.slice(0, 7) })} onDayPreview={setPreviewDay} />
       <div className="clinical-history-day-heading"><h2>{format(parseISO(day), 'd MMMM yyyy')}</h2><span>{visible.length} {visible.length === 1 ? itemName : itemPlural}</span></div>
     </>}
-    {children(visible.slice(0, limit).map((entry) => entry.record))}
+    <div className="clinical-timeline patient-record-card-list">{children(visible.slice(0, limit).map((entry) => entry.record))}</div>
     {!records.length && <EmptyState title={emptyTitle} description={emptyDescription} />}
     {records.length > 0 && !filtered.length && <div className="empty-inline"><h3>No matching {itemPlural}</h3><p>Try another search or clear the filters.</p><button type="button" className="button button-secondary" onClick={clear}>Show all {itemPlural}</button></div>}
     {filtered.length > 0 && !visible.length && <EmptyState title={`No ${itemPlural} on this day`} description="Select a marked day to view its records." />}

@@ -1,5 +1,461 @@
 # Testing Veterina
 
+## Patient admission and hospitalization (KAN-19)
+
+Admissions are available at `/admissions` and `/admissions/:admissionId`, and from
+the patient profile. The dashboard searches current or closed stays and filters
+status, clinical condition, veterinarian and accommodation. Owners manage wards,
+cages/kennels and archival; approved staff assign/transfer patients and mark
+released accommodation cleaned. Admissions may remain unassigned.
+
+All new writes use `portal_mutation(action, payload, retryKey)`. Facility edits
+and admission actions require `expectedVersion`; task outcomes also require
+`taskVersion`. A receipt binds the original payload and returns the same response
+after a lost acknowledgement. A changed retry payload is rejected. Forms retain
+their input and original version while polling refreshes the background. Saved
+changes whose refresh fails display recovery feedback without implying rollback.
+
+Operational states are Admitted, Under Treatment, Ready for Discharge, Discharged
+and owner-only Cancelled. Clinical condition is independent. Cancellation requires
+a reason and an intake-only Admitted stay. Discharge requires readiness, assessment,
+instructions, final condition, reasons for outstanding overdue tasks and explicit
+acknowledgment of cancelling future tasks. Closure, task outcomes, encounter
+finalization, occupancy release to cleaning-required and the summary commit together.
+
+Monitoring entries retain occurrence and recording times and the author's saved
+name. Owners append reasoned corrections; original evidence remains immutable.
+The `admission_observation_history` security-invoker view indicates superseded
+entries even when a correction is beyond the current UI page. Admission detail
+queries use stable cursors with 100-row pages; open tasks load separately from
+resolved tasks. Active pages refresh every 30 seconds while visible and on focus.
+
+One visit is authoritative for each stay (`recording_purpose=admission` for live
+care, `record_only` for historical stays). Medication details remain in
+`prescriptions`, with `dispensing_mode=on_administration`. Orders generate one-off
+or fixed-hour tasks, with explicit recurrence end times and at most 1,000 tasks.
+Revisions preserve previous schedules and cancel future occurrences with a reason.
+Given, Held, Missed and Delayed actions preserve attribution. Only Given for an
+inventory-backed medication consumes stock; dose and consumed stock quantity are
+separate. Stock validation follows existing item-lock, batch, expiry, fraction and
+immutable-movement conventions. Legacy prescription/finalization APIs reject
+inpatient encounters. Outpatient prescriptions retain `on_save` dispensing.
+
+Discharge stores a version-1 snapshot of patient, clinic, veterinarian, monitoring,
+orders, medication details, care outcomes and occupancy history. Print/Save as PDF
+uses that frozen evidence, with subsequent corrections appended separately. All
+post-discharge addenda are fetched for printing, independently of loaded UI pages.
+Complete-history exports include admission evidence and render the associated
+encounter/prescriptions once. Historical stays accept structured observations and
+medicines without live occupancy, tasks, reminders or stock effects.
+
+Run these checks against the otherwise empty synthetic loopback stack described
+below; they refuse hosted endpoints and unrelated accounts:
+
+```sh
+npm run test:admission-database
+npm run test:admission-concurrency
+npm run test:admissions
+npm run test:admission-upgrade -- --baseline test-artifacts.local/admission-baseline.sql
+```
+
+The upgrade check requires a reviewed **pre-admission schema-only** catalog export
+from `scripts/snapshot-test-schema.mjs` (copy its output to the chosen baseline
+path). It rehearses clean provisioning and a populated upgrade in rolled-back
+transactions. Populated checks fingerprint visits, prescriptions, dispensing
+ledgers, stock movements, vaccine history and an issued travel certificate before
+and after the admissions migrations. No clinic rows are copied from the source.
+
+`test:database` includes admission SQL, real concurrency and real Auth/PostgREST/UI
+acceptance; `test:all` includes that runner. The admission browser suite tests a
+lost creation acknowledgement, retained form input and identical retry keys,
+medication consumption, monitoring, 320/375/1440px layouts and modal focus,
+discharge printing, patient history, structured historical medicine and staff
+cleaning permissions. Screenshots are in ignored `test-artifacts.local/admissions-*`.
+
+The admissions UI follows `UI_UX_PATCH_SPEC.md`: hospital overview counts,
+quick-skim/detailed patient cards, ward and accommodation cards, consistent card
+and form spacing, and clinic-themed selects and checkboxes. The scope is the
+admissions list, selected stay and their dialogs. Dropdowns retain native form
+validation and FormData while exposing searchable lists and keyboard navigation.
+The browser suite verifies required-select errors, search/no-results, arrow and
+Home/End navigation, Escape returning focus without closing the dialog, checkbox
+keyboard operation, filter reset, and both card views. It checks 320/375px layouts,
+light/dark screenshots, and reduced-motion preferences. Screenshots finish finite
+animations before capture. All fixtures remain on the guarded local test stack.
+
+UI refinement validation on 8 November 2026: 258 unit tests, lint, production
+build and the real admissions browser journey passed. Lint retains the existing
+unused `icons` warning in `scripts/create-clinic-infographic.mjs`. The first browser
+passes identified an ambiguous empty-state button label and a checkbox hit target;
+both were corrected. Cold-start route loading uses a 15-second assertion timeout.
+
+Rollout order is `20261108143221_admission_foundation.sql`,
+`20261108143222_inpatient_care.sql`, then
+`20261108143224_admission_history_and_discharge.sql`, and
+`20261108152806_admission_foreign_key_indexes.sql`, followed by the frontend.
+Foundation includes safe discharge; never expose admission creation against a
+partial backend. Local verification includes clean/populated rehearsals and
+Supabase database advisors. Development deployment is recorded below; rollout
+to other environments and clinical acceptance remain separate release steps.
+Follow-up is a recommendation; booking remains an
+explicit existing workflow. Billing, owner messaging and automated dosing are
+outside KAN-19.
+
+Verification on 8 November 2026: 258 unit tests passed; production build and lint
+passed (the existing unused `icons` warning remains). All aggregate component
+suites passed individually, including the updated workspace navigation check and
+a subscription browser check rerun. The complete `test:database` runner passed
+serially, including admission SQL/concurrency/UI and existing Auth/Edge workflows.
+Clean provisioning and populated upgrade rehearsals passed, and local database
+advisors reported no issues. An initial aggregate attempt recorded the outdated
+navigation expectation, a subscription browser failure that passed on rerun,
+and a test-only deadlock caused by overlapping the catalog rehearsal with the
+database runner. Do not run catalog rehearsals alongside other database suites.
+
+Hosted Development rollout on 8 November 2026 fixed frontend `404/PGRST205`
+requests caused by the missing admissions tables. Applied migration names and
+hosted history versions are `admission_foundation` (`20261108152553`),
+`inpatient_care` (`20261108152555`), `admission_history_and_discharge`
+(`20261108152556`), and `admission_foreign_key_indexes` (`20261108152849`).
+The latter covers the new module's foreign-key lookups; clean/populated local
+rehearsals also include it. The earlier repository timestamps above remain the
+source filenames; hosted MCP history records the actual application times.
+
+Approved-member reads of admissions, wards, units, occupancy and observation
+history succeeded under the authenticated database role. The four failing REST
+endpoints now resolve and deny anonymous reads with `401/42501`, preserving the
+existing authentication boundary. All ten admissions tables have RLS, approved
+staff SELECT access and no direct authenticated writes or anonymous SELECT.
+Fingerprints across 19 existing clinic/clinical/stock/document tables matched
+before and after deployment. The hosted security-advisor baseline is unchanged;
+there are no unindexed-foreign-key findings for the admissions module. No test
+patients or care records were created in the hosted project.
+
+## Add Record steps
+
+Patient Add Record uses one modal for service selection, recording method, the
+relevant form steps, and a final review. Checkups separate visit details, vitals,
+clinical notes, follow-up, and optional historical medicines. Preventive care
+separates shared details from each vaccine/deworming item. The vaccination
+section's add button opens the same flow with its service already selected.
+
+Next validates the current step; Back and visited step labels preserve entered
+values. Review offers an Edit action for each section. Previously opened service
+and recording-method forms stay mounted until the modal closes, keeping their
+unsaved values separate. Only the final save performs the existing mutation.
+Existing record editing and queue drafts keep their original workflows.
+
+`test:new-visits` checks single-dialog navigation, validation, review/edit,
+retained values across service/purpose revisits, cancellation, keyboard focus,
+and mobile layouts in light/dark mode. Preventive-care, historical-checkup,
+checkup-completion, queue, and real database browser suites navigate these steps
+and verify saved payloads, retries, completion, and stock behavior.
+
+## Manual vaccination lots and certificate evidence
+
+Live vaccination entries require a manually entered lot number separate from the
+stock batch. Drafts may remain incomplete. Completed lots can be corrected through
+the audited record editor without changing the stock ledger; issued certificate
+snapshots retain their original evidence. Deworming retains its batch-based lots.
+
+Travel certificates accept saved Anti-Rabies evidence, manual evidence, and mixed
+saved/manual history. Manual rows require a name, lot, and administration date;
+the selected Anti-Rabies row also needs a next-due date covering certificate
+validity. Optional product expiration remains in the certificate snapshot.
+Issuance atomically creates one historical vaccination group per manual row;
+preview/cancel/failure create no rows, queue tickets, reminders, or stock changes.
+
+Deploy `20261107084400_manual_vaccine_lots_and_certificate_entries.sql` before
+this frontend. It is applied to Development; all 18 existing vaccine rows,
+stock movements, and issued snapshots were unchanged, and the security advisor
+baseline was unchanged. Existing saved-record issuance requests remain supported. New
+live vaccination requests must include a nonempty `lotNumber` for each item.
+`issue_travel_certificate` accepts optional `manualVaccinations` and
+`manualRabiesItemId`; a saved `rabiesVaccinationId` and manual selection are
+mutually exclusive. Manual row IDs are stable UUIDs and issuance uses the existing
+payload-bound retry receipt.
+
+`manual_certificate_vaccines.sql` covers manual/mixed issuance, invalid fields,
+rollback, immutable snapshots, history corrections, and private helper access.
+The real `test:preventive-database` browser suite covers manual entry, cancellation,
+preview reset, lost issuance responses, patient history search, public snapshot
+parity, and mobile dialogs in both appearance modes. The travel certificate
+concurrency suite checks simultaneous retries create one certificate and vaccine.
+These SQL checks also run under `test:database`.
+
+Patients use **Vaccinations and Deworming**. A vaccination record contains one
+or more vaccine items; a deworming record contains exactly one administration.
+Live items require active Vaccines/Medicine inventory, an available batch and a
+stock quantity separate from clinical dose. Waiting records and drafts do not
+deduct stock. Completion consumes every item atomically, and completed-record
+edits consume only newly added vaccines. Consumed products/batches/quantities
+and their records cannot be removed; corrections go through Inventory.
+Historical records accept manual details and create no operational effects.
+
+Existing vaccine IDs, reminders and certificate references remain intact under
+one-item parent records. Legacy rows are exempt from retroactive stock deduction.
+The original single-vaccine APIs retain their receipt namespaces and child-ID
+responses, and reject edits/deletion that would overwrite a multi-vaccine group.
+Individual vaccine evidence remains available to travel certificates; deworming
+is excluded. Due-date exports include both types and their record identifiers.
+Printed histories group administrations and use an explicit white background.
+
+Development (`yerrtkosxksacqxznrhk`) has migrations
+`20261107043221_preventive_care_records.sql` and
+`20261107043602_preventive_care_explicit_grants.sql`. Apply both before releasing
+the frontend in another environment. Hosted verification preserved all 15 vaccine
+rows and two issued certificates, with matching clinical, certificate, stock and
+settings fingerprints. Backfilled queue links and stock exemptions were checked.
+Browser writes/private helper access are denied; tenant RLS is enabled and the
+security advisor baseline is unchanged.
+
+`20261107043603_preventive_care_service_role_read.sql` grants the trusted
+server-side workflow read access to the grouped parent and its private stock
+ledger. Apply it with the preceding migrations before deploying this frontend.
+
+`test:preventive-care` (also available through `test:historical-vaccinations`)
+covers repeatable vaccine rows, single-product deworming, historical editing,
+inventory categories, drafts, retries, completed-item locks, legacy deep links,
+search/type filters, calendar previews and mobile layouts in both appearance
+modes. `test:preventive-stock` uses actual concurrent PostgreSQL transactions to
+check overselling and simultaneous lost-response retries. `preventive_care.sql`
+adds atomic stock failures, repeated batch selections, fractional units, appends,
+permissions, cancellation/deletion, reminders, reports and legacy adapters.
+The real `test:database` workflow also exercises both live types through Auth,
+PostgREST and the browser, including a deliberately lost completion response.
+
+Settings > Appearance is available to every approved staff member. Light, Dark,
+and System apply across clinic, public, authentication, account and platform
+pages. The preference is browser-local (`veterina-appearance`), defaults to System,
+syncs between tabs, and stays usable in memory when storage is unavailable.
+The document head applies the resolved mode before React loads. Print and
+standalone prescription/certificate exports retain white paper backgrounds.
+
+Owners can preview and save the existing six clinic palettes in Appearance.
+`portal_mutation('set_clinic_theme', { brandColor }, retryKey)` updates only the
+active clinic's `brand_color`, using the existing audit and retry mechanisms.
+Migration `20261107025039_clinic_appearance_theme.sql` is applied to Development
+(`yerrtkosxksacqxznrhk`); the settings fingerprint and advisor baseline were
+unchanged. Apply this migration before releasing the frontend elsewhere.
+
+`test:theme` covers modes, OS changes, reloads, cross-tab sync, preview/save/retry,
+retained selections and recovery when a saved color cannot be refreshed,
+staff permissions, route/palette coverage, mobile layouts, keyboard focus,
+contrast, unavailable storage and pre-React initialization. Appearance screenshots
+are saved under ignored `test-artifacts.local/appearance-dark-*.png`.
+`supabase/tests/clinic_appearance_theme.sql` rolls back its fixtures and checks
+all six colors, owner/staff/anonymous/inactive/expired boundaries, clinic
+isolation, unchanged settings/credentials and audited idempotent retries.
+
+Clinic and veterinarian settings are separated. Settings > Clinic profile updates
+only clinic identity/preferences. Settings > Veterinarian Details lists approved
+accounts (including inactive ones), veterinarian designation, and per-person name,
+TIN, PRC, PTR and license expiry. Owners edit these through the audited/idempotent
+`save_veterinarian_details` action. Registration code/QR and pending approvals are
+under Staff accounts, reached by the Register a veterinarian shortcut. Designation
+does not change login role/status. Legacy `save_settings` professional fields are
+ignored, while `set_veterinarian_tin` remains available under its old restrictions.
+
+Migration `20261106171706_veterinarian_professional_details.sql` is applied to
+Development (`yerrtkosxksacqxznrhk`). `profiles.is_veterinarian` defaults false;
+existing nonblank PRC accounts were initially designated. Verified the backfill,
+unchanged credential fingerprints and issued snapshots, private helper access,
+clinic isolation and unchanged security advisor baseline. Apply this migration
+before the updated frontend in other environments.
+
+New certificates select only active designated veterinarians, defaulting to the
+logged-in account when eligible and otherwise blank. Missing PRC/expiry and expired
+licenses show nonblocking warnings; same-day expiry is current in clinic-local
+dates. The server independently rechecks designation/status/clinic and snapshots
+all credentials, including expiry in version 4. Version-1/2/3 documents retain
+their original rendering. Other clinical staff selectors are unchanged.
+
+Validation: 235 unit tests, Settings/certificate and clinic-access browser checks,
+22 rolled-back SQL suites, four concurrency suites, the real Auth/Edge/browser
+database workflow, lint and production build passed. Coverage includes separate
+saves, multiple veterinarians, role/clinic/inactive-account boundaries, optional
+credentials, invalid dates/text, designation removal, audit/retry safety, warning
+boundaries, profile-change reprints, public QR views and mobile/keyboard controls.
+Settings screenshots are `test-artifacts.local/veterinarian-details-*.png`.
+
+Earlier TIN-only rollout (superseded by Veterinarian Details above):
+Veterinarian TIN is managed in Settings, never entered on the certificate form.
+Owners save their own TIN under Clinic profile > Your professional details and
+other active veterinarians' TINs under Staff accounts > Veterinarian TINs.
+The issuance form displays the selected issuer's saved TIN alongside PRC/PTR.
+The server snapshots `profiles.tin_number` and ignores legacy issuance overrides;
+already issued certificates keep their original TIN. Missing TIN stays optional
+and prints as "Not recorded". Older settings clients preserve existing TINs.
+
+Migration `20261106165757_veterinarian_tin_settings.sql` is applied to Development
+(`yerrtkosxksacqxznrhk`). The existing audited, idempotent mutation interface now
+accepts owner-only `set_veterinarian_tin: { id, tinNumber }`; `save_settings` accepts
+optional `tinNumber`. Profile updates remain clinic-scoped, direct browser writes
+and private helper access remain denied, and existing snapshot fingerprints and
+security advisor findings are unchanged. Apply the migration before the frontend
+in other environments.
+
+Validation: 232 unit tests, certificate/Settings and clinic-access browser checks,
+21 rolled-back SQL suites, four concurrency suites, the real Auth/Edge/browser
+database workflow, lint and production build passed. Checks cover profile save
+and reload, selected issuer changes, missing/formatted TINs, spoofed certificate
+overrides, owner-only/cross-clinic/inactive-account enforcement, audit/retry safety
+and snapshot-preserving print/public viewing after profile changes.
+
+The Knowledge workspace menu entry, lazy import and route are commented out for
+now. Its implementation and data remain available for later work. Direct
+`/knowledge` URLs use the existing dashboard fallback. Connection checks verify
+the workspace is hidden for both roles and old links redirect safely.
+
+Travel certificate layout and owner edits: migration
+`20261106164152_travel_certificate_owner_details.sql` is applied to Development
+(`yerrtkosxksacqxznrhk`). New version-3 snapshots use a formal A4 letterhead,
+underlined owner/pet fields, patient photo, Anti-Rabies evidence, validity,
+veterinarian credentials/signature line and QR code, followed by vaccination
+history on continuation pages with repeating table headers. Version-1/2 snapshots
+keep their original renderer. Existing issued snapshot fingerprints were verified
+unchanged after migration; permissions remain private and security advisors match
+the existing baseline. Apply this migration before the frontend elsewhere.
+
+Owner name, address and contact number are required, prefilled, resettable and
+editable for this certificate only. `issue_travel_certificate` accepts optional
+`ownerDetails: { name, address, contactNumber }`; older callers use the registered
+owner's details. The server validates all three, records them in the immutable
+snapshot and owner search/display name, and never updates the clinic owner or pet
+ownership. Draft edits survive focus refresh, preview and failed-save retries;
+choosing a different pet loads that pet's owner details.
+
+Unit, browser and rolled-back SQL checks cover required fields, Unicode,
+formatted contacts, escaping, reset/pet switching/refresh, immutable owner edits,
+legacy layouts, saved search, public QR viewing, A4 sizing, long details,
+multipage PDFs and retry safety. The real isolated database suite verifies
+certificate edits leave the owner row unchanged and persist through source edits
+and reloading. Desktop/mobile form and certificate captures, plus standard and
+long-details PDFs, are saved under ignored `test-artifacts.local/`.
+
+Appointments now owns the calendar and Follow-ups & tasks view. Reminders is no
+longer a workspace menu/dashboard entry or page component. `/reminders` remains a
+protected compatibility redirect, retaining status/type filters and record
+fragments. Notification, dashboard, patient and assistant links use Appointments.
+Calendar entries combine only explicit same-pet, same-date source links; unrelated
+tasks and snoozed calls remain separate. Historical clinical sources are excluded
+from live scheduling. Task contact history, outcomes, edit/snooze/cancel actions,
+and owner-only deletion retain their existing authenticated mutation interfaces.
+
+`test:appointments` covers calendar/task pairing, linked follow-up rescheduling,
+contact acknowledgement retries, booking from a task, independent contact/care
+completion, custom tasks, snoozing without changing vaccine dates, source links,
+legacy redirect/reload/focus, roles and both calendar/task views at 320/375/1440px.
+Unit tests cover pairing, explicit source IDs, terminal history and historical
+exclusions. Connection checks assert the updated workspace menu. The original
+reminder data and APIs are retained; this integration needs no database migration.
+
+Patient history has three tabs: Clinical history, Vaccinations, and Weight & vitals.
+Clinical history combines checkups, queued maintenance services and historical
+service records, with shared search, record-type/detail filters and calendar
+previews. Old services/timeline URLs resolve to Clinical history; equivalent
+service filters and source fragments are retained. Checkup colors, clinical
+editors, historical service edits and queue actions use their existing interfaces.
+
+`test:clinical-history` covers mixed ordering, colliding source IDs, filters,
+legacy links, combined previews and permitted edits. It also checks dated weight
+points, partial vitals, BCS scales, baseline-only patients, visit links, keyboard
+focus and 320/375/1440px chart/table layouts, producing screenshots under
+`test-artifacts.local/`. Weight/vitals unit tests cover missing/single/equal/small
+weights and clinic-local year boundaries. The connections, new-visits, queue,
+checkup-completion, historical-checkups, theme and isolated database checks cover
+the affected navigation and clinical workflows. This UI change needs no migration
+or mutation API change.
+
+Travel certificate details: `20261106152738_travel_certificate_details.sql` is applied
+to Development. New certificates require a manually entered control number (text,
+preserving leading zeroes) and a certificate valid-until date. Control numbers are
+unique within the clinic and issuance year, including voided certificates; the
+generated system reference remains separate. Validity must cover issuance/travel
+and cannot exceed the selected Anti-Rabies record's next-dose date. The server
+records actual issuance date/time in the clinic timezone.
+
+Version-2 snapshots include owner address/contact, pet color, sex, birth date,
+recorded weight and microchip, plus optional certificate-specific veterinarian TIN
+and vaccine product expiration copied from documentary evidence. These optional
+fields do not update staff profiles or vaccination records. Product expiration
+cannot precede vaccination and is separate from immunity/next-dose validity. Pet
+weight uses the latest nonfuture recorded measurement, falling back to baseline
+weight. Missing details print as "Not recorded". Existing snapshots are retained.
+Search includes the manual control number; preview, print and public QR viewing
+use the same saved details. Public-sharing controls explain that owner contact
+details and veterinarian credentials are included.
+
+The travel unit/browser/SQL suites cover these fields, escaping, retained inputs,
+historical source changes, inclusive date boundaries and server validation.
+Concurrency checks verify duplicate manual controls cannot create two documents
+or consume a system reference. The full isolated database suite covers real
+authenticated issuance, public QR access/revocation, reload and voiding. Migration
+permissions and RLS were verified in Development; security advisor findings are
+unchanged. Apply this migration before the updated frontend in other environments.
+
+Initial inventory stock: `20261106131107_inventory_initial_stock.sql` is applied to
+Development. New items accept whole-unit or fractional opening quantities, up to
+two decimal places when fractional quantities are enabled. Zero or omitted stock
+creates no movement. The item, initial batch and opening ledger movement save in
+one transaction using the existing authenticated mutation and retry receipts.
+`test:inventory` covers quantity validation, owner/staff creation, retained inputs,
+lost acknowledgements, whole/fractional/zero balances and mobile layouts.
+`portal_workflows.sql` checks server validation, rollback after a batch failure,
+retry safety and that item edits cannot rewrite stock. `test:database` also verifies
+a real fractional opening balance after a lost save acknowledgement and reload.
+
+`npm run test:travel-certificates` covers workspace navigation, pet selection,
+vaccination eligibility, preview, lost-save acknowledgement retries, saved history,
+immutable reprints, print retry, branding, credentials, owner voiding and mobile
+layouts using intercepted APIs. It also produces a multipage A4 PDF under
+`test-artifacts.local/`. Unit tests verify date boundaries, missing details,
+estimated ages and print escaping. `travel_certificates.sql` tests clinic and
+subscription isolation, server eligibility, immutable snapshots, source deletion,
+void permissions and idempotency with rolled-back fixtures.
+`npm run test:travel-certificate-concurrency` verifies reference allocation and
+simultaneous retry safety using independent local Postgres sessions. It refuses
+hosted databases and requires the empty synthetic clinic. These checks are included
+in `test:all` and `test:database`; the latter also issues, reloads and voids a
+certificate through the real browser/Auth/PostgREST workflow.
+
+Travel certificate rollout: `20261106052056_pet_travel_certificates.sql` is applied
+to Development. The authenticated dispatcher, clinic RLS and browser write denial
+were verified after deployment; security advisor findings are unchanged. Deploy
+this migration before the matching frontend in other environments. Certificates
+are clinic-issued records; government shipping-permit applications remain separate.
+
+Patient photos: `20261106054843_travel_certificate_patient_photos.sql` and the
+matching `pet-photo` Edge Function are deployed to Development. The service reads
+the private patient image and prepares bytes for its current revision; issuance
+copies those bytes into the certificate snapshot. Reprints retain the original
+photo after profile changes or deletion. Existing issued snapshots stay immutable.
+Browser checks cover photo loading/retry, preview and print; SQL verifies revision
+conflicts, missing prepared images, caller-supplied image rejection and clinic
+isolation. Unit tests cover image encoding and rejection of unsafe print sources.
+
+Certificate QR sharing: `20261106060854_travel_certificate_public_sharing.sql` and
+the `travel-certificate` Edge Function are deployed to Development. Certificates
+default to private. Active clinic staff can publish or revoke public viewing through
+the audited mutation interface, during issuance or from the saved document. QR codes
+use a random 256-bit token in the URL fragment. Anonymous reads return one explicitly
+shared snapshot only, with no-store headers and clinic/subscription checks; private,
+unknown and revoked links return the same unavailable response. Direct anonymous
+table/RPC access remains denied. Public voided certificates display their status.
+Browser tests decode the generated QR, check anonymous viewing/revocation, mobile
+layout, visibility retries and printed QR output. The real database acceptance flow
+also exercises public/private transitions through Auth, PostgREST and Edge Functions.
+SQL tests cover private defaults, public issuance, invalid visibility values, tenant
+isolation, immutable tokens, retry receipts and snapshot-preserving public reads.
+
+`npm run test:historical-checkups` covers the purpose chooser, record-only entry,
+missing measurements, Unicode clinician names, partial historical prescriptions,
+prescription dates, retry/edit/reload, owner/staff defaults, and mobile layouts.
+`historical_checkups.sql` verifies atomic saves, queue/reminder/stock isolation,
+custom clinicians with separate queue responsibility, tenant isolation, anonymous
+denial, and finalized-record guards. Its fixtures roll back. Both checks are
+included in the corresponding aggregate suites.
+
 `npm run test:subscriptions` covers admin OAuth return paths, owner/staff denial,
 clinic search and filters, history, independent code durations, generation and
 revocation, extension retries, expired owner/staff notices, renewal, verified
@@ -310,3 +766,144 @@ is required before photo controls are enabled. This separately verifies the pres
 signed authenticated upload/read and denied unsigned delivery. Confirm HTTPS camera
 permissions on target desktop/mobile devices and check the hourly cleanup schedule
 before release. Never copy Cloudinary secrets into browser test fixtures or logs.
+
+
+### Historical vaccinations
+
+`npm run test:historical-vaccinations` checks the shared purpose chooser, keyboard
+selection/cancellation, unchanged queue inventory controls, required historical
+fields, custom Unicode clinician names, optional details, preserved input after a
+failed save, retry keys, editing without another chooser, both roles, and mobile
+layouts. These UI checks intercept APIs.
+
+`supabase/tests/historical_vaccinations.sql` verifies real authenticated creation
+and editing, retry receipts, recorder attribution, missing clinicians, original
+dates, date validation, cross-clinic isolation, inventory/dispensing rejection,
+immutable purpose, helper grants, and server rejection of historical queue and
+reminder links. It runs with active checkup and vaccination queues and confirms
+that historical entry leaves operational records unchanged. Fixtures roll back.
+The database suite includes this as its nineteenth SQL suite and separately tests
+a real browser save whose acknowledgement is lost after commit: retry must leave
+one historical vaccination without changing queue counters, reminders,
+appointments, or inventory movements.
+
+Validation on 6 November 2026: 215 unit tests, lint, production build, historical
+vaccination/checkup, queue, clinical-history, appointment and travel-certificate
+browser checks, nineteen isolated SQL suites, four concurrency suites, and the
+real Auth/Edge/browser database suite passed. Synthetic database fixtures were
+removed afterward. Migration `20261106133210_historical_vaccinations.sql` was
+applied to Development (`yerrtkosxksacqxznrhk`); verified existing vaccinations
+remain in queue mode, RLS remains enabled, and historical helpers are private.
+Security advisors have no new findings relative to the existing baseline. Apply
+this migration before releasing the frontend to any other environment.
+
+
+### Unified New visit flow
+
+`npm run test:new-visits` checks the patient header's single New visit action,
+required service selection, the separate queue/record-only choice, changing a
+service, and matching forms for Vaccination, Follow-up, Grooming, Wellness check,
+Surgery and Sick visit in both modes. It covers keyboard selection, cancellation,
+320/375px layouts, historical service save failures/retries/reloads/edits, custom
+staff names and unknown performers. The patient opens the relevant history tab
+after saving. Existing queue dialogs and record editors keep their direct entry.
+
+`supabase/tests/unified_patient_visits.sql` verifies historical service writes,
+idempotency, dates, clinic isolation, private helpers, rejected dispensing,
+unchanged operational records and history exports. It also verifies the selected
+clinical service survives independently of the checkup reason, and that grooming
+cannot be submitted as a clinical checkup. This is the twentieth SQL suite in
+`test:database`. The real database/browser suite now covers New visit -> live
+grooming queue -> historical grooming, including lost acknowledgement recovery,
+reload, editing and no historical changes to queue counters, appointments,
+reminders or stock.
+
+Validation on 6 November 2026: 217 unit tests, app lint, production build, New
+visit, checkup completion, historical checkup/vaccination, queue, clinical history
+and prescription browser checks passed. All twenty isolated SQL suites, four
+concurrency suites and the real Auth/Edge/browser database suite passed; synthetic
+fixtures were cleaned. Migration `20261106140152_unified_patient_visits.sql` was
+applied to Development (`yerrtkosxksacqxznrhk`). Verified scoped reads, denied
+anonymous reads/direct writes, private helpers, queue service retention and
+historical services in history exports. Security advisors match the previous
+baseline. Apply this migration before releasing the frontend elsewhere.
+
+
+The New visit service picker uses native radio cards with service icons,
+descriptions, a theme-colored selected state, and Continue disabled until selection.
+`test:new-visits` covers Space/arrow-key selection, a single selected card,
+selection retention when returning from the purpose chooser, and 320/375px
+layouts. Desktop/mobile screenshots are saved in `test-artifacts.local` as
+`new-visit-picker-desktop.png` and `new-visit-picker-mobile.png`. The reference
+layout was reviewed against these captures. UI-only update: no database changes.
+
+
+### Clinic color consistency
+
+`npm run test:theme` checks every clinic workspace route with Coastal green and
+Ocean blue, then checks shared controls under all six supported palettes. It
+verifies buttons, icons, selected cards/radios, hover/active/focus/disabled states,
+normal text contrast (including pixels sampled from the rendered hero metric
+panels), hero gradients, patient chart strokes, and preserved
+red/amber semantic colors. The suite also checks global Install controls and
+installation dialogs, theme refresh without navigation, local onboarding
+previews, sign-out cleanup, account changes, and navigation to public pages
+without a document reload. Public/auth/account/subscription/platform pages use
+the default primary when no clinic theme is loaded.
+
+Desktop/mobile dashboard and patient screenshots and 320/375px picker captures
+are stored as `theme-*.png` under ignored `test-artifacts.local`. APIs are
+intercepted; this suite never writes real clinic data. Theme publication uses
+the existing allowed palette and cleans document-level overrides when the clinic
+provider unmounts. Error/warning/status colors, logos/photos, user-selected record
+colors, categorical calendar colors and document snapshots remain separate.
+
+Validation on 6 November 2026: 217 unit tests, lint and production build passed,
+along with theme, Add Record, onboarding, clinical-history, checkup-completion,
+appointment, inventory, public/auth frontend and production PWA browser checks.
+No database migration or API change is required.
+
+
+### UI/UX patch specification
+
+`npm run test:ui-refinements` verifies the agenda badge and live refresh, empty
+states and dismissal; task search and keyboard filters; searchable report patient
+selection and control spacing; branded checkbox keyboard use; independent patient
+Call/SMS links; Quick Skim records with full vitals, clinical notes, prescriptions,
+corrections and service details; supplier stock previews and inventory links; and
+404, 403 and crash boundaries with private diagnostic codes.
+
+The suite checks every clinic workspace at 320, 375 and 1440 pixels in light and
+dark mode with reduced motion. Screenshots are saved under `test-artifacts.local`
+as `ui-suppliers-light.png`, `ui-suppliers-dark.png` and `ui-reports-mobile.png`.
+All requests use intercepted fixtures. This suite never writes real clinic data.
+
+Existing browser suites use `scripts/helpers/select.mjs` to operate visible branded
+selects by fixture value. `selectControl()` separately checks the native form
+value. Native backing controls retain required validation, disabled fieldsets,
+FormData serialization and wizard review labels; they are hidden from assistive
+technology and keyboard tab order. Unknown routes now show the mascot 404, and
+unauthorized authenticated platform users see the mascot 403. Workspace navigation
+remains available through the header after removal of dashboard workspace tiles.
+
+Validation on 9 November 2026: 258 unit tests, lint and production build passed.
+UI patch, theme, public/auth frontend, admissions, appointments, clinical history,
+queue, inventory, new-visit wizard, registration, prescriptions, preventive care,
+checkup completion, historical checkups, clinic access, Google auth, travel
+certificates and subscription browser checks passed with intercepted APIs. Lint
+retains the existing unused `icons` warning in `create-clinic-infographic.mjs`.
+The UI patch requires no database migration.
+
+
+Hospital stays appear as Hospitalization records in the clinical timeline,
+sorted alongside checkups, services, vaccinations and deworming. Admission
+encounters are not repeated as separate checkups. Search, type/status filters,
+date filters, calendar entries and previews include these stays. Opening a skim
+card shows admission details and links to monitoring and discharge evidence.
+The standalone Hospitalization history section is no longer rendered.
+
+Quick Skim is the default. Detailed View is available through the view toggle;
+an explicit `historyDensity=detailed` URL preserves that choice across reloads.
+Existing source fragments still open detailed records so cited items can receive
+focus. The UI regression fixture covers the default, both views, hospitalization
+search/filter/calendar behavior, admission links and absence on other tabs.

@@ -6,6 +6,16 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/pwa/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#173f37" />
+    <script>
+      (() => {
+        let mode = 'system';
+        try { mode = localStorage.getItem('veterina-appearance') || 'system'; } catch {}
+        const dark = mode === 'dark' || (mode !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.appearance = dark ? 'dark' : 'light';
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        document.querySelector('meta[name="theme-color"]').content = dark ? '#111b19' : '#f3f5f2';
+      })();
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Veterina" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />

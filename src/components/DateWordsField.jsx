@@ -10,7 +10,7 @@ function readDate(text) {
   return isValid(value) ? value : null
 }
 
-export default function DateWordsField({ name, label, initial = '', required = false, includeTime = false, hint }) {
+export default function DateWordsField({ name, label, initial = '', required = false, includeTime = false, hint, onChange }) {
   const id = useId()
   const initialDate = readDate(initial)
   const [text, setText] = useState(initialDate ? format(initialDate, 'MMMM d, yyyy') : '')
@@ -20,6 +20,7 @@ export default function DateWordsField({ name, label, initial = '', required = f
   const container = useRef(null)
   const date = readDate(text)
   const value = date ? format(date, 'yyyy-MM-dd') + (includeTime ? time ? `T${time}` : '' : '') : ''
+  useEffect(() => { onChange?.(value) }, [value, onChange])
   useEffect(() => {
     if (!open) return
     const outside = (event) => { if (!container.current?.contains(event.target)) setOpen(false) }

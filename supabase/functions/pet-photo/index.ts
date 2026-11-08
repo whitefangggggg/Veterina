@@ -1,5 +1,5 @@
 import { checked,createClient,headers,staff,url } from '../_shared/http.ts';
-import { boundedBytes,downloadPhoto,MAX_PHOTO_BYTES,photoFormat,sha256,uploadPhoto } from '../_shared/petPhotos.ts';
+import { boundedBytes,downloadPhoto,MAX_PHOTO_BYTES,photoDataUrl,photoFormat,sha256,uploadPhoto } from '../_shared/petPhotos.ts';
 import { photoConfig } from '../_shared/photoConfig.ts';
 import { createPhotoByteCache } from '../_shared/photoCache.ts';
 
@@ -41,7 +41,7 @@ Deno.serve(async(req:Request)=>{
       return new Response(JSON.stringify({enabled:Boolean(config)&&Boolean(readiness.enabled)}),{headers:responseHeaders});
     }
     if(input.action==='remove')return new Response(JSON.stringify(await manage({...input,action:'remove'})),{headers:responseHeaders});
-    if(input.action==='read'){
+    if(input.action==='read'||input.action==='prepare_certificate'){
       if(!config)throw new Error('PROVIDER_NOT_CONFIGURED');
       const photo=await manage({action:'read',petId:input.petId});
       if(!photo?.public_id)throw new Error('NOT_FOUND');
@@ -49,6 +49,10 @@ Deno.serve(async(req:Request)=>{
       // before sharing cached immutable bytes among authorized staff requests.
       const key=JSON.stringify([config.cloud,photo.public_id,photo.version,photo.format]);
       const bytes=await photoBytes.get(key,()=>downloadPhoto(config,photo));
+      if(input.action==='prepare_certificate'){
+        const prepared=await manage({action:'certificate',petId:input.petId,expectedRevision:input.expectedRevision,photoDataUrl:photoDataUrl(bytes)});
+        return new Response(JSON.stringify(prepared),{headers:responseHeaders});
+      }
       return new Response(bytes,{headers:{...responseHeaders,'Content-Type':'application/octet-stream','X-Pet-Photo-Type':`image/${photo.format==='jpg'?'jpeg':photo.format}`,'Access-Control-Expose-Headers':'X-Pet-Photo-Type','X-Content-Type-Options':'nosniff'}});
     }
     throw new Error('VALIDATION_FAILED');

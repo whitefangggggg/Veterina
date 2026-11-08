@@ -29,7 +29,7 @@ export default function DailyWorklist() {
         {!checkins.length && <p className="daily-empty">No bookings awaiting check-in today.</p>}
         {checkins.length > 5 && <Link className="text-link" to="/appointments">View all {checkins.length} bookings</Link>}
       </SectionCard>
-      <SectionCard title={`Calls due (${calls.length})`} description="Overdue follow-ups first. Log outcomes in the reminder record." action={<Link className="text-link" to="/reminders">Open reminders</Link>}>
+      <SectionCard title={`Calls due (${calls.length})`} description="Overdue follow-ups first. Manage calls alongside bookings." action={<Link className="text-link" to="/appointments?view=tasks">Open follow-up tasks</Link>}>
         <ul className="daily-work-list">{calls.slice(0, 5).map((reminder) => {
           const pet = data.getPet(reminder.petId)
           const owner = data.getOwner(pet?.ownerId)
@@ -37,7 +37,7 @@ export default function DailyWorklist() {
           return <li key={reminder.id}><div><Link className="daily-patient-link" to={patientSource(reminder.petId)}>{patientName(reminder.petId)}</Link><small>{reminder.title}</small><span>{reminder.dueDate} · {reminder.status}</span></div><div>{phone ? <a className="text-link" href={`tel:${phone.replace(/\s/g, '')}`}>Call owner</a> : <span>No phone recorded</span>}<Link className="text-link" to={reminderSource(reminder.id)}>Open reminder</Link></div></li>
         })}</ul>
         {!calls.length && <p className="daily-empty">No follow-up calls due.</p>}
-        {calls.length > 5 && <Link className="text-link" to="/reminders">View all reminders</Link>}
+        {calls.length > 5 && <Link className="text-link" to="/appointments?view=tasks">View all follow-up tasks</Link>}
       </SectionCard>
       <SectionCard title={`Stock watch (${stock.length})`} description="Expired batches, low stock and batches expiring within 30 days." action={<Link className="text-link" to="/inventory?attention=all">Review stock</Link>}>
         <ul className="daily-work-list">{stock.slice(0, 5).map(({ item, expired, expiring, lowStock, href }) => <li key={item.id}><div><strong>{item.name}</strong><small>{item.quantity} {item.unit} on hand · minimum {item.minimumStock}</small><span>{[expired.length ? `${expired.length} expired ${expired.length === 1 ? 'batch' : 'batches'}` : '', expiring.length ? `${expiring.length} ${expiring.length === 1 ? 'batch' : 'batches'} expiring soon` : '', lowStock ? 'At or below minimum' : ''].filter(Boolean).join(' · ')}</span>{item.supplierId && <Link className="text-link" to={`/suppliers#${encodeURIComponent(item.supplierId)}`}>Supplier contact</Link>}</div><Link className="text-link" to={href}>Review item</Link></li>)}</ul>

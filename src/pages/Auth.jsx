@@ -1,3 +1,4 @@
+import VeterinaCheckbox from '../components/VeterinaCheckbox'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -100,7 +101,7 @@ export default function Auth({ mode = 'sign-in' }) {
             <label htmlFor="password">Password<input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete={creating ? 'new-password' : 'current-password'} required minLength={creating ? 8 : undefined} aria-describedby={creating ? 'password-help' : undefined} /></label>
             {creating && <p className="auth-hint" id="password-help">Use at least 8 characters.</p>}
             {creating && <label htmlFor="confirm-password">Confirm password<input id="confirm-password" name="confirmPassword" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required minLength={8} /></label>}
-            <label className="auth-show-password"><input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />Show {creating ? 'passwords' : 'password'}</label>
+            <VeterinaCheckbox className="auth-show-password" checked={showPassword} onChange={setShowPassword} label={`Show ${creating ? 'passwords' : 'password'}`} />
             <button className="button button-primary auth-submit" type="submit">{busy && !googleBusy ? (creating ? 'Creating account...' : 'Signing in...') : (creating ? 'Create account' : 'Sign in')}</button>
           </fieldset>
         </form>

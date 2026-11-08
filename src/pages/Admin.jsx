@@ -1,12 +1,17 @@
+import { SelectField } from '../components/VeterinaSelect'
+import VeterinaCheckbox from '../components/VeterinaCheckbox'
+import { ForbiddenView } from '../components/ErrorViews'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ClipboardText, ClockCountdown, FileText, PawPrint, ShieldCheck, Syringe } from '@phosphor-icons/react'
 import { PageHeader, SectionCard } from '../components/ui'
 import { AsyncForm } from '../components/RecordForm'
 import StaffAdmin from '../components/StaffAdmin'
+import VeterinarianDetailsSettings from '../components/VeterinarianDetailsSettings'
 import ClinicJoinCode from '../components/ClinicJoinCode'
 import ClinicLogoSettings from '../components/ClinicLogoSettings'
 import ServiceSettings from '../components/ServiceSettings'
+import AppearanceSettings from '../components/AppearanceSettings'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { downloadReport, fetchReport, printPatientHistory } from '../lib/reports'
@@ -26,8 +31,8 @@ export function Reports() {
       : { date_from: filters.date_from, date_to: filters.date_to, ...(report === 'reminders' ? { reminder_status: filters.reminder_status } : {}) }
   const reports = [
     { id: 'patients', icon: PawPrint, title: 'Patient register', description: 'Patient identities, owners and identifiers', format: 'CSV' },
-    { id: 'vaccinations', icon: Syringe, title: 'Vaccinations due', description: 'Recorded doses and next-due dates', format: 'CSV' },
-    { id: 'history', icon: FileText, title: 'Complete clinical history', description: 'Identity, owner, alerts, encounters, vitals, vaccines and prescriptions', format: 'Print / Save as PDF' },
+    { id: 'vaccinations', icon: Syringe, title: 'Vaccinations and Deworming due', description: 'Each administered product and its next-due date', format: 'CSV' },
+    { id: 'history', icon: FileText, title: 'Complete clinical history', description: 'Identity, owner, alerts, encounters, vitals, vaccinations, deworming and prescriptions', format: 'Print / Save as PDF' },
     { id: 'inventory', icon: ClipboardText, title: 'Inventory status', description: 'Stock on hand, minimum levels and expirations', format: 'CSV' },
     { id: 'reminders', icon: ClockCountdown, title: 'Reminder outcomes', description: 'Follow-ups, due dates and contact outcomes', format: 'CSV' },
   ]
@@ -46,25 +51,27 @@ export function Reports() {
   }
   return <div className="page">
     <PageHeader eyebrow="Clinic exports" title="Reports" description="Export saved clinic records. Every export is checked and recorded on the server." />
-    {profile.role !== 'owner' ? <p className="auth-message">Only the clinic owner can export records.</p> : <>
+    {profile.role !== 'owner' ? <ForbiddenView embedded message="Only the clinic owner can export records. Ask your clinic administrator for access." /> : <>
       {error && <p className="auth-message auth-error" role="alert">{error}</p>}{message && <p className="auth-message" role="status">{message}</p>}
       <SectionCard title="Report filters" description="Due dates apply to vaccination and reminder exports. Complete patient histories always include every encounter.">
         <div className="settings-panel form-grid">
           <label className="field"><span>Due from</span><input aria-label="Due from" type="date" value={filters.date_from} onChange={changeFilter('date_from')} /></label>
           <label className="field"><span>Due through</span><input aria-label="Due through" type="date" min={filters.date_from || undefined} value={filters.date_to} onChange={changeFilter('date_to')} /></label>
-          <label className="field"><span>Patient species</span><select aria-label="Patient species" value={filters.species} onChange={changeFilter('species')}><option value="">All species</option>{['Dog','Cat','Bird','Rabbit','Other'].map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label className="field"><span>Patient status</span><select aria-label="Patient status" value={filters.patient_status} onChange={changeFilter('patient_status')}><option value="">All statuses</option>{['Active','Inactive','Deceased'].map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label className="field"><span>Reminder status</span><select aria-label="Reminder status" value={filters.reminder_status} onChange={changeFilter('reminder_status')}>{['all','open','due','overdue','upcoming','completed','cancelled'].map((value) => <option key={value} value={value}>{value.charAt(0).toUpperCase()+value.slice(1)}</option>)}</select></label>
-          <label className="field"><span>Inventory category</span><select aria-label="Inventory category" value={filters.category} onChange={changeFilter('category')}><option value="">All categories</option>{['Vaccines','Medicine','Consumables','Other'].map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label><input type="checkbox" checked={filters.low_stock_only} onChange={changeFilter('low_stock_only')} /> Low stock only</label>
-          <label><input type="checkbox" checked={filters.include_archived} onChange={changeFilter('include_archived')} /> Include archived inventory</label>
+          <label className="field"><span>Patient species</span><SelectField aria-label="Patient species" value={filters.species} onChange={changeFilter('species')}><option value="">All species</option>{['Dog','Cat','Bird','Rabbit','Other'].map((value) => <option key={value}>{value}</option>)}</SelectField></label>
+          <label className="field"><span>Patient status</span><SelectField aria-label="Patient status" value={filters.patient_status} onChange={changeFilter('patient_status')}><option value="">All statuses</option>{['Active','Inactive','Deceased'].map((value) => <option key={value}>{value}</option>)}</SelectField></label>
+          <label className="field"><span>Reminder status</span><SelectField aria-label="Reminder status" value={filters.reminder_status} onChange={changeFilter('reminder_status')}>{['all','open','due','overdue','upcoming','completed','cancelled'].map((value) => <option key={value} value={value}>{value.charAt(0).toUpperCase()+value.slice(1)}</option>)}</SelectField></label>
+          <label className="field"><span>Inventory category</span><SelectField aria-label="Inventory category" value={filters.category} onChange={changeFilter('category')}><option value="">All categories</option>{['Vaccines','Medicine','Consumables','Other'].map((value) => <option key={value}>{value}</option>)}</SelectField></label>
+          <VeterinaCheckbox label="Low stock only" checked={filters.low_stock_only} onChange={(checked) => setFilters((current) => ({ ...current, low_stock_only: checked }))} />
+          <VeterinaCheckbox label="Include archived inventory" checked={filters.include_archived} onChange={(checked) => setFilters((current) => ({ ...current, include_archived: checked }))} />
           {invalidDates && <p className="auth-message auth-error" role="alert">Due through must be on or after Due from.</p>}
         </div>
       </SectionCard>
       <div className="report-grid">{reports.map(({ id, icon: Icon, title, description, format }) => <SectionCard key={id} className="report-card">
-        <div className="report-icon"><Icon size={23} /></div><h2>{title}</h2><p>{description}</p><span>{format}</span>
-        {id === 'history' && <label className="field"><span>Patient</span><select aria-label="Patient for history export" value={patientId} onChange={(event) => setPatientId(event.target.value)}><option value="">Select patient</option>{pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name} · {pet.recordNumber}</option>)}</select></label>}
-        <button className="button button-secondary" disabled={Boolean(busy) || (id === 'history' && !patientId) || (['vaccinations','reminders'].includes(id) && Boolean(invalidDates))} onClick={() => prepare(id)}>{busy === id ? 'Preparing...' : 'Prepare report'}</button>
+        <div className="report-icon"><Icon size={23} /></div><h2>{title}</h2><p className="report-desc">{description}</p><span className="report-format-pill">{format}</span>
+        <div className="report-card-footer">
+          {id === 'history' && <label className="field"><span>Patient</span><SelectField searchable searchPlaceholder="Search pet or record number…" aria-label="Patient for history export" value={patientId} onChange={(event) => setPatientId(event.target.value)}><option value="">Select patient</option>{pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name} · {pet.recordNumber}</option>)}</SelectField></label>}
+          <button className="button button-secondary report-action-btn" disabled={Boolean(busy) || (id === 'history' && !patientId) || (['vaccinations','reminders'].includes(id) && Boolean(invalidDates))} onClick={() => prepare(id)}>{busy === id ? 'Preparing...' : 'Prepare report'}</button>
+        </div>
       </SectionCard>)}</div>
     </>}
     <div className="privacy-callout"><ShieldCheck size={20} /><div><strong>Exports contain personal information</strong><span>Keep exported files within your clinic’s approved storage.</span></div></div>
@@ -72,16 +79,15 @@ export function Reports() {
 }
 
 export function Settings() {
-  const { settings, profiles, execute } = useClinicData()
-  const { user, profile, refreshAccess } = useAuth()
+  const { settings, execute } = useClinicData()
+  const { profile, refreshAccess } = useAuth()
   const [tab, setTab] = useState('profile')
   const [saved, setSaved] = useState(false)
-  const ownProfile = profiles.find((entry) => entry.id === user.id)
-  if (profile.role !== 'owner') return <div className="page"><PageHeader title="Clinic settings" description="Clinic settings and staff administration are managed by the clinic owner." /><SectionCard title={settings?.clinic_name}><div className="directory-card"><p>{settings?.address}</p><p>{settings?.phone}</p><p>{settings?.email}</p><p>Clinic timezone: {settings?.timezone}</p></div></SectionCard></div>
+  if (profile.role !== 'owner') return <div className="page"><PageHeader title="Clinic settings" description="Choose your display mode. Clinic settings and staff administration are managed by the clinic owner." /><div className="tabs"><button className={tab === 'profile' ? 'active' : ''} aria-pressed={tab === 'profile'} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'appearance' ? 'active' : ''} aria-pressed={tab === 'appearance'} onClick={() => setTab('appearance')}>Appearance</button></div>{tab === 'appearance' ? <AppearanceSettings /> : <SectionCard title={settings?.clinic_name}><div className="directory-card"><p>{settings?.address}</p><p>{settings?.phone}</p><p>{settings?.email}</p><p>Clinic timezone: {settings?.timezone}</p></div></SectionCard>}</div>
   return <div className="page">
-    <PageHeader eyebrow="Owner access" title="Clinic settings" description="Persisted clinic identity, professional details, privacy settings and staff access." actions={<Link className="button button-secondary" to="/clinic-setup?next=%2Fsettings">Personalize clinic</Link>} />
-    <div className="tabs"><button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'staff' ? 'active' : ''} onClick={() => setTab('staff')}>Staff accounts</button><button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Services</button></div>
-    {tab === 'services' ? <ServiceSettings /> : tab === 'staff' ? <SectionCard className="settings-panel"><StaffAdmin /></SectionCard> : <><ClinicJoinCode /><ClinicLogoSettings /><SectionCard title="Clinic profile">
+    <PageHeader eyebrow="Owner access" title="Clinic settings" description="Manage your clinic profile, professional credentials, privacy settings and staff access." actions={<Link className="button button-secondary" to="/clinic-setup?next=%2Fsettings">Personalize clinic</Link>} />
+    <div className="tabs"><button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'veterinarians' ? 'active' : ''} onClick={() => setTab('veterinarians')}>Veterinarian Details</button><button className={tab === 'staff' ? 'active' : ''} onClick={() => setTab('staff')}>Staff accounts</button><button className={tab === 'services' ? 'active' : ''} onClick={() => setTab('services')}>Services</button><button className={tab === 'appearance' ? 'active' : ''} aria-pressed={tab === 'appearance'} onClick={() => setTab('appearance')}>Appearance</button></div>
+    {tab === 'appearance' ? <AppearanceSettings /> : tab === 'services' ? <ServiceSettings /> : tab === 'veterinarians' ? <VeterinarianDetailsSettings onRegister={() => setTab('staff')} /> : tab === 'staff' ? <><ClinicJoinCode /><SectionCard className="settings-panel"><StaffAdmin /></SectionCard></> : <><ClinicLogoSettings /><SectionCard title="Clinic profile">
       <div className="settings-panel">
       {saved && <p className="auth-message" role="status">Clinic settings saved.</p>}
       <AsyncForm submitLabel="Save settings" onSave={async (values) => { setSaved(false); await execute('save_settings', { ...values, aiEnabled: values.aiEnabled === 'on' }); await refreshAccess(); setSaved(true) }}>
@@ -96,12 +102,7 @@ export function Settings() {
           <label className="field"><span>Clinic timezone *</span><input name="timezone" defaultValue={settings?.timezone || 'Asia/Manila'} required placeholder="Asia/Manila" /></label>
           <label className="field"><span>Retention (years) *</span><input name="retentionYears" type="number" min="1" max="50" required defaultValue={settings?.record_retention_years || 10} /></label>
           <label className="field"><span>Reminder lead days *</span><input name="reminderLeadDays" type="number" min="0" max="365" required defaultValue={settings?.reminder_lead_days ?? 3} /></label>
-          <label className="field"><span>Record recall assistant</span><span><input name="aiEnabled" type="checkbox" defaultChecked={settings?.ai_enabled || false} /> Enable cited record recall</span></label>
-          <div className="form-divider full"><h3>Your professional details</h3><p>Printed with the clinic’s clinical documents.</p></div>
-          <label className="field"><span>Full name *</span><input name="fullName" required defaultValue={ownProfile.full_name} /></label>
-          <label className="field"><span>PRC license number</span><input name="prcLicenseNumber" defaultValue={ownProfile.prc_license_number || ''} /></label>
-          <label className="field"><span>PTR number</span><input name="ptrNumber" defaultValue={ownProfile.ptr_number || ''} /></label>
-          <label className="field"><span>License expiry</span><input name="licenseExpiresOn" type="date" defaultValue={ownProfile.license_expires_on || ''} /></label>
+          <VeterinaCheckbox label="Enable cited record recall" name="aiEnabled" defaultChecked={settings?.ai_enabled || false} />
         </div>
       </AsyncForm>
       </div>
