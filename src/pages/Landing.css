@@ -16,6 +16,7 @@
 @media(prefers-reduced-motion:reduce){.vt-page *{animation:none!important;transition:none!important}}
 /* Carry the install button's teal green through the public landing page. */
 .vt-page{--forest:#1d554b;--ink:light-dark(#244b43, #e7eeeb);--sage:#e1f0de;--landing-green:#2a6f62;--landing-green-deep:#1d554b;--landing-gradient:var(--brand-gradient)}
+.vt-page{color-scheme:light;--canvas:#f3f5f2;--ink:#244b43;--muted:#637064;--line:#e0e6e1;--surface:#fafbf7;--surface-soft:#f7f9f7;--brand-ink:var(--brand);--brand-strong-ink:var(--brand-dark);--brand-soft:var(--brand-tint);--landing-gradient:var(--landing-green-deep)}
 .vt-hero,.vt-closing{background:var(--landing-gradient)}
 .vt-nav-start{background:var(--landing-gradient);box-shadow:0 4px 14px #2a6f6229}
 .vt-nav-start:hover{background:linear-gradient(145deg,#347f70,#246559)}

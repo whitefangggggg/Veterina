@@ -159,10 +159,7 @@ button:disabled, fieldset:disabled .button { opacity: .6; cursor: wait; transfor
 :root {
   font-family: "Figtree", "Segoe UI", system-ui, sans-serif;
   color: light-dark(#243530, var(--ink));
-  background:
-    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(45, 117, 103, .06), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(168, 104, 24, .04), transparent 50%),
-    light-dark(#f3f5f2, var(--surface-soft));
+  background: light-dark(#f3f5f2, var(--surface-soft));
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -246,7 +243,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .topbar {
   position: sticky; top: 0; z-index: 15; display: flex; align-items: center; gap: 18px;
   height: 70px; padding: 0 32px; border-bottom: 1px solid light-dark(#e5e9e4, var(--line));
-  background: light-dark(rgba(255,255,255,.92), var(--surface)); backdrop-filter: blur(14px);
+  background: light-dark(#fff, var(--surface));
 }
 .search-trigger {
   display: flex; align-items: center; width: min(440px, 50vw); height: 40px; gap: 10px;
@@ -907,15 +904,12 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
 /* Spacious workspace shell */
 .spacious-shell {
   min-height: 100vh; min-height: 100dvh;
-  background:
-    radial-gradient(ellipse 70% 45% at 0% -10%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 55%),
-    radial-gradient(ellipse 50% 35% at 100% 0%, color-mix(in srgb, var(--brand) 3.5%, transparent), transparent 45%),
-    var(--canvas);
+  background: var(--canvas);
 }
 .workspace-header {
   position: sticky; top: 0; z-index: 40; height: calc(var(--header-height) + var(--safe-top));
   padding-top: var(--safe-top); border-bottom: 1px solid rgba(33,49,43,.07);
-  background: light-dark(rgba(252,253,251,.88), color-mix(in srgb, var(--surface) 88%, transparent)); backdrop-filter: saturate(160%) blur(20px);
+  background: var(--surface);
 }
 .workspace-header-inner {
   display: flex; align-items: center; width: min(1440px, 100%); height: var(--header-height); gap: 12px;
@@ -1210,9 +1204,8 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
   position: sticky;
   top: 0;
   z-index: 40;
-  backdrop-filter: blur(14px);
-  background: rgba(244, 247, 245, .86);
-  border-bottom: 1px solid rgba(224, 230, 225, .7);
+  background: #f4f7f5;
+  border-bottom: 1px solid #e0e6e1;
 }
 
 .landing-header-inner {
