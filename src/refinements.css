@@ -203,3 +203,29 @@ form[aria-busy="true"] :disabled { cursor: wait; }
   .list-toolbar > .button { min-height: 44px; }
 }
 @media print { .section-card, .stat-card { box-shadow: none; } .skim-toggle-group, .notification-wrapper, .contact-actions, .skip-link { display: none; } }
+
+/* Keep content surfaces opaque when light-dark() is unavailable. */
+@supports not (background: light-dark(white, black)) {
+  .auth-card, .auth-form input:not([type="checkbox"]), .auth-form select,
+  .modal, .modal-header, .global-search, .search-result, .workspace-switcher, .workspace-tile,
+  .section-card, .stat-card, .checkup-purpose-card, .directory-card, .prescription-row,
+  .medication-editor, .settings-panel, .pet-summary-grid > div, .visit-card, .queue-card,
+  .queue-summary > div, .reminder-summary > div, .reminder-card, .space-card,
+  .month-calendar-card, .selected-day-panel, .agenda-card-body, .patient-schedule-entry,
+  .platform-header, .platform-stats article, .platform-panel, .onboarding-card,
+  .public-admission-card, .visit-service-card, .visit-service-select, .visit-service-footer,
+  .travel-certificate-preview, .public-certificate-document,
+  .checkup-form .form-section, .field input, .field select, .field textarea,
+  .checkup-form .field input:not([type="checkbox"]), .checkup-form .field select,
+  .checkup-form .field textarea, .platform-field input, .platform-field select,
+  .platform-list-heading input, .platform-list-heading select,
+  .onboarding-fields input:not([type="checkbox"]), .onboarding-fields select,
+  .onboarding-fields textarea, .settings-form input {
+    background-color: var(--surface);
+  }
+
+  .workspace-tile.current, .search-result:hover, .search-result:active,
+  .checkup-purpose-card:hover, .checkup-purpose-card:active {
+    background-color: var(--surface-soft);
+  }
+}
