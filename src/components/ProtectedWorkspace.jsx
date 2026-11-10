@@ -9,7 +9,9 @@ import OwnerOnboardingGate from './OwnerOnboardingGate'
 export default function ProtectedWorkspace() {
   const { access, user } = useAuth()
   const location = useLocation()
-  const returnTo = safeReturnTo(`${location.pathname}${location.search}${location.hash}`)
+  // Search fragments can contain personal data; do not promote them into the
+  // sign-in URL's HTTP query string when a session is absent or expires.
+  const returnTo = safeReturnTo(location.pathname === '/search' ? '/search' : `${location.pathname}${location.search}${location.hash}`)
   if (access === 'loading') return <AuthLoading />
   if (access === 'error') return <AuthAccessError />
   if (access === 'signed-out') return <Navigate to={`/sign-in?next=${encodeURIComponent(returnTo)}`} replace />
@@ -17,5 +19,6 @@ export default function ProtectedWorkspace() {
   if (access === 'expired') return <Navigate to="/subscription" replace />
   if (access === 'platform-admin') return <Navigate to="/admin" replace />
   if (access !== 'approved') return <Navigate to={`/access-pending?next=${encodeURIComponent(returnTo)}`} replace />
-  return <ClinicDataProvider key={user.id}><OwnerOnboardingGate><AppShell /></OwnerOnboardingGate></ClinicDataProvider>
+  const searchWorkspace = location.pathname === '/search' || location.pathname.startsWith('/records/')
+  return <ClinicDataProvider key={`${user.id}:${searchWorkspace ? 'search' : 'workspace'}`} searchWorkspace={searchWorkspace}><OwnerOnboardingGate><AppShell /></OwnerOnboardingGate></ClinicDataProvider>
 }

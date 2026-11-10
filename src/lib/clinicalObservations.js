@@ -3,6 +3,8 @@ export const clinicalObservationFields = [
   { name: 'subjective', label: 'History' },
   { name: 'objective', label: 'Clinical Assessment' },
   { name: 'plan', label: 'Treatment Plan' },
+  { name: 'laboratoryRequests', label: 'Laboratory Requests', storageName: 'laboratory_requests', maxLength: 10000, span: true },
+  { name: 'laboratoryResults', label: 'Laboratory Results', storageName: 'laboratory_results', maxLength: 10000, span: true },
 ]
 
 export function clinicalAssessmentText(record) {
@@ -10,5 +12,8 @@ export function clinicalAssessmentText(record) {
 }
 
 export function clinicalObservationRows(record) {
-  return clinicalObservationFields.map(({ name, label }) => [label, name === 'objective' ? clinicalAssessmentText(record) : record[name]])
+  return clinicalObservationFields.flatMap(({ name, label, storageName }) => {
+    const value = name === 'objective' ? clinicalAssessmentText(record) : record[name] ?? record[storageName]
+    return storageName && !(typeof value === 'string' && value.trim()) ? [] : [[label, value]]
+  })
 }

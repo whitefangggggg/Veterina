@@ -47,7 +47,17 @@
     "test:subscription-api": "node scripts/check-subscription-api.mjs",
     "test:subscription-concurrency": "node scripts/check-subscription-concurrency.mjs",
     "test:api": "node scripts/check-supabase.mjs",
-    "test:ui-refinements": "node scripts/check-ui-refinements.mjs"
+    "test:ui-refinements": "node scripts/check-ui-refinements.mjs",
+    "test:dashboard": "node scripts/check-dashboard.mjs",
+    "test:stock-expiry": "node scripts/check-stock-expiry.mjs",
+    "test:admission-tracking": "node scripts/check-admission-tracking.mjs",
+    "test:admission-tracking-database": "node scripts/check-admission-tracking-database.mjs",
+    "test:admission-tracking-migration": "node scripts/check-admission-tracking-migration.mjs",
+    "test:admission-tracking-concurrency": "node scripts/check-admission-tracking-concurrency.mjs",
+    "test:global-search": "node scripts/check-clinic-search.mjs",
+    "test:global-search-migration": "node scripts/check-clinic-search-migration.mjs",
+    "test:global-search-database": "node scripts/check-clinic-search-database.mjs",
+    "test:global-search-scale": "node scripts/check-clinic-search-scale.mjs"
   },
   "dependencies": {
     "@daypicker/react": "^10.0.1",

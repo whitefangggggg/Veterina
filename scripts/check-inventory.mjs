@@ -139,6 +139,18 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.locator('.inventory-record').filter({ hasText: 'Empty stock item' })).toContainText('0 unit')
   assert.equal(raw.inventory_movements.length, 2, 'Zero opening stock wrote a movement')
+  for (const colorScheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' })
+    for (const width of [320, 375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 })
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Inventory cards overflow in ${colorScheme} at ${width}px`)
+      await page.screenshot({ path: `test-artifacts.local/inventory-cards-${colorScheme}-${width}.png`, fullPage: true })
+    }
+  }
+  const firstCard = page.locator('.inventory-record').first()
+  await firstCard.locator('summary').click()
+  await expect(firstCard.locator('.ledger-details')).toHaveAttribute('open', '')
+  await expect(firstCard.locator('.ledger-details')).toContainText('PARTIAL-INITIAL')
   assert.deepEqual(errors, [])
   console.log('PASS initial whole/fractional/zero stock, quantity validation, owner/staff creation, lost acknowledgement retry, notes edit/reload, ledger balances and mobile layouts (intercepted API)')
 } finally {

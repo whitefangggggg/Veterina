@@ -13,6 +13,8 @@ const CompleteAccount = lazy(() => import('./pages/CompleteAccount'))
 const PlatformAdmin = lazy(() => import('./pages/PlatformAdmin'))
 const Subscription = lazy(() => import('./pages/Subscription'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const ClinicSearch = lazy(() => import('./pages/ClinicSearch'))
+const ClinicSearchRecord = lazy(() => import('./pages/ClinicSearchRecord'))
 const Queue = lazy(() => import('./pages/Queue'))
 const Admissions = lazy(() => import('./pages/Admissions'))
 const AdmissionDetail = lazy(() => import('./pages/AdmissionDetail'))
@@ -20,6 +22,7 @@ const Patients = lazy(() => import('./pages/Patients'))
 const PetDetail = lazy(() => import('./pages/PetDetail'))
 const TravelCertificates = lazy(() => import('./pages/TravelCertificates'))
 const PublicTravelCertificate = lazy(() => import('./pages/PublicTravelCertificate'))
+const PublicAdmissionTracking = lazy(() => import('./pages/PublicAdmissionTracking'))
 const Appointments = lazy(() => import('./pages/Operations').then((module) => ({ default: module.Appointments })))
 const Inventory = lazy(() => import('./pages/Stock').then((module) => ({ default: module.Inventory })))
 const Suppliers = lazy(() => import('./pages/Stock').then((module) => ({ default: module.Suppliers })))
@@ -61,6 +64,7 @@ const router = createBrowserRouter([{ element: <RecoveryRedirect />, errorElemen
   },
   { path: '/sign-in', element: load(<Auth key="sign-in" />) },
   { path: '/travel-certificate', element: load(<PublicTravelCertificate />) },
+  { path: '/track-admission', element: load(<PublicAdmissionTracking />) },
   { path: '/admin/sign-in', element: load(<Auth key="admin-sign-in" mode="admin" />) },
   { path: '/admin', element: load(<PlatformAdmin />) },
   { path: '/subscription', element: load(<Subscription />) },
@@ -75,6 +79,8 @@ const router = createBrowserRouter([{ element: <RecoveryRedirect />, errorElemen
     element: <ProtectedWorkspace />,
     children: [
       { path: '/dashboard', element: load(<Dashboard />) },
+      { path: '/search', element: load(<ClinicSearch />) },
+      { path: '/records/:source/:recordId', element: load(<ClinicSearchRecord />) },
       { path: '/queue', element: load(<Queue />) },
       { path: '/admissions', element: load(<Admissions />) },
       { path: '/admissions/:admissionId', element: load(<AdmissionDetail />) },

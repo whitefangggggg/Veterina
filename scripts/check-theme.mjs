@@ -118,17 +118,9 @@ const checkReadable = async (page) => {
   assert.deepEqual(failures, [], `Unreadable text on ${page.url()}`)
 }
 
-async function checkHeroTextContrast(page, theme) {
-  const box = await page.locator('.glance-metrics > div').first().boundingBox()
-  const pixel = await page.screenshot({ clip: { x: Math.floor(box.x + box.width / 2), y: Math.floor(box.y + 8), width: 1, height: 1 } })
-  const background = await page.evaluate(async (base64) => {
-    const picture = new Image(); picture.src = `data:image/png;base64,${base64}`; await picture.decode()
-    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1
-    const context = canvas.getContext('2d'); context.drawImage(picture, 0, 0)
-    return '#' + [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map((value) => value.toString(16).padStart(2, '0')).join('')
-  }, pixel.toString('base64'))
-  await expect(page.locator('.glance-metrics span').first()).toHaveCSS('color', 'rgb(255, 255, 255)')
-  assert.ok(contrast('#ffffff', background) >= 4.5, `${theme.name}: hero metric text contrast on rendered background ${background}`)
+async function checkDashboardContrast(page, theme) {
+  await expect(page.locator('.shift-logo')).toHaveCSS('color', rgb(theme.color))
+  await checkReadable(page)
 }
 
 try {
@@ -145,8 +137,8 @@ try {
       const actions = page.locator('.spacious-content .button-primary:visible')
       if (await actions.count()) await checkBrandFill(actions.first(), theme)
       if (route === '/dashboard') {
-        await expect(page.locator('.home-hero')).toHaveCSS('color', 'rgb(255, 255, 255)')
-        assert.ok((await page.locator('.home-hero').evaluate((element) => getComputedStyle(element).backgroundImage)).includes(rgb(theme.color)), 'Hero gradient must use the selected clinic color')
+        await expect(page.locator('.shift-logo')).toHaveCSS('color', rgb(theme.color))
+        await expect(page.locator('.home-hero')).toHaveCount(0)
         await expect(page.getByRole('heading', { name: 'Choose a workspace', exact: true })).toHaveCount(0)
         await page.getByRole('button', { name: 'Open workspaces', exact: true }).click()
         await expect(page.locator('.workspace-icon').first()).toHaveCSS('color', rgb(theme.color))
@@ -212,8 +204,8 @@ try {
     await checkBrandFill(page.getByRole('dialog', { name: 'Install Veterina', exact: true }).getByRole('button', { name: 'Done', exact: true }), theme)
     await page.keyboard.press('Escape')
     await page.getByRole('link', { name: 'Veterina home', exact: true }).click()
-    await expect(page.locator('.home-hero')).toBeVisible()
-    await checkHeroTextContrast(page, theme)
+    await expect(page.locator('.shift-command-bar')).toBeVisible()
+    await checkDashboardContrast(page, theme)
     await page.goto(`${app.origin}/patients/${patient}`)
   }
   console.log('PASS all six palettes: refreshed theme, global PWA/dialogs, controls, contrast, hover, active, focus, selected and disabled states')
@@ -410,7 +402,7 @@ try {
   await unavailable.page.getByRole('radio', { name: /^Dark/ }).check()
   await checkMode(unavailable.page, 'dark')
   await unavailable.page.getByRole('link', { name: 'Veterina home', exact: true }).click()
-  await expect(unavailable.page.locator('.home-hero')).toBeVisible()
+  await expect(unavailable.page.locator('.shift-command-bar')).toBeVisible()
   await checkMode(unavailable.page, 'dark')
   await unavailable.context.close()
   const bootstrap = await scenario('public')

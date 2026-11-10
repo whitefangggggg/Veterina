@@ -16,6 +16,12 @@ const visits = [
 const ids = (filters) => filterClinicalHistory(visits, filters, 'Asia/Manila').map((visit) => visit.id)
 
 describe('clinical history search and filters', () => {
+  it('finds records by requested laboratory work and result text', () => {
+    const records = [{ ...visits[0], laboratoryRequests: 'CBC and urinalysis', laboratoryResults: 'No hemoparasites detected' }, visits[1]]
+    for (const query of ['urinalysis', 'hemoparasites', 'CBC detected']) {
+      expect(filterClinicalHistory(records, { query }, 'Asia/Manila').map((record) => record.id)).toEqual(['recent'])
+    }
+  })
   const services = [
     { id: 'recent', service: 'Grooming', arrivedAt: '2026-10-17T18:00:00Z', status: 'completed', veterinarian: 'Dr. Lee', serviceNotes: 'Bath and trim', notes: 'Gentle handling', queueNumber: 'Q-003' },
     { id: 'historic', service: 'Nail trim', arrivedAt: '2026-10-17T17:10:00Z', status: 'record_only', recordingPurpose: 'record_only', veterinarian: 'Dok sa Bukid' },

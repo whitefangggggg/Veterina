@@ -1,4 +1,4 @@
-const clinicPath = /^\/(dashboard|queue|patients|appointments|reminders|inventory|suppliers|reports|settings|knowledge|clinic-setup|subscription)(\/|$)/
+const clinicPath = /^\/(dashboard|queue|patients|appointments|reminders|inventory|suppliers|reports|settings|knowledge|clinic-setup|subscription|search|records|admissions|travel-certificates)(\/|$)/
 
 // Only return to known clinic routes. Reject protocol-relative and encoded URLs.
 export function safeReturnTo(value) {
@@ -7,6 +7,7 @@ export function safeReturnTo(value) {
     const url = new URL(value, 'https://veterina.invalid')
     if (!value.startsWith('/') || url.origin !== 'https://veterina.invalid') return '/dashboard'
     if (!clinicPath.test(url.pathname) || /%|\/\//.test(url.pathname)) return '/dashboard'
+    if (url.pathname === '/search') return '/search'
     return `${url.pathname}${url.search}${url.hash}`
   } catch {
     return '/dashboard'

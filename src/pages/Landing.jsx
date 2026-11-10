@@ -23,7 +23,7 @@ export default function Landing() {
       <header className="vt-header">
         <div className="vt-header-inner">
           <a className="vt-brand" href="#top" aria-label="Veterina home"><img src="/brand/veterina-logo.png" alt="Veterina" width="180" height="60" /><span>THE CLINIC WORKSPACE</span></a>
-          <nav aria-label="Main navigation"><a href="#workspace">The platform</a><a href="#care">How it works</a></nav>
+          <nav aria-label="Main navigation"><a href="#workspace">The platform</a><a href="#care">How it works</a><Link to="/track-admission">Track admission</Link></nav>
           <div className="vt-header-actions"><Link className="vt-signin" to="/sign-in">Sign in</Link><Link className="vt-nav-start" to="/create-account">Get started <ArrowUpRight size={17} /></Link></div>
         </div>
       </header>
@@ -53,7 +53,7 @@ export default function Landing() {
         </section>
         <section className="vt-closing"><ClinicDoodle kind="heart" className="vt-margin-heart" /><div><p className="vt-eyebrow">MEET YOUR CLINIC’S NEXT CHAPTER</p><h2>More connected work.<br />More considered care.</h2></div><div><Link className="vt-button" to="/create-account">Get started with Veterina <ArrowUpRight size={20} /></Link><p>Already have an account? <Link to="/sign-in">Sign in</Link></p></div></section>
       </main>
-      <footer className="vt-footer"><img src="/brand/veterina-logo.png" alt="Veterina" width="150" height="50" /><p>Veterinary care, better connected.</p><span>© {new Date().getFullYear()} Veterina</span></footer>
+      <footer className="vt-footer"><img src="/brand/veterina-logo.png" alt="Veterina" width="150" height="50" /><p>Veterinary care, better connected.</p><Link to="/track-admission">Track admission</Link><span>© {new Date().getFullYear()} Veterina</span></footer>
     </div>
   )
 }

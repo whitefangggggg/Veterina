@@ -14,6 +14,8 @@ export default function Patients() {
   const [species, setSpecies] = useState('All')
   const [status, setStatus] = useState('All')
   const [modal, setModal] = useState(null)
+  const hasFilters = Boolean(query || species !== 'All' || status !== 'All')
+  const resetFilters = () => { setQuery(''); setSpecies('All'); setStatus('All') }
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -41,11 +43,12 @@ export default function Patients() {
 
       <div className="list-toolbar">
         <label className="table-search"><MagnifyingGlass size={18} /><input aria-label="Search patients and owners" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pet, owner, phone or record number..." /></label>
-        <div className="filter-pills">
-          {['All', 'Dog', 'Cat', 'Bird', 'Rabbit', 'Other'].map((value) => <button key={value} onClick={() => setSpecies(value)} className={species === value ? 'active' : ''}>{value}</button>)}
+        <div className="filter-pills" role="group" aria-label="Patient species">
+          {['All', 'Dog', 'Cat', 'Bird', 'Rabbit', 'Other'].map((value) => <button key={value} onClick={() => setSpecies(value)} aria-pressed={species === value} className={species === value ? 'active' : ''}>{value}</button>)}
         </div>
-        <span className="result-count">{filtered.length} patient{filtered.length === 1 ? '' : 's'}</span>
+        <span className="result-count" role="status">{filtered.length} patient{filtered.length === 1 ? '' : 's'}</span>
         <SelectField aria-label="Filter patient status" value={status} onChange={(event) => setStatus(event.target.value)}>{['All', 'Active', 'Inactive', 'Deceased'].map((value) => <option key={value} value={value}>{value === 'All' ? 'All patient statuses' : value}</option>)}</SelectField>
+        {hasFilters && <button className="button button-secondary small-button" onClick={resetFilters}>Clear filters</button>}
       </div>
 
       {filtered.length ? (
@@ -73,7 +76,7 @@ export default function Patients() {
           })}
         </div>
       ) : (
-        <EmptyState icon={PawPrint} title="No matching patients" description="Try a different search or register a new pet." />
+        <EmptyState icon={PawPrint} title={hasFilters ? 'No matching patients' : 'No patients registered yet'} description={hasFilters ? 'Change your search or clear the filters to see all patients.' : 'Add an owner, then register their pet to start a patient record.'} />
       )}
 
       <OwnerDirectory />

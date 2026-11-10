@@ -51,6 +51,7 @@ export function normalizeClinicData(raw, now = new Date()) {
     const vital = get('visit_vitals').filter((entry) => entry.visit_id === row.id).sort((a, b) => b.measured_at.localeCompare(a.measured_at))[0] || {}
     const admission = get('admissions').find((entry) => entry.visit_id === row.id)
     return { ...row, ...careMetadata('visit_id', row.id), admissionId: admission?.id, petId: row.pet_id, type: row.visit_type, complaint: row.chief_complaint, diagnosis: row.diagnosis_summary, clinicalNotes: row.clinical_notes || '',
+      laboratoryRequests: row.laboratory_requests || '', laboratoryResults: row.laboratory_results || '',
       visitedAt: row.visited_at, serviceName: row.service_name || '', serviceTypeId: row.service_type_id || '', cardColor: /^#[0-9a-f]{6}$/i.test(row.card_color) ? row.card_color.toLowerCase() : null, followUpDate: row.follow_up_date,
       followUpScheduledDate: row.follow_up_scheduled_date, followUpArrivedAt: row.follow_up_arrived_at, followUpVisitId: row.follow_up_visit_id, followUpQueueId: row.follow_up_queue_id,
       recordingPurpose: row.recording_purpose || 'queue', veterinarianId: row.attending_veterinarian_id,

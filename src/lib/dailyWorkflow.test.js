@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appointmentSource, buildDailyWork, buildPatientTimeline, dateInClinic, isClinicDate, queueSource, stockAttention } from './dailyWorkflow'
+import { appointmentSource, buildDailyWork, buildPatientTimeline, dateInClinic, isClinicDate, queueSource, stockAttention, stockExpiryAlerts } from './dailyWorkflow'
 
 describe('patient care timeline', () => {
   const data = {
@@ -83,6 +83,33 @@ describe('daily action board', () => {
 
 describe('stock watch', () => {
   const item = (overrides) => ({ id: 'i', name: 'Medicine', isActive: true, quantity: 10, minimumStock: 5, batches: [], ...overrides })
+  it('warns for each held batch through day 30, retaining same-day validity and stable links', () => {
+    const alerts = stockExpiryAlerts([item({ id: 'item/a', batches: [
+      { id: 'day-30', expiration_date: '2026-12-09', quantity: 0.5 },
+      { id: 'expired', expiration_date: '2026-11-08', quantity: 1 },
+      { id: 'today/a', expiration_date: '2026-11-09', quantity: 1 },
+      { id: 'tomorrow', expiration_date: '2026-11-10', quantity: 1 },
+      { id: 'later', expiration_date: '2026-12-10', quantity: 1 },
+    ] })], '2026-11-09')
+    expect(alerts.map(({ days, label }) => [days, label])).toEqual([
+      [-1, 'Expired 1 day ago'], [0, 'Expires today'], [1, 'Expires tomorrow'], [30, 'Expires in 30 days'],
+    ])
+    expect(alerts[0].status).toBe('expired')
+    expect(alerts[1].href).toBe('/inventory?attention=expiring#inventory-batch-today%2Fa')
+  })
+  it('ignores depleted, undated, invalid and archived-item lots; retains physical stock in archived batches', () => {
+    expect(stockExpiryAlerts([item({ batches: [
+      { id: 'empty', expiration_date: '2026-11-08', quantity: 0 },
+      { id: 'undated', quantity: 2 }, { id: 'invalid', expiration_date: '2026-02-30', quantity: 2 },
+      { id: 'held', expiration_date: '2026-11-10', quantity: 1, is_active: false },
+    ] }), item({ id: 'archived', isActive: false, batches: [{ expiration_date: '2026-11-08', quantity: 2 }] })], '2026-11-09').map((alert) => alert.batch.id)).toEqual(['held'])
+  })
+  it('uses calendar days across daylight-saving boundaries and refreshes classification at midnight', () => {
+    const inventory = [item({ batches: [{ id: 'lot', expiration_date: '2026-03-09', quantity: 2 }] })]
+    expect(stockExpiryAlerts(inventory, '2026-03-08')[0]).toMatchObject({ days: 1, status: 'expiring' })
+    expect(stockExpiryAlerts(inventory, '2026-03-09')[0].label).toBe('Expires today')
+    expect(stockExpiryAlerts(inventory, '2026-03-10')[0]).toMatchObject({ days: -1, status: 'expired' })
+  })
   it('checks every stocked batch, including later expiries hidden by an already expired lot', () => {
     const [attention] = stockAttention([item({ batches: [
       { expiration_date: '2026-10-19', quantity: 1 }, { expiration_date: '2026-11-19', quantity: 2 },

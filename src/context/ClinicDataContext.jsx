@@ -6,7 +6,7 @@ import { useAuth } from './AuthContext'
 import { ClinicDataContext } from './ClinicContext'
 import { clinicThemeStyle } from '../lib/clinicPersonalization'
 
-export function ClinicDataProvider({ children }) {
+export function ClinicDataProvider({ children, searchWorkspace = false }) {
   const { user, refreshAccess, signOut } = useAuth()
   const [raw, setRaw] = useState(null)
   const [error, setError] = useState('')
@@ -20,7 +20,15 @@ export function ClinicDataProvider({ children }) {
     const current = ++request.current
     setRefreshing(true)
     try {
-      const result = await fetchClinicData(supabase)
+      let result
+      if (searchWorkspace) {
+        const [settings, profile] = await Promise.all([
+          supabase.from('clinic_settings').select('*').limit(1),
+          supabase.from('profiles').select('id,clinic_id,full_name,role,is_active,is_veterinarian').eq('id', user.id).limit(1),
+        ])
+        if (settings.error || profile.error) throw settings.error || profile.error
+        result = { clinic_settings: settings.data, profiles: profile.data }
+      } else result = await fetchClinicData(supabase)
       if (!mounted.current || current !== request.current) return false
       if (!result.profiles.some((profile) => profile.id === user.id && profile.is_active)) {
         await refreshAccess()
@@ -35,7 +43,7 @@ export function ClinicDataProvider({ children }) {
     } finally {
       if (mounted.current && current === request.current) setRefreshing(false)
     }
-  }, [user.id, refreshAccess])
+  }, [user.id, refreshAccess, searchWorkspace])
 
   useEffect(() => {
     mounted.current = true
@@ -71,7 +79,7 @@ export function ClinicDataProvider({ children }) {
     Object.entries(theme).forEach(([name, value]) => root.setProperty(name, value))
     return () => Object.keys(theme).forEach((name) => root.removeProperty(name))
   }, [themeColor, themeReady])
-  const value = { ...data, execute, reload, refreshing,
+  const value = { ...data, execute, reload, refreshing, searchWorkspace,
     manageKb: async (payload) => {
       const { data: result, error } = await supabase.rpc('manage_kb', { p_data: payload })
       if (error) throw new Error(clinicErrorMessage(error), { cause: error })

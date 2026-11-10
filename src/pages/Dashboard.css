@@ -1,0 +1,134 @@
+.command-dashboard { display: grid; gap: 12px; width: min(1540px, 100%); margin: 0 auto; padding: 16px 24px; }
+.command-dashboard :is(h1,h2,h3,p) { margin: 0; }
+.command-dashboard :is(h2,h3) { color: var(--ink); }
+.command-dashboard h2 { font-size: 14px; font-weight: 700; letter-spacing: -.15px; }
+.command-dashboard .text-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.shift-command-bar { display: flex; align-items: center; gap: 22px; height: 84px; padding: 14px 18px; border: 1px solid var(--brand-border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-subtle); }
+.shift-brand { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.shift-logo { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 13px; background: var(--brand-soft); color: var(--brand-ink); }
+.shift-logo img { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
+.shift-brand > div { min-width: 0; }
+.shift-brand h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 21px; font-weight: 700; letter-spacing: -.5px; }
+.shift-brand p { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shift-context { display: grid; justify-items: start; gap: 5px; flex: none; }
+.shift-context time { font-size: 11px; color: var(--muted); }
+.shift-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.shift-actions .button { min-height: 40px; font-size: 12px; padding: 0 12px; }
+.command-dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; height: clamp(420px, 52dvh, 570px); }
+.clinic-floor, .radar-card, .appointment-stream-card, .recent-patients-tray { min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-subtle); }
+.clinic-floor { display: flex; flex-direction: column; overflow: hidden; }
+.command-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.command-card-header .eyebrow { font-size: 9px; }
+.command-card-header h2 { margin-top: 3px; font-size: 18px; }
+.floor-lanes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 12px; min-height: 0; flex: 1; background: var(--surface-soft); }
+.floor-lane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.floor-lane > h3 { display: flex; align-items: center; justify-content: space-between; gap: 5px; min-height: 34px; padding: 0 4px 8px; font-size: 12px; }
+.floor-lane > h3 > span { display: grid; place-items: center; min-width: 21px; height: 21px; border-radius: 6px; color: var(--brand-strong-ink); background: var(--brand-soft); }
+.floor-lane-body { display: grid; align-content: start; gap: 8px; overflow-y: auto; padding: 2px 4px 6px; min-height: 0; overscroll-behavior: contain; }
+.floor-patient { display: grid; gap: 7px; padding: 11px; border: 1px solid var(--line); border-top: 3px solid var(--amber); border-radius: 10px; background: var(--surface); }
+.lane-in_progress .floor-patient { border-top-color: var(--brand-ink); }
+.lane-ready .floor-patient { border-top-color: var(--blue); }
+.command-patient { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.command-patient > div { min-width: 0; }
+.command-patient a { color: var(--ink); font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.command-patient small, .floor-patient > small { display: block; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.floor-patient > p { font-size: 12px; overflow-wrap: anywhere; }
+.floor-patient .button { min-height: 34px; padding: 6px 8px; font-size: 11px; white-space: normal; }
+.floor-zero { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 14px 24px; flex: 1; text-align: center; }
+.floor-zero .vt-pixel-patient { width: 130px; flex: none; margin: 0; }
+.floor-zero .vt-patient-toggle { font-size: 10px; color: var(--muted); }
+.floor-zero h3 { font-size: 17px; }
+.floor-zero p { max-width: 42ch; font-size: 13px; color: var(--muted); }
+.action-radar { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1.15fr); gap: 10px; min-height: 0; min-width: 0; }
+.radar-card { display: flex; flex-direction: column; overflow: hidden; }
+.radar-card > header { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.radar-card h2 { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.radar-card h2 svg { flex: none; color: var(--brand-ink); }
+.radar-card > header .text-link { font-size: 10px; }
+.radar-card-body { overflow-y: auto; min-height: 0; padding: 0 14px; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.radar-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; }
+.radar-row + .radar-row { border-top: 1px solid var(--line); }
+.radar-row > div:first-child { min-width: 0; }
+.radar-row > div:first-child > a { display: block; color: var(--ink); font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+.radar-row small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.chart-assignee { font-size: 10px; font-weight: 400; color: var(--muted); }
+.radar-row > button, .radar-inline-actions, .radar-stock-action { flex: none; }
+.radar-inline-actions { display: flex; align-items: center; gap: 12px; }
+.radar-inline-actions .vt-checkbox-label { gap: 6px; font-size: 11px; }
+.radar-inline-actions .vt-checkbox-control { width: 20px; height: 20px; }
+.radar-stock-action { display: grid; justify-items: end; gap: 4px; }
+.radar-stock-action .text-link { font-size: 10px; }
+.radar-stock-action .badge { font-size: 9px; }
+.command-dashboard .stock-expiry-summary { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 10px; font-weight: 650; }
+.stock-expiry-summary a { color: var(--brand-strong-ink); text-decoration: underline; overflow-wrap: anywhere; }
+.command-empty { display: flex; align-items: center; gap: 6px; padding: 12px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.command-empty svg { flex: none; color: var(--brand-ink); }
+.command-inline-error { color: var(--rose); font-size: 11px; line-height: 1.5; }
+.command-dashboard .command-feedback { padding: 8px 0; font-size: 11px; color: var(--brand-strong-ink); }
+.command-feedback:empty { display: none; }
+.appointment-stream-card { height: 102px; display: flex; flex-direction: column; padding: 10px 16px; }
+.appointment-stream-card > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.appointment-stream { display: flex; align-items: stretch; gap: 10px; min-width: 0; min-height: 0; overflow-x: auto; padding: 2px 3px 6px; scroll-snap-type: x proximity; }
+.stream-appointment { display: flex; align-items: center; gap: 10px; flex: 0 0 360px; max-width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-left: 3px solid var(--brand-ink); border-radius: 9px; background: var(--surface-soft); scroll-snap-align: start; }
+.stream-appointment time { flex: none; font-size: 10px; font-weight: 700; color: var(--brand-strong-ink); }
+.stream-appointment > span:not(.pet-sticker):not(.badge) { flex: 1; min-width: 0; }
+.stream-appointment strong { display: block; font-size: 12px; }
+.stream-appointment small { display: block; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--muted); }
+.stream-appointment .badge { font-size: 9px; }
+.stream-appointment .pet-sticker-small { width: 30px; height: 30px; }
+.recent-patients-tray { display: flex; align-items: center; gap: 18px; min-height: 62px; padding: 8px 16px; }
+.recent-patients-tray > div:first-child { flex: none; }
+.recent-patients-tray > div:first-child > small { display: block; font-size: 10px; color: var(--muted); }
+.recent-patient-chips { display: flex; flex: 1; min-width: 0; gap: 8px; overflow-x: auto; padding: 3px; }
+.recent-patient-chip { display: flex; align-items: center; gap: 7px; flex: none; max-width: 190px; padding: 5px 10px; border: 1px solid var(--brand-border); border-radius: 11px; background: var(--brand-soft); }
+.recent-patient-chip .pet-sticker-small { width: 28px; height: 28px; border-radius: 9px; }
+.recent-patient-chip > span:last-child { min-width: 0; }
+.recent-patient-chip strong { display: block; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.recent-patient-chip small { display: block; font-size: 9px; color: var(--muted); overflow-wrap: anywhere; }
+.recent-patients-tray > button { flex: none; font-size: 10px; }
+@media (hover: hover) { .floor-patient:hover, .stream-appointment:hover, .recent-patient-chip:hover { border-color: var(--brand-ink); } }
+@media (max-width: 1100px) and (min-width: 1024px) { .shift-command-bar { gap: 12px; padding-inline: 12px; } .shift-logo { display: none; } .shift-actions .button { padding-inline: 9px; } .radar-inline-actions { gap: 6px; } }
+@media (max-width: 1023px) {
+  .command-dashboard { padding: 16px; }
+  .shift-command-bar { height: auto; min-height: 84px; flex-wrap: wrap; gap: 12px; }
+  .shift-actions { flex: 1 0 100%; }
+  .shift-actions .button { flex: 1; min-height: 44px; }
+  .command-dashboard-grid { grid-template-columns: minmax(0, 1fr); height: auto; gap: 14px; }
+  .clinic-floor { min-height: 290px; }
+  .floor-lane-body { max-height: 360px; }
+  .action-radar { grid-template-rows: none; }
+  .radar-card-body { max-height: 260px; }
+  .radar-card > header { padding: 12px 14px; }
+  .radar-row { min-height: 60px; }
+  .radar-card h2 { font-size: 13px; }
+  .radar-row small { font-size: 11px; }
+  .radar-inline-actions .vt-checkbox-label { min-height: 44px; }
+  .appointment-stream-card { height: 128px; }
+  .stream-appointment { flex-basis: 340px; }
+  .recent-patients-tray { flex-wrap: wrap; gap: 10px; }
+  .recent-patient-chips { flex: 1 0 100%; order: 3; }
+  .recent-patients-tray > button { margin-left: auto; min-height: 32px; }
+}
+@media (max-width: 520px) {
+  .command-dashboard { padding: 12px; gap: 12px; }
+  .shift-context { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+  .shift-brand h1 { font-size: 19px; }
+  .shift-brand p { font-size: 11px; }
+  .shift-actions { flex-wrap: wrap; }
+  .shift-actions .button { flex-basis: calc(50% - 4px); padding: 8px; white-space: normal; }
+  .floor-lanes { grid-template-columns: minmax(0, 1fr); }
+  .floor-lane-body { max-height: 300px; }
+  .floor-patient { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .floor-patient .command-patient { grid-column: 1 / -1; }
+  .floor-patient > p { grid-column: 1; }
+  .floor-patient > .button, .floor-patient > .text-link { grid-column: 2; grid-row: 2 / span 2; min-height: 44px; }
+  .radar-row { flex-wrap: wrap; }
+  .radar-inline-actions { margin-left: auto; }
+  .appointment-stream-card > header h2 { font-size: 12px; }
+  .appointment-stream-card > header .text-link { font-size: 10px; }
+  .stream-appointment { flex-basis: 100%; flex-wrap: wrap; gap: 6px; }
+  .stream-appointment small { max-width: 120px; }
+  .floor-zero { padding: 16px 12px; }
+  .floor-zero .button { white-space: normal; text-align: center; }
+}
+@media print { .command-dashboard .shift-actions, .command-dashboard .text-link { display: none; } .command-dashboard-grid { height: auto; } .radar-card-body, .floor-lane-body { overflow: visible; } }

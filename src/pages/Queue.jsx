@@ -22,6 +22,13 @@ export default function Queue() {
   const setHistoryDate = (value) => { const next = new URLSearchParams(searchParams); next.set('date', value); setSearchParams(next) }
   const [modal, setModal] = useState(null)
   const date = isClinicDate(searchParams.get('date')) ? searchParams.get('date') : today
+  const hasFilters = service !== 'All' || status !== 'Active' || date !== today
+  const resetFilters = () => {
+    setService('All')
+    const next = new URLSearchParams(searchParams)
+    next.delete('status'); next.delete('date')
+    setSearchParams(next)
+  }
   useEffect(() => {
     const timer = setInterval(() => { void reload() }, 30000)
     return () => clearInterval(timer)
@@ -38,6 +45,8 @@ export default function Queue() {
       <label>Service <SelectField aria-label="Queue service" value={service} onChange={(event) => setService(event.target.value)}><option>All</option><optgroup label="Workflow"><option value="checkup">Checkup</option><option value="vaccination">Vaccinations and Deworming</option><option value="maintenance">Maintenance</option></optgroup><optgroup label="Services">{[...serviceOptions].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</optgroup></SelectField></label>
       <label>Status <SelectField aria-label="Queue status" value={status} onChange={(event) => setStatus(event.target.value)}><option>Active</option>{Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option>All</option></SelectField></label>
       {showHistory && <label>History date <input aria-label="Queue history date" type="date" value={date} onChange={(event) => setHistoryDate(event.target.value)} /></label>}
+      {hasFilters && <button className="button button-secondary small-button" onClick={resetFilters}>Reset queue filters</button>}
+      <span className="result-count" role="status">{visible.length} arrival{visible.length === 1 ? '' : 's'}</span>
     </div>
     {showHistory && <p className="queue-hint">History shows entries finished on the selected date. Active arrivals remain visible across days.</p>}
     <div className="queue-list">{visible.map((entry) => {

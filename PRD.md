@@ -237,6 +237,13 @@ These are planning findings. Needs verification does not mean a hosted guarantee
 
 ## 8. Proposed upgrade backlog
 
+KAN-23 implements the global-search part of UPG-04: authenticated server search
+across allowlisted persisted clinic domains, grouped header suggestions, cursor
+pages, role-aware navigation and focused record views. Search/detail routes use
+bounded reads and preserve INV-01, INV-12 and INV-14. Broader clinical workspace
+startup/refresh loading, date windows and selective invalidation remain UPG-04
+work. See [the search release notes and verification](docs/kan-23-global-search.md).
+
 Priorities apply to future work: **P0** blocks the next production-ready release; **P1** follows foundations; **P2** requires discovery or a separate gate. Sequence by dependencies and clinic impact.
 
 | ID / priority | Outcome and scope | Acceptance criteria | Dependencies / proposed accountable role |

@@ -91,7 +91,9 @@ export function buildDailyWork(data, now = new Date()) {
   return { care, checkins, calls }
 }
 
-export function stockAttention(inventory, today, days = 30) {
+export const STOCK_EXPIRY_WARNING_DAYS = 30
+
+export function stockAttention(inventory, today, days = STOCK_EXPIRY_WARNING_DAYS) {
   const cutoff = new Date(`${today}T00:00:00Z`)
   cutoff.setUTCDate(cutoff.getUTCDate() + days)
   const lastDate = cutoff.toISOString().slice(0, 10)
@@ -103,4 +105,16 @@ export function stockAttention(inventory, today, days = 30) {
     return { item, expired, expiring, lowStock, priority: expired.length ? 0 : lowStock ? 1 : 2, href: `/inventory#inventory-${encoded(item.id)}` }
   }).filter((entry) => entry.lowStock || entry.expired.length || entry.expiring.length)
     .sort((a, b) => a.priority - b.priority || a.item.name.localeCompare(b.item.name))
+}
+
+// Every stocked lot matters, including later expiries behind an expired lot.
+// Date-only arithmetic follows the clinic date without DST or browser offsets.
+export function stockExpiryAlerts(inventory, today) {
+  return stockAttention(inventory, today).flatMap(({ item, expired, expiring }) => [...expired, ...expiring].map((batch) => {
+    const days = Math.round((Date.parse(`${batch.expiration_date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000)
+    const status = days < 0 ? 'expired' : 'expiring'
+    const label = days < 0 ? `Expired ${-days} day${days === -1 ? '' : 's'} ago` : days === 0 ? 'Expires today' : days === 1 ? 'Expires tomorrow' : `Expires in ${days} days`
+    return { item, batch, days, status, label,
+      href: `/inventory?attention=${status}#inventory-batch-${encoded(batch.id)}` }
+  })).sort((a, b) => a.batch.expiration_date.localeCompare(b.batch.expiration_date) || a.item.name.localeCompare(b.item.name) || String(a.batch.id).localeCompare(String(b.batch.id)))
 }

@@ -194,7 +194,7 @@ button:disabled, fieldset:disabled .button { opacity: .6; cursor: wait; transfor
 * { box-sizing: border-box; }
 html { min-width: 320px; background: light-dark(#f3f5f2, var(--surface-soft)); }
 body { margin: 0; min-width: 320px; min-height: 100vh; min-height: 100dvh; line-height: 1.45; }
-body.overlay-open { overflow: hidden; touch-action: none; }
+body.overlay-open { overflow: hidden; }
 button, input, select, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
@@ -561,7 +561,7 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
 .soap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .soap-grid div { padding: 12px; border: 1px solid light-dark(#e8ece8, var(--line)); border-radius: 9px; background: light-dark(#fbfcfb, var(--surface)); }
 .soap-grid strong { color: var(--brand-strong-ink); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
-.soap-grid p { white-space: pre-wrap; margin: 5px 0 0; color: light-dark(#54615c, var(--muted)); font-size: 13px; line-height: 1.55; }
+.soap-grid p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 5px 0 0; color: light-dark(#54615c, var(--muted)); font-size: 13px; line-height: 1.55; }
 .follow-up-note { display: flex; align-items: center; gap: 7px; margin-top: 12px; padding: 9px 11px; border-radius: 8px; color: var(--blue); background: var(--blue-soft); font-size: 13px; font-weight: 600; }
 .record-sidebar .section-card { padding: 18px; }
 .record-sidebar .section-card > h2 { margin-bottom: 14px; font-size: 14px; }
@@ -756,13 +756,6 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
   .reminder-due, .reminder-actions { grid-column: 2; padding-left: 0; border-left: 0; }
   .reminder-actions { display: flex; gap: 8px; width: 100%; }
   .reminder-actions .button { flex: 1; min-height: 44px; }
-  .home-hero {
-    grid-template-columns: 1fr;
-    min-height: auto;
-    gap: 28px;
-    padding: 40px max(24px, var(--safe-left)) 40px max(24px, var(--safe-right));
-  }
-  .today-glance { width: 100%; }
   .space-card-grid { grid-template-columns: repeat(2,1fr); }
   .flow-calendar-layout { grid-template-columns: 1fr; }
   .selected-day-panel { min-height: 0; }
@@ -1012,46 +1005,9 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
 .pet-sticker-large { width: 72px; height: 72px; border-radius: 21px; }
 
 /* Home launchpad */
-.home-page { width: 100%; }
-.home-hero {
-  display: grid; grid-template-columns: minmax(0,1.1fr) minmax(400px,.9fr); min-height: 420px; gap: 40px;
-  padding: 56px max(36px, calc((100vw - 1280px)/2)); color: #fff;
-  background:
-    radial-gradient(circle at 12% 15%, color-mix(in srgb, var(--brand-soft) 20%, transparent), transparent 34%),
-    radial-gradient(circle at 88% 85%, color-mix(in srgb, var(--brand-soft) 12%, transparent), transparent 28%),
-    linear-gradient(145deg, color-mix(in srgb, var(--brand-dark) 85%, #000) 0%, var(--brand-dark) 55%, var(--brand) 100%);
-}
-.home-greeting { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
-.hero-kicker {
-  display: inline-flex; align-items: center; width: fit-content; gap: 6px; padding: 6px 11px;
-  border-radius: 999px; color: var(--brand-ink); background: var(--brand-soft); font-size: 11px; font-weight: 700;
-  letter-spacing: .5px; text-transform: uppercase;
-}
-.home-greeting .hero-kicker { color: #ffffff; background: rgba(255,255,255,.12); }
-.home-greeting h1 { margin: 16px 0 12px; color: #fff; font-size: clamp(36px, 4.5vw, 56px); font-weight: 650; line-height: 1.06; letter-spacing: -1.8px; }
-.home-greeting h1 span { color: #ffffff; }
-.home-greeting > p { max-width: 420px; margin: 0; color: #ffffff; font-size: 16px; line-height: 1.55; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
 .roomy-button { min-height: 46px; padding: 0 18px; border-radius: 12px; font-size: 14px; }
 .button-glass { border-color: rgba(255,255,255,.2); color: #fff; background: rgba(255,255,255,.1); backdrop-filter: blur(10px); }
 .button-glass:hover { background: rgba(255,255,255,.18); }
-.today-glance {
-  align-self: center; padding: 24px; border: 1px solid rgba(255,255,255,.16); border-radius: 20px;
-  background: color-mix(in srgb, var(--brand-dark) 60%, transparent); box-shadow: 0 22px 50px rgba(9,31,24,.16); backdrop-filter: blur(18px);
-}
-.glance-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
-.glance-heading > span { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 14px; font-weight: 650; }
-.glance-heading a { display: flex; align-items: center; gap: 4px; color: #ffffff; font-size: 12px; font-weight: 620; }
-.glance-metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 18px 0; }
-.glance-metrics div { display: flex; flex-direction: column; padding: 14px; border-radius: 12px; background: rgba(255,255,255,.06); }
-.glance-metrics strong { font-size: 24px; font-weight: 650; }
-.glance-metrics span { color: #ffffff; font-size: 12px; margin-top: 2px; }
-.glance-label { display: block; margin: 0 0 8px; color: #ffffff; font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
-.next-patients > a { display: grid; grid-template-columns: 48px 38px minmax(0,1fr) auto; align-items: center; gap: 10px; min-height: 60px; border-top: 1px solid rgba(255,255,255,.12); }
-.next-patients time { color: #ffffff; font-size: 12px; font-weight: 600; }
-.next-patients a > span:nth-child(3) { display: flex; flex-direction: column; gap: 2px; }
-.next-patients strong { color: #fff; font-size: 13px; font-weight: 620; }
-.next-patients small { color: #ffffff; font-size: 12px; }
 .spaces-section { width: min(1280px,100%); margin: 0 auto; padding: 48px 36px 72px; }
 .spaces-heading { display: flex; justify-content: space-between; margin-bottom: 22px; }
 .spaces-heading h2 { margin: 6px 0 5px; color: var(--ink); font-size: 26px; font-weight: 650; letter-spacing: -.5px; }
@@ -1196,8 +1152,6 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
 
 @media (max-width: 1100px) {
   .flow-calendar-layout { grid-template-columns: minmax(0, 1fr); }
-  .home-hero { grid-template-columns: minmax(0, 1fr); }
-  .today-glance { width: 100%; min-width: 0; }
   .space-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {
@@ -1219,15 +1173,7 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
     border-radius: 20px;
   }
   .workspace-tile { min-height: 72px; }
-  .home-hero { min-height: auto; gap: 28px; padding: 36px max(16px, var(--safe-left)) 36px max(16px, var(--safe-right)); }
-  .home-greeting { min-width: 0; overflow-wrap: anywhere; }
   .space-card-grid { grid-template-columns: minmax(0, 1fr); }
-  .home-greeting h1 { font-size: 36px; letter-spacing: -1.3px; }
-  .hero-actions { width: 100%; }
-  .hero-actions .button { flex: 1; min-height: 46px; padding: 0 12px; }
-  .glance-metrics div { padding: 12px; }
-  .next-patients > a { grid-template-columns: 44px 38px minmax(0,1fr); min-height: 56px; }
-  .next-patients .badge { display: none; }
   .spaces-section { padding: 32px max(16px, var(--safe-left)) 56px max(16px, var(--safe-right)); }
   .space-card { min-height: 160px; }
   .appointments-page { padding: 24px max(14px, var(--safe-left)) 48px max(14px, var(--safe-right)); }
@@ -2061,24 +2007,10 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
 :target { scroll-margin-top: 100px; }
 
 /* Daily workflow panels share the existing clinic workspace styling. */
-.daily-work-section { width: min(1280px, 100%); margin: 0 auto; padding: 36px 36px 0; }
-.daily-work-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.daily-work-grid .section-card { min-width: 0; }
-.daily-work-list, .care-event-list { list-style: none; margin: 0; padding: 0; }
-.daily-work-list, .care-event-list { padding: 0 24px; }
-.daily-work-grid .section-card > .text-link { display: inline-block; margin: 0 24px 20px; }
+.care-event-list { list-style: none; margin: 0; padding: 0; }
+.care-event-list { padding: 0 24px; }
 .patient-timeline > .list-toolbar { margin: 0 24px 8px; }
 .patient-timeline > button { margin: 16px 24px 24px; }
-.daily-work-list li { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
-.daily-work-list li:last-child { border-bottom: 0; }
-.daily-work-list li > div { display: grid; gap: 5px; min-width: 0; }
-.daily-work-list li > div:last-child { justify-items: start; }
-.daily-work-list li > a { flex-shrink: 0; }
-.daily-work-list small, .daily-work-list span:not(.badge) { color: var(--muted); font-size: 12px; }
-.daily-work-list a, .daily-work-list strong, .daily-work-list small, .daily-work-list span { overflow-wrap: anywhere; }
-.daily-patient-link { font-weight: 700; color: var(--ink); }
-.daily-patient-link:hover { color: var(--brand-ink); text-decoration: underline; }
-.daily-empty { padding: 12px 24px; color: var(--muted); font-size: 13px; }
 .care-event { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--line); }
 .care-event time { font-size: 12px; color: var(--muted); padding-top: 4px; }
 .care-event time small { display: block; margin-top: 5px; }
@@ -2086,9 +2018,6 @@ kbd { padding: 2px 6px; border: 1px solid light-dark(#d0d8d2, var(--line)); bord
 .care-event p { margin: 0 0 10px; color: var(--muted); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .care-event-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 760px) {
-  .daily-work-section { padding: 28px max(16px, var(--safe-left)) 0 max(16px, var(--safe-right)); }
-  .daily-work-grid { grid-template-columns: minmax(0, 1fr); }
-  .daily-work-list li { flex-wrap: wrap; }
   .care-event { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 }
 

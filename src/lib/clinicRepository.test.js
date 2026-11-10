@@ -2,6 +2,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { clinicDate, clinicTime, clinicTimestamp, createMutationRunner, fetchClinicData, normalizeClinicData, unwrap } from './clinicRepository'
 
 describe('clinic dates and persisted record projection', () => {
+  it('normalizes laboratory fields and defaults older records without inventing findings', () => {
+    const { visits } = normalizeClinicData({ visits: [
+      { id: 'new', visited_at: '2026-11-09', laboratory_requests: 'CBC\nChemistry', laboratory_results: 'Normal values' },
+      { id: 'old', visited_at: '2020-01-02' },
+    ] })
+    expect(visits[0]).toMatchObject({ laboratoryRequests: 'CBC\nChemistry', laboratoryResults: 'Normal values' })
+    expect(visits[1]).toMatchObject({ laboratoryRequests: '', laboratoryResults: '' })
+  })
   it.each([['waiting', 'Waiting'], ['in_progress', 'In progress'], ['completed', 'Completed'], ['cancelled', 'Cancelled']])('shows %s care status on both linked record types', (status, label) => {
     const snapshot = normalizeClinicData({
       visits: [{ id: 'visit', visited_at: '2026-10-17T01:00:00Z' }],

@@ -52,6 +52,7 @@ import { preventiveHistoryRecords } from '../lib/preventiveCare'
 import PreventiveCareCard from '../components/PreventiveCareCard'
 import { clinicalObservationRows } from '../lib/clinicalObservations'
 import HospitalizationHistoryCard from '../components/HospitalizationHistoryCard'
+import { useRecentPatients } from '../lib/useRecentPatients'
 
 function CareStatus({ record }) {
   if (record.recordingPurpose === 'record_only') return <Badge>Record only</Badge>
@@ -104,6 +105,8 @@ export default function PetDetail() {
     catch (error) { setPrintError(error.message) } finally { setPrinting(false) }
   }
   const pet = getPet(petId)
+  const { record: rememberPatient } = useRecentPatients()
+  useEffect(() => { if (pet?.id) rememberPatient(pet.id) }, [pet?.id, rememberPatient])
   const patientAge = formatPatientAge(pet?.birthDate, today)
   const owner = getOwner(pet?.ownerId)
   const petVisits = useMemo(() => visits.filter((item) => item.petId === petId).sort((a, b) => b.visitedAt.localeCompare(a.visitedAt)), [visits, petId])

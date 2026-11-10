@@ -21,6 +21,7 @@ const raw = {
 }
 const calls = [], errors = [], receipts = new Map()
 let failCompletion = true, failPrescription = true
+let failDraft = true
 const app = await browserServer(5187)
 try {
   const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' })
@@ -39,7 +40,7 @@ try {
       if (['complete_checkup', 'save_checkup_progress'].includes(action)) {
         if (failCompletion) { failCompletion = false; return reply({ message: 'Completion interrupted. Please retry.' }, 400) }
         const id = crypto.randomUUID(), ticket = crypto.randomUUID()
-        raw.visits.push({ id, pet_id: patient, visit_type: data.type, chief_complaint: data.complaint, clinical_notes: data.clinicalNotes, visited_at: data.encounteredAt, attending_veterinarian_id: actor })
+        raw.visits.push({ id, pet_id: patient, visit_type: data.type, chief_complaint: data.complaint, clinical_notes: data.clinicalNotes, laboratory_requests: data.laboratoryRequests, laboratory_results: data.laboratoryResults, visited_at: data.encounteredAt, attending_veterinarian_id: actor })
         raw.queue_entries.push({ id: ticket, pet_id: patient, category: 'checkup', service_name: data.type, status: action === 'complete_checkup' ? 'completed' : 'in_progress', draft_version: 1, visit_id: id, arrived_at: new Date().toISOString(), finished_at: action === 'complete_checkup' ? new Date().toISOString() : null, queue_date: '2026-10-25', queue_number: raw.queue_entries.length + 1 })
         const result = { id, queueEntryId: ticket, draftVersion: 1 }; receipts.set(key, result); return reply(result)
       }
@@ -47,6 +48,18 @@ try {
         if (failPrescription) { failPrescription = false; return reply({ message: 'Prescription interrupted. Please retry.' }, 400) }
         Object.assign(raw.queue_entries.find((entry) => entry.id === data.checkup.queueEntryId), { status: 'completed', finished_at: new Date().toISOString() })
         const id = crypto.randomUUID(); raw.prescriptions.push({ id, visit_id: data.visitId, medications: data.medications, prescribed_at: new Date().toISOString() }); return reply({ id })
+      }
+      if (action === 'save_queue_draft') {
+        if (failDraft) { failDraft = false; return reply({ message: 'Draft interrupted. Please retry.' }, 400) }
+        const entry = raw.queue_entries.find((row) => row.id === data.id)
+        Object.assign(entry, { care_draft: data.record, draft_version: entry.draft_version + 1, draft_saved_at: new Date().toISOString() })
+        const result = { id: entry.id, draftVersion: entry.draft_version }; receipts.set(key, result); return reply(result)
+      }
+      if (action === 'complete_queue_entry') {
+        const entry = raw.queue_entries.find((row) => row.id === data.id), record = data.record
+        Object.assign(raw.visits.find((row) => row.id === entry.visit_id), { laboratory_requests: record.laboratoryRequests, laboratory_results: record.laboratoryResults })
+        Object.assign(entry, { status: 'completed', care_draft: {}, draft_version: entry.draft_version + 1, finished_at: new Date().toISOString() })
+        return reply({ id: entry.visit_id, queueEntryId: entry.id })
       }
       throw new Error(`Unexpected completion action ${action}`)
     }
@@ -174,6 +187,30 @@ try {
   await page.getByRole('button', { name: /Queue processing/ }).click()
   await expect(veterinarian).toHaveValue('Assigned veterinarian')
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.goto(`${app.origin}/queue`)
+  await page.getByRole('button', { name: 'Resume checkup', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit Vitals & condition', exact: true }).click()
+  await page.getByLabel('Weight (kg)', { exact: true }).fill('3')
+  await page.getByLabel('Laboratory Requests', { exact: true }).fill('CBC\nChemistry panel')
+  await page.getByLabel('Laboratory Results', { exact: true }).fill('Initial finding')
+  await page.getByRole('button', { name: 'Save as draft', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('Draft interrupted')
+  await expect(page.getByLabel('Laboratory Results', { exact: true })).toHaveValue('Initial finding')
+  await page.getByRole('button', { name: 'Save as draft', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const draftCalls = calls.filter((call) => call.action === 'save_queue_draft')
+  assert.equal(draftCalls[0].key, draftCalls[1].key)
+  await page.reload()
+  await page.getByRole('button', { name: 'Resume checkup', exact: true }).click()
+  await expect(page.getByLabel('Laboratory Requests', { exact: true })).toHaveValue('CBC\nChemistry panel')
+  await expect(page.getByLabel('Laboratory Results', { exact: true })).toHaveValue('Initial finding')
+  await page.getByLabel('Laboratory Results', { exact: true }).fill('Final finding\nNo parasites')
+  await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
+  await page.getByRole('button', { name: 'Complete Checkup', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.goto(withDetailedHistory(`${app.origin}/patients/${patient}`))
+  await expect(page.locator('.visit-card').filter({ hasText: 'Leave prescription unfinished' })).toContainText('Final finding')
+  assert.equal(raw.visits.at(-1).laboratory_requests, 'CBC\nChemistry panel')
   assert.deepEqual(errors, [])
   console.log('PASS blank staff veterinarian, attention styling, required selection, saved/queue/draft assignment retention, checkup confirmation, retries, prescription completion and mobile layout')
 } finally { await app.close() }

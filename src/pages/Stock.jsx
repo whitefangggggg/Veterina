@@ -1,15 +1,19 @@
 import { SelectField } from '../components/VeterinaSelect'
 import VeterinaCheckbox from '../components/VeterinaCheckbox'
-import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { addDays, format, parseISO } from 'date-fns'
-import { Cube, EnvelopeSimple, MagnifyingGlass, MapPin, Notepad, Package, Phone, Plus, Truck, Warning } from '@phosphor-icons/react'
+import { useLayoutEffect, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { format, parseISO } from 'date-fns'
+import { Cube, EnvelopeSimple, MagnifyingGlass, MapPin, Notepad, Package, Phone, Pill, Plus, Syringe, Truck, Warning } from '@phosphor-icons/react'
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { Badge, EmptyState, Modal, PageHeader, SectionCard, StatCard } from '../components/ui'
 import { AsyncForm, DeleteRecordDialog, RecordEditor } from '../components/RecordForm'
 import { useHashTarget } from '../lib/useHashTarget'
-import { stockAttention } from '../lib/dailyWorkflow'
+import { STOCK_EXPIRY_WARNING_DAYS, stockAttention, stockExpiryAlerts } from '../lib/dailyWorkflow'
+import './Admissions.css'
+import './Inventory.css'
+
+const inventoryIcons = { Vaccines: Syringe, Medicine: Pill, Consumables: Package, Other: Cube }
 
 const supplierFields = [
   { name: 'name', label: 'Supplier name', required: true }, { name: 'contactPerson', label: 'Contact person' },
@@ -70,12 +74,16 @@ function StockMovementEditor({ item, onClose }) {
 }
 
 export function Inventory() {
-  useHashTarget()
+  const targetId = useHashTarget()
+  const { key: locationKey } = useLocation()
   const { inventory, suppliers, today } = useClinicData()
   const [searchParams, setSearchParams] = useSearchParams()
-  const attention = ['all', 'low', 'expired', 'expiring'].includes(searchParams.get('attention')) ? searchParams.get('attention') : ''
+  const attention = ['all', 'low', 'expiry', 'expired', 'expiring'].includes(searchParams.get('attention')) ? searchParams.get('attention') : ''
   const stockAlerts = stockAttention(inventory, today)
-  const attentionIds = new Set(stockAlerts.filter((entry) => attention === 'low' ? entry.lowStock : attention === 'expired' ? entry.expired.length : attention === 'expiring' ? entry.expiring.length : true).map((entry) => entry.item.id))
+  const stockAlertsById = new Map(stockAlerts.map((entry) => [entry.item.id, entry]))
+  const expiryAlerts = stockExpiryAlerts(inventory, today)
+  const batchAlertsById = new Map(expiryAlerts.map((entry) => [entry.batch.id, entry]))
+  const attentionIds = new Set(stockAlerts.filter((entry) => attention === 'low' ? entry.lowStock : attention === 'expiry' ? entry.expired.length || entry.expiring.length : attention === 'expired' ? entry.expired.length : attention === 'expiring' ? entry.expiring.length : true).map((entry) => entry.item.id))
   const supplierId = searchParams.get('supplierId')
   const selectedSupplier = suppliers.find((supplier) => supplier.id === supplierId)
   const invalidSupplier = supplierId !== null && !selectedSupplier
@@ -88,45 +96,77 @@ export function Inventory() {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All')
   const [showArchived, setShowArchived] = useState(false)
+  useLayoutEffect(() => {
+    if (!targetId.startsWith('inventory-batch-')) return
+    setQuery(''); setCategory('All')
+    const frame = requestAnimationFrame(() => {
+      const target = document.getElementById(targetId)
+      const details = target?.closest('details')
+      if (details) details.open = true
+      if (target) {
+        target.setAttribute('tabindex', '-1')
+        target.focus({ preventScroll: true })
+        target.scrollIntoView({ block: 'start' })
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [targetId, locationKey])
+  const hasFilters = Boolean(query || category !== 'All' || showArchived || attention || supplierId !== null)
+  const resetFilters = () => {
+    setQuery(''); setCategory('All'); setShowArchived(false)
+    const next = new URLSearchParams(searchParams)
+    next.delete('supplierId'); next.delete('attention')
+    setSearchParams(next)
+  }
   const [modal, setModal] = useState(null)
-  const cutoff = format(addDays(parseISO(today), 90), 'yyyy-MM-dd')
   const active = inventory.filter((item) => item.isActive)
   const lowStock = active.filter((item) => item.quantity <= item.minimumStock)
-  const expiring = active.filter((item) => item.nearestExpiry && item.nearestExpiry >= today && item.nearestExpiry <= cutoff)
-  const expired = active.filter((item) => item.nearestExpiry && item.nearestExpiry < today)
+  const expiring = stockAlerts.filter((entry) => entry.expiring.length)
+  const expired = stockAlerts.filter((entry) => entry.expired.length)
   const filtered = inventory.filter((item) => (!attention || attentionIds.has(item.id)) && (!supplierId || item.supplierIds.includes(supplierId)) && !invalidSupplier && (showArchived || item.isActive) && (category === 'All' || item.category === category) && [item.name, item.sku].some((value) => value.toLowerCase().includes(query.toLowerCase())))
   const selectedItem = modal?.itemId ? inventory.find((item) => item.id === modal.itemId) : null
-  return <div className="page">
+  return <div className="page inventory-page">
     <PageHeader eyebrow="Stock control" title="Inventory" description="Live balances, batches and permanent movement history." actions={<button className="button button-primary" onClick={() => setModal({ type: 'item' })}><Package size={18} /> New item</button>} />
     {supplierId !== null && <p className={invalidSupplier ? 'auth-message auth-error' : 'auth-message'} role={invalidSupplier ? 'alert' : 'status'}>{invalidSupplier ? 'This supplier is unavailable.' : <>Items linked to <Link className="text-link" to={`/suppliers#${encodeURIComponent(supplierId)}`}>{selectedSupplier.name}</Link>.</>} <button className="text-link" onClick={clearSupplier}>Clear supplier filter</button></p>}
-    <div className="stats-grid stock-stats"><StatCard icon={Cube} label="Active items" value={active.length} /><StatCard icon={Warning} label="At or below minimum" value={lowStock.length} tone="rose" /><StatCard icon={Warning} label="Expiring in 90 days" value={expiring.length} detail={expired.length + ' items have expired stock'} tone="amber" /><StatCard icon={Truck} label="Active suppliers" value={suppliers.filter((supplier) => supplier.isActive).length} /></div>
-    <div className="list-toolbar"><label className="table-search"><MagnifyingGlass size={18} /><input aria-label="Search inventory" placeholder="Search item or SKU..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-      <SelectField aria-label="Inventory category" value={category} onChange={(event) => setCategory(event.target.value)}>{['All', 'Vaccines', 'Medicine', 'Consumables', 'Other'].map((value) => <option key={value}>{value}</option>)}</SelectField>
-      <label>Stock attention <SelectField aria-label="Stock attention" value={attention} onChange={(event) => { const next = new URLSearchParams(searchParams); if (event.target.value) next.set('attention', event.target.value); else next.delete('attention'); setSearchParams(next) }}><option value="">All items</option><option value="all">Needs attention</option><option value="low">At or below minimum</option><option value="expired">Expired stock</option><option value="expiring">Expiring within 30 days</option></SelectField></label>
-      <VeterinaCheckbox label="Include archived" checked={showArchived} onChange={setShowArchived} />
+    <div className="stats-grid stock-stats"><StatCard icon={Cube} label="Active items" value={active.length} /><StatCard icon={Warning} label="At or below minimum" value={lowStock.length} tone="rose" /><StatCard icon={Warning} label={`Expiring in ${STOCK_EXPIRY_WARNING_DAYS} days`} value={expiring.length} detail={expired.length + ' items have expired stock'} tone="amber" /><StatCard icon={Truck} label="Active suppliers" value={suppliers.filter((supplier) => supplier.isActive).length} /></div>
+    <div className="inventory-toolbar">
+      <label className="field inventory-search-field"><span>Search inventory</span><span className="admission-search"><MagnifyingGlass size={18} aria-hidden="true" /><input aria-label="Search inventory" placeholder="Search item or SKU..." value={query} onChange={(event) => setQuery(event.target.value)} /></span></label>
+      <label className="field"><span>Category</span><SelectField aria-label="Inventory category" value={category} onChange={(event) => setCategory(event.target.value)}>{['All', 'Vaccines', 'Medicine', 'Consumables', 'Other'].map((value) => <option key={value}>{value}</option>)}</SelectField></label>
+      <label className="field"><span>Stock attention</span><SelectField aria-label="Stock attention" value={attention} onChange={(event) => { const next = new URLSearchParams(searchParams); if (event.target.value) next.set('attention', event.target.value); else next.delete('attention'); setSearchParams(next) }}><option value="">All items</option><option value="all">Needs attention</option><option value="low">At or below minimum</option><option value="expiry">Expiry warnings</option><option value="expired">Expired stock</option><option value="expiring">Expiring within {STOCK_EXPIRY_WARNING_DAYS} days</option></SelectField></label>
+      <div className="inventory-filter-footer"><VeterinaCheckbox label="Include archived" checked={showArchived} onChange={setShowArchived} />
+        {hasFilters && <button className="button button-secondary small-button" onClick={resetFilters}>Clear filters</button>}
+        <span className="result-count" role="status">{filtered.length} item{filtered.length === 1 ? '' : 's'}</span>
+      </div>
     </div>
-    <div className="record-directory">{filtered.map((item) => <SectionCard key={item.id} id={`inventory-${item.id}`} className="inventory-record">
-      <div className="directory-card"><div><h2>{item.name}</h2><code>{item.sku}</code> <Badge>{item.category}</Badge> {!item.isActive && <Badge>Archived</Badge>}
-        {item.brand && <p>Brand: {item.brand}</p>}
-        {item.notes && <p className="inventory-item-notes"><strong>Notes:</strong> {item.notes}</p>}
-        <p><strong className={item.quantity <= item.minimumStock ? 'danger-text' : ''}>{item.quantity} {item.unit}</strong> · Minimum {item.minimumStock}</p>
-        <p>Nearest expiry: {item.nearestExpiry ? format(parseISO(item.nearestExpiry), 'd MMM yyyy') : 'No stocked expiry-dated batches'} {item.nearestExpiry && item.nearestExpiry < today ? <Badge tone="danger">Expired stock</Badge> : item.nearestExpiry && item.nearestExpiry <= cutoff ? <Badge tone="warning">Expiring soon</Badge> : null}</p>
-        <small>{item.supplierIds.length ? item.supplierIds.map((id) => {
+    <div className="admission-grid inventory-card-grid">{filtered.map((item) => {
+      const alert = stockAlertsById.get(item.id)
+      const Icon = inventoryIcons[item.category] || Cube
+      const stockLabel = item.quantity <= 0 ? 'Out of stock' : item.quantity <= item.minimumStock ? 'Low stock' : 'In stock'
+      return <article key={item.id} id={`inventory-${item.id}`} className={`admission-card admission-patient-card inventory-record ${!item.isActive ? 'inventory-card-archived' : ''}`} aria-labelledby={`inventory-title-${item.id}`}>
+      <div className="admission-badges"><Badge>{item.category}</Badge><Badge tone={item.quantity <= 0 ? 'danger' : item.quantity <= item.minimumStock ? 'warning' : 'success'}>{stockLabel}</Badge>{!item.isActive && <Badge>Archived</Badge>}</div>
+      <div className="inventory-card-heading"><span className="inventory-item-icon"><Icon size={25} weight="duotone" aria-hidden="true" /></span><div><h2 id={`inventory-title-${item.id}`}>{item.name}</h2><code>{item.sku}</code></div></div>
+      <div className="inventory-stock-level"><span>On hand</span><p><strong className={item.quantity <= item.minimumStock ? 'danger-text' : ''}>{item.quantity}</strong> {item.unit}</p><small>Minimum {item.minimumStock} {item.unit}</small></div>
+      <dl className="inventory-card-meta">
+        {item.brand && <><dt>Brand</dt><dd>{item.brand}</dd></>}
+        <dt>Nearest expiry</dt><dd>{item.nearestExpiry ? format(parseISO(item.nearestExpiry), 'd MMM yyyy') : 'No stocked expiry-dated batches'}<div className="admission-badges inventory-expiry-badges">{alert?.expired.length > 0 && <Badge tone="danger">Expired stock</Badge>}{alert?.expiring.length > 0 && <Badge tone="warning">Expiring soon ({alert.expiring.length})</Badge>}</div></dd>
+        <dt>Suppliers</dt><dd className="inventory-supplier-links">{item.supplierIds.length ? item.supplierIds.map((id) => {
           const supplier = suppliers.find((entry) => entry.id === id)
-          return supplier ? <Link className="text-link" key={id} to={`/suppliers#${encodeURIComponent(id)}`} style={{ marginRight: 12 }}>{supplier.name}{id === item.supplierId ? ' (preferred)' : ''}</Link> : null
-        }) : 'No preferred supplier'}</small></div>
-        <div className="record-actions"><button className="button button-secondary small-button" onClick={() => setModal({ type: 'item', itemId: item.id })}>Edit item</button>
-          <button className="button button-primary small-button" disabled={!item.isActive || !item.batches.some((batch) => batch.is_active)} onClick={() => setModal({ type: 'movement', itemId: item.id })}>Update stock</button>
-          <button className="button button-secondary small-button" onClick={() => setModal({ type: 'batch', itemId: item.id })}>Add batch</button>
-          {profile.role === 'owner' && !item.movements.length && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete-item', record: item })}>Delete item</button>}
-        </div>
+          return supplier ? <Link className="text-link" key={id} to={`/suppliers#${encodeURIComponent(id)}`}>{supplier.name}{id === item.supplierId ? ' (preferred)' : ''}</Link> : null
+        }) : 'No preferred supplier'}</dd>
+      </dl>
+      {item.notes && <p className="inventory-item-notes"><strong>Notes:</strong> {item.notes}</p>}
+      <div className="admission-card-footer inventory-card-actions">
+        <button className="button button-primary small-button inventory-stock-action" disabled={!item.isActive || !item.batches.some((batch) => batch.is_active)} onClick={() => setModal({ type: 'movement', itemId: item.id })}>Update stock</button>
+        <button className="button button-secondary small-button" onClick={() => setModal({ type: 'item', itemId: item.id })}>Edit item</button>
+        <button className="button button-secondary small-button" onClick={() => setModal({ type: 'batch', itemId: item.id })}>Add batch</button>
+        {profile.role === 'owner' && !item.movements.length && <button className="text-link danger-text inventory-delete-action" onClick={() => setModal({ type: 'delete-item', record: item })}>Delete item</button>}
       </div>
       <details className="ledger-details"><summary>Batches ({item.batches.length}) and movement history ({item.movements.length})</summary>
-        {item.batches.map((batch) => <div className="ledger-row" key={batch.id}><span><strong>{batch.lot_number || 'Unnumbered batch'}</strong> · {batch.quantity} {item.unit} · Expires {batch.expiration_date || 'not set'} {!batch.is_active && <Badge>Archived</Badge>}</span><button className="text-link" onClick={() => setModal({ type: 'batch', itemId: item.id, record: batch })}>Edit batch</button>{profile.role === 'owner' && !item.movements.some((movement) => movement.batch_id === batch.id) && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete-batch', record: batch })}>Delete batch</button>}</div>)}
+        {item.batches.map((batch) => <div className="ledger-row" key={batch.id} id={`inventory-batch-${batch.id}`}><span><strong>{batch.lot_number || 'Unnumbered batch'}</strong> · {batch.quantity} {item.unit} · Expires {batch.expiration_date || 'not set'} {batchAlertsById.has(batch.id) && <Badge tone={batchAlertsById.get(batch.id).status === 'expired' ? 'danger' : 'warning'}>{batchAlertsById.get(batch.id).label}</Badge>} {!batch.is_active && <Badge>Archived</Badge>}</span><button className="text-link" onClick={() => setModal({ type: 'batch', itemId: item.id, record: batch })}>Edit batch</button>{profile.role === 'owner' && !item.movements.some((movement) => movement.batch_id === batch.id) && <button className="text-link danger-text" onClick={() => setModal({ type: 'delete-batch', record: batch })}>Delete batch</button>}</div>)}
         {item.movements.map((movement) => <p className="ledger-row" key={movement.id}>{format(parseISO(movement.created_at), 'd MMM yyyy, h:mm a')} · {movement.movement_type.replaceAll('_', ' ')} · {movement.quantity_delta > 0 ? '+' : ''}{movement.quantity_delta} {item.unit} · {movement.reason}</p>)}
         {!item.movements.length && <p>No stock movements yet. Record stock in after creating the item.</p>}
       </details>
-    </SectionCard>)}</div>
+    </article>})}</div>
     {!filtered.length && <EmptyState icon={Package} title="No inventory items" description="Create an item with its initial stock, or add stock later." />}
     <p className="inventory-rule-note">Stock balances come from the movement ledger. Items with stock history can be archived; their ledger is retained.</p>
     {modal?.type === 'item' && <ItemEditor record={selectedItem} onClose={() => setModal(null)} />}

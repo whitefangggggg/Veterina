@@ -30,10 +30,12 @@ The system supports multiple clinics with separate records, staff access, brandi
 
 | Workspace | Capabilities |
 | --- | --- |
-| **Daily operations** | Dashboard action board, stock watch, walk-in arrivals, numbered queue tickets, veterinarian assignments, and resumable care drafts. |
+| **Daily operations** | Compact shift dashboard, live clinic floor, unfinished charts and drafts, inline follow-up completion, clinical stock watch and batch expiry alerts, appointment stream, recent patients and quick walk-in intake. |
 | **Patients and owners** | Searchable directories, registration, optional private photos, alerts, growth and vitals, and a unified clinical timeline. |
-| **Clinical care** | Checkups, clinical notes, diagnoses, follow-up plans, finalization, retained corrections, and service records. |
+| **Global search** | Header search across saved clinical, scheduling, inventory and document records; grouped suggestions, bounded results and focused record links, scoped to the current clinic and role. |
+| **Clinical care** | Checkups, clinical notes, laboratory requests and results, diagnoses, follow-up plans, finalization, retained corrections, and service records. |
 | **Admissions** | Hospitalization dashboard, wards/cages/kennels, transfers, monitoring, scheduled treatments, medication administration, historical stays, and durable discharge summaries. |
+| **Owner admission tracking** | No-login tracking with a private 13-character code or QR card, clinic-approved public fields and updates, credential rotation/revocation, and expiry. |
 | **Preventive care** | Grouped vaccination records, individual deworming administrations, next-dose reminders, historical records, and inventory-linked completion. |
 | **Scheduling** | Appointments, veterinarian conflict checks, patient arrival, follow-up scheduling, and reminder activity. |
 | **Prescriptions and stock** | Batch-based dispensing, stock movements, expiry tracking, supplier management, and prescription PDF/PNG exports. |
@@ -46,6 +48,8 @@ The system supports multiple clinics with separate records, staff access, brandi
 Operational care follows **Waiting → In progress → Completed**, with cancellation available. Drafts preserve work without completing care. Historical record entry is separate and creates no queue entry, live reminder, or stock deduction.
 
 Hospitalization uses **Admitted → Under Treatment → Ready for Discharge → Discharged**, independently of clinical condition. Approved staff manage care and authorize discharge; owners configure facilities, cancel intake-only mistakes, and append corrections. Accommodation can remain unassigned. Released cages require cleaning. Inpatient medication orders do not consume stock: each recorded Given dose deducts its selected batch once. Existing outpatient prescriptions continue deducting when saved.
+
+Public admission tracking is available at `/track-admission`. Staff approve fields and generate a bearer-secret code in an admission's **Public tracking** tab. The default view contains the workflow status and published updates. Staff can separately enable **Live clinical sharing** to expose Admission activity, Monitoring & notes, and Care board, including existing/future clinical notes, measurements, medication doses and staff names. Existing links stay limited until this approval; their codes remain unchanged. Codes expire after 90 days or 7 days after discharge, whichever comes first. The KAN-22 backend, including clinical sharing, is deployed to the configured `Veterina_Demo` project as of 9 November 2026. The frontend runs locally; future Vercel hosting requires SPA rewrites and equivalent privacy/cache headers. See [the policy and rollout notes](docs/kan-22-admission-tracking.md).
 
 The admissions migrations and follow-up foreign-key indexes are applied to the hosted Development project (`yerrtkosxksacqxznrhk`) as of 8 November 2026. Apply the matching backend migrations before releasing this frontend to another environment. See [admissions testing and rollout](TESTING.md#patient-admission-and-hospitalization-kan-19).
 
@@ -99,6 +103,13 @@ flowchart TB
 3. **Write:** Core clinical changes use `portal_mutation` with an action, payload, and retry key. Database transactions enforce workflow rules and protect related record, reminder, and stock updates.
 4. **Refresh:** After a successful mutation, the context reloads saved data. Failed refreshes offer recovery without silently presenting the save as undone.
 5. **Run specialized operations:** Edge Functions handle staff administration, exports, subscriptions, private photos, and travel certificates, with explicit authentication and authorization.
+
+Header search uses a private Postgres index and authenticated search/detail RPCs.
+The search routes load only clinic settings, the current profile and bounded
+results; clinical workspaces retain their existing loader. The KAN-23 backend is
+deployed to the configured `Veterina_Demo` project as of 9 November 2026. Apply its
+migration when releasing to another environment. See [search coverage, privacy,
+verification and rollout](docs/kan-23-global-search.md).
 
 ### Access model
 
