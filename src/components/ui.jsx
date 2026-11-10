@@ -1,5 +1,6 @@
-import { cloneElement, isValidElement, useEffect, useId, useRef } from 'react'
+import { cloneElement, isValidElement, useId, useRef } from 'react'
 import { X } from '@phosphor-icons/react'
+import { useDialogFocus } from '../lib/useDialogFocus'
 
 export function PageHeader({ eyebrow, title, description, actions }) {
   return (
@@ -44,48 +45,28 @@ export function EmptyState({ icon: Icon, title, description, action }) {
 
 export function Modal({ title, description, children, onClose, wide = false, className = '', embedded = false }) {
   const dialogRef = useRef(null)
-  useEffect(() => {
-    if (embedded) return
-    const previousFocus = document.activeElement
-    document.body.classList.add('overlay-open')
-    const firstControl = [...(dialogRef.current?.querySelectorAll('input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),button:not([disabled])') || [])].find((element) => element.getClientRects().length)
-    firstControl?.focus()
-    return () => {
-      document.body.classList.remove('overlay-open')
-      if (previousFocus?.isConnected) previousFocus.focus()
-    }
-  }, [embedded])
-
-  const onKeyDown = (event) => {
-    const busy = Boolean(dialogRef.current?.querySelector('form[aria-busy="true"]'))
-    if (event.key === 'Escape' && !busy) { event.preventDefault(); event.stopPropagation(); onClose() }
-    if (event.key !== 'Tab') return
-    const controls = [...dialogRef.current.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')]
-      .filter((element) => !element.matches(':disabled') && element.getClientRects().length)
-    const first = controls[0]
-    const last = controls.at(-1)
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
-  }
+  const descriptionId = useId()
   const close = () => {
     if (!dialogRef.current?.querySelector('form[aria-busy="true"]')) onClose()
   }
+  useDialogFocus(dialogRef, close, !embedded)
 
   if (embedded) return <>{children}</>
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={close}>
       <section
         ref={dialogRef}
-        onKeyDown={onKeyDown}
+        tabIndex={-1}
         className={`modal ${wide ? 'modal-wide' : ''} ${className}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        aria-describedby={description ? descriptionId : undefined}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="modal-header">
-          <div><h2>{title}</h2>{description && <p>{description}</p>}</div>
-          <button className="icon-button" onClick={close} aria-label="Close"><X size={20} weight="bold" /></button>
+          <div><h2>{title}</h2>{description && <p id={descriptionId}>{description}</p>}</div>
+          <button type="button" className="icon-button" onClick={close} aria-label="Close"><X size={20} weight="bold" /></button>
         </header>
         <div className="modal-body">{children}</div>
       </section>

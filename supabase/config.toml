@@ -27,3 +27,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.travel-certificate]
 verify_jwt = false
+[functions.admission-tracking]
+verify_jwt = false

@@ -1,5 +1,107 @@
 # Testing Veterina
 
+## Global clinic search (KAN-23)
+
+Run `npm run test:global-search-migration` to rehearse the migration and SQL suite
+with the mutation role present and absent, verifying that search inherits only
+the authenticated RLS persona. This uses guarded local rollback transactions.
+
+Apply `20261109091730_clinic_global_search.sql` to the isolated backend, then run
+`npm run test:global-search-database`, `npm run test:global-search-scale` and
+`npm run test:global-search` sequentially. The database runner includes all three.
+The scale/catalog rehearsal requires an empty synthetic stack and must run alone.
+It backfills 20,001 search documents, preserves source fingerprints, checks a
+selective trigram plan, verifies broad result totals and bounds response size.
+
+The real browser suite verifies no source-table downloads on focused search and
+record routes, grouped/debounced suggestions, keyboard/focus, Enter full results,
+cursor pagination, direct record reload, owner-only navigation exclusion,
+empty/error/retry/cancel states and Light/Dark 320/375/768/1440px layouts. Updated
+UI-refinement/connected suites cover search and return to patient-chart actions.
+SQL tests also exercise direct API tenant/persona boundaries and disclosure rules.
+See [coverage, limits and rollout](docs/kan-23-global-search.md). No Edge Function
+deployment is required for KAN-23.
+
+The search backend is deployed to the configured `Veterina_Demo` project as hosted
+migration `20261109110126`. Hosted search/record reads, exact RPC schema resolution,
+anonymous denials and backfill/source preservation checks pass. Frontend hosting
+remains local pending future Vercel deployment.
+
+## Public admission tracking (KAN-22)
+
+Run `node scripts/check-admission-tracking-migration.mjs` to rehearse migration
+compatibility and the complete SQL suite with both `veterina_rpc` and `postgres`
+dispatcher ownership, each rolled back against the guarded isolated database.
+The rehearsal includes the forward clinical-sharing migration, default-off and
+same-code approval behavior, medication details, corrections, keyset pagination,
+clinic isolation, disable and expiry/subscription gates. The database command also
+runs `supabase/tests/admission_tracking_clinical.sql`.
+
+Run `npm run test:admission-tracking-database`,
+`npm run test:admission-tracking-concurrency`, then
+`npm run test:admission-tracking` sequentially against the empty isolated stack.
+The database runner also includes all three in that order after admissions.
+Apply `20261109083959_admission_public_tracking.sql` to the isolated database
+and serve `supabase/functions/admission-tracking` plus the shared helpers with
+JWT verification disabled for this deliberately public function.
+
+Coverage includes approval gates, exact code format and hash storage, safe retry,
+staff/tenant boundaries, strict public projection, optional disclosure,
+publication/unpublishing, rotation/revocation, cancellation and historical stays,
+clinic/subscription visibility, discharge and absolute expiry, audited changes,
+per-caller/global throttling, concurrent generation/publication, collision-path
+recovery and 100 distinct rotations. Chrome uses real local Auth, PostgREST and
+Edge Functions for staff controls, deliberately lost generation acknowledgment,
+QR image decoding, print isolation, anonymous manual/QR lookup, live status,
+literal-text rendering and 320/375/768/1440px light/dark public layouts.
+
+Screenshots are `test-artifacts.local/admission-tracking-{light,dark}-*.png`
+and `admission-sharing-mobile.png`. Unit tests cover URL secrecy, code validation,
+client response states, timezone/expiry and Edge input/header/error handling.
+See [policy, limits and deployment](docs/kan-22-admission-tracking.md).
+
+The real browser suite additionally enables clinical sharing through staff
+controls, verifies all three public sections, encrypted pagination, 30-second
+refresh, pause while reading older notes, clearing after a failed page fetch, and
+same-code disabling. It checks clinical layouts at 320, 375, 768 and 1440 pixels
+in light and dark themes. The clinical backend is deployed to `Veterina_Demo`;
+the frontend remains local pending the user's future Vercel deployment.
+
+## Stock expiry warnings (KAN-17)
+
+`npm run test:stock-expiry` checks dashboard counts beyond the two prioritized
+items, notification order/counts, direct lot navigation/reload and filter recovery,
+mixed expired/upcoming batches, empty/archived-item exclusions, stock depletion,
+approved staff visibility, clinic-local midnight and light/dark mobile layouts.
+The shared 30-day date-window and batch classification have unit coverage. The
+aggregate runner includes this suite. No schema migration is needed.
+See [behavior and verification](docs/kan-17-stock-expiry.md).
+
+Inventory reuses the Admissions patient-card treatment, with grouped stock
+actions and expandable batch ledgers. `test:inventory` captures the card grid at
+320/375/768/1440px in light/dark mode under
+`test-artifacts.local/inventory-cards-*.png`. The dashboard suite checks that its
+duplicate search/refresh controls are absent while header search and automatic
+refresh still work.
+
+## Operational dashboard (KAN-20)
+
+`npm run test:dashboard` verifies the five-zone dashboard with intercepted APIs:
+desktop viewport fit, configured clinic hours, waiting/consultation/discharge
+lanes, chart and draft editors, walk-in/search launch, optimistic follow-up Done
+with rollback/retry/failed-refresh recovery, stock/supplier priorities, appointment
+ordering, visible polling, and five scoped recent-patient IDs. It checks populated
+and quiet layouts at 320/375/768/1440px in light/dark mode. Screenshots use
+`test-artifacts.local/dashboard-*.png`.
+
+Domain tests cover timezone/opening boundaries, incomplete-chart deduplication,
+clinical exclusions, stock priorities, and browser storage isolation/fallbacks.
+See [the dashboard implementation notes](docs/kan-20-dashboard.md) for the explicit
+ready-for-discharge mapping, persistence contract and manual acceptance limits.
+The existing theme, UI-refinement, connected-workflow and Add Record browser
+suites exercise the new dashboard alongside established workflows. No database
+migration is required by KAN-20.
+
 ## Patient admission and hospitalization (KAN-19)
 
 Admissions are available at `/admissions` and `/admissions/:admissionId`, and from
@@ -866,6 +968,20 @@ No database migration or API change is required.
 
 ### UI/UX patch specification
 
+KAN-18 follow-up (9 November 2026): the shared dialog focus stack, keyboard
+patient search, skip link, role-relevant workspace menu, clinic-specific dashboard,
+list filter resets and saving announcements are described in
+[`docs/kan-18-ui-review.md`](docs/kan-18-ui-review.md). No new preference storage or
+clinical permissions are introduced. Staff retain Settings for personal appearance;
+Reports remains owner-only.
+
+The refinement suite additionally checks search arrow/Enter selection, Tab and
+Shift+Tab containment, focus restoration, clear filters, a duplicate submit in the
+same event turn, retained fields after validation failure, unchanged retry keys,
+busy-dialog dismissal protection, and a successful save followed by a failed
+refresh. Retry refresh must load the saved owner without another mutation.
+Search screenshots use `kan18-search-<mode>-<width>.png`.
+
 `npm run test:ui-refinements` verifies the agenda badge and live refresh, empty
 states and dismissal; task search and keyboard filters; searchable report patient
 selection and control spacing; branded checkbox keyboard use; independent patient
@@ -907,3 +1023,18 @@ an explicit `historyDensity=detailed` URL preserves that choice across reloads.
 Existing source fragments still open detailed records so cited items can receive
 focus. The UI regression fixture covers the default, both views, hospitalization
 search/filter/calendar behavior, admission links and absence on other tabs.
+
+## Laboratory observations (KAN-15)
+
+Both live in-progress and historical checkups support optional Laboratory Requests
+and Laboratory Results, each up to 10,000 characters. `npm test` covers mapping,
+legacy presentation, history search and safe multiline printing. The existing
+`test:new-visits`, `test:historical-checkups` and `test:checkup-completion` browser
+suites cover navigation/review, saved drafts, errors/retries, editing and display.
+
+`test:database` includes `laboratory_observations.sql` with rolled-back synthetic
+fixtures for real persistence, omitted-field compatibility, clearing, validation,
+stale drafts, retry receipts, clinical completion, clinic/staff access, finalization
+and retained correction/audit snapshots. Apply
+`20261109051710_laboratory_observations.sql` before releasing this frontend.
+See [behavior and rollout notes](docs/kan-15-laboratory-observations.md).

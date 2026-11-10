@@ -25,8 +25,12 @@ describe('clinic access decisions', () => {
 })
 
 describe('sign-in return destinations', () => {
-  it.each(['/dashboard', '/queue', '/patients/pet-1', '/appointments?date=2026-10-17#agenda', '/inventory', '/settings', '/knowledge#document-1'])('preserves clinic path %s', (path) => {
+  it.each(['/dashboard', '/queue', '/patients/pet-1', '/appointments?date=2026-10-17#agenda', '/inventory', '/settings', '/knowledge#document-1', '/search', '/records/pets/pet-1', '/admissions/admission-1', '/travel-certificates?certificateId=cert-1'])('preserves clinic path %s', (path) => {
     expect(safeReturnTo(path)).toBe(path)
+  })
+  it('drops personal search terms from authentication return destinations', () => {
+    expect(safeReturnTo('/search#q=private+phone')).toBe('/search')
+    expect(safeReturnTo('/search?q=private')).toBe('/search')
   })
 
   it.each([null, undefined, '', 'https://evil.example/patients', '//evil.example/patients', '/\\evil.example/patients', '/sign-in', '/create-account', '/access-pending', '/dashboard-other', '/patients/../../sign-in', '/patients/%2e%2e/%2e%2e/sign-in', '/patients/%2f%2fevil.example', '/patients//evil', '/patients\n', 'javascript:alert(1)'])('rejects unsafe or looping return path %s', (path) => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import {
   CalendarDots,
   CaretDown,
@@ -19,10 +19,11 @@ import {
 import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { authErrorMessage } from '../lib/authAccess'
-import PetSticker from './PetSticker'
+import GlobalSearch from './GlobalSearch'
 import { isClinicLogoDataUrl } from '../lib/clinicLogo'
 import SubscriptionTimer from './SubscriptionTimer'
 import NotificationHub from './NotificationHub'
+import { useDialogFocus } from '../lib/useDialogFocus'
 import '../pages/PlatformAdmin.css'
 
 const workspaces = [
@@ -33,8 +34,8 @@ const workspaces = [
   { to: '/appointments', label: 'Appointments', detail: 'Bookings, due care and owner follow-ups', icon: CalendarDots, color: 'mint' },
   { to: '/inventory', label: 'Inventory', detail: 'Stock, batches and expirations', icon: Package, color: 'blue' },
   { to: '/suppliers', label: 'Suppliers', detail: 'Ordering contacts', icon: Truck, color: 'amber' },
-  { to: '/reports', label: 'Reports', detail: 'Clinic exports and summaries', icon: ChartBar, color: 'mint' },
-  { to: '/settings', label: 'Settings', detail: 'Staff and clinic profile', icon: Gear, color: 'slate' },
+  { to: '/reports', label: 'Reports', detail: 'Clinic exports and summaries', icon: ChartBar, color: 'mint', ownerOnly: true },
+  { to: '/settings', label: 'Settings', detail: 'Staff and clinic profile', staffDetail: 'Display mode and clinic information', icon: Gear, color: 'slate' },
   // Paused until the Knowledge workspace is ready for release.
   // { to: '/knowledge', label: 'Knowledge', detail: 'Approved documents and cited recall', icon: FirstAidKit, color: 'sage' },
 ]
@@ -52,31 +53,21 @@ function Brand() {
 
 function WorkspaceSwitcher({ onClose }) {
   const location = useLocation()
+  const { profile } = useAuth()
   const dialog = useRef(null)
-  useEffect(() => {
-    const previous = document.activeElement
-    dialog.current?.querySelector('button')?.focus()
-    return () => { if (previous?.isConnected) previous.focus() }
-  }, [])
-  const trapFocus = (event) => {
-    if (event.key !== 'Tab') return
-    const controls = [...dialog.current.querySelectorAll('button,a[href]')]
-    const first = controls[0], last = controls.at(-1)
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
-  }
+  useDialogFocus(dialog, onClose)
   return (
     <div className="workspace-overlay" onMouseDown={onClose}>
-      <section ref={dialog} onKeyDown={trapFocus} className="workspace-switcher" role="dialog" aria-modal="true" aria-label="Choose a workspace" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialog} tabIndex={-1} className="workspace-switcher" role="dialog" aria-modal="true" aria-label="Choose a workspace" onMouseDown={(event) => event.stopPropagation()}>
         <header>
           <div><span className="eyebrow">Clinic workspaces</span><h2>Where would you like to go?</h2><p>Each area has its own focused space.</p></div>
           <button className="icon-button" onClick={onClose} aria-label="Close workspace menu"><X size={20} /></button>
         </header>
         <div className="workspace-grid">
-          {workspaces.map(({ to, label, detail, icon: Icon, color }) => (
-            <Link key={to} to={to} onClick={onClose} className={`workspace-tile ${location.pathname.startsWith(to) ? 'current' : ''}`}>
+          {workspaces.filter((workspace) => !workspace.ownerOnly || profile.role === 'owner').map(({ to, label, detail, staffDetail, icon: Icon, color }) => (
+            <Link key={to} to={to} onClick={onClose} aria-current={location.pathname.startsWith(to) ? 'page' : undefined} className={`workspace-tile ${location.pathname.startsWith(to) ? 'current' : ''}`}>
               <span className={`workspace-icon workspace-${color}`}><Icon size={27} weight="duotone" /></span>
-              <span><strong>{label}</strong><small>{detail}</small></span>
+              <span><strong>{label}</strong><small>{profile.role !== 'owner' && staffDetail ? staffDetail : detail}</small></span>
             </Link>
           ))}
         </div>
@@ -85,66 +76,8 @@ function WorkspaceSwitcher({ onClose }) {
   )
 }
 
-function GlobalSearch({ onClose }) {
-  const { pets, owners } = useClinicData()
-  const navigate = useNavigate()
-  const inputRef = useRef(null)
-  const [query, setQuery] = useState('')
-
-  useEffect(() => inputRef.current?.focus(), [])
-
-  const normalized = query.trim().toLowerCase()
-  const results = normalized
-    ? pets.filter((pet) => {
-        const owner = owners.find((item) => item.id === pet.ownerId)
-        return [pet.name, pet.recordNumber, pet.microchip, owner?.fullName, owner?.phone, owner?.normalizedPhone, owner?.normalizedPhone?.replace(/^\+63/, '0')]
-          .some((value) => value?.toLowerCase().includes(normalized))
-      }).slice(0, 6)
-    : []
-
-  const openPet = (id) => {
-    navigate(`/patients/${id}`)
-    onClose()
-  }
-
-  return (
-    <div className="search-overlay" role="dialog" aria-modal="true" aria-label="Search clinic records" onMouseDown={onClose}>
-      <div className="global-search" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="global-search-input">
-          <MagnifyingGlass size={22} weight="bold" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search any patient, owner or record..."
-            onKeyDown={(event) => event.key === 'Escape' && onClose()}
-          />
-          <button className="icon-button" onClick={onClose} aria-label="Close search"><X size={20} /></button>
-        </div>
-        {!normalized && (
-          <div className="search-empty">
-            <FirstAidKit size={34} weight="duotone" />
-            <p>Find a clinic record</p>
-            <span>Search by pet, owner, phone, microchip or record number.</span>
-          </div>
-        )}
-        {normalized && results.length === 0 && <div className="search-empty"><p>No matching clinic records found.</p></div>}
-        {results.map((pet) => {
-          const owner = owners.find((item) => item.id === pet.ownerId)
-          return (
-            <button key={pet.id} className="search-result" onClick={() => openPet(pet.id)}>
-              <PetSticker pet={pet} size="small" />
-              <span><strong>{pet.name}</strong><small>{pet.breed} · {owner?.fullName}</small></span>
-              <code>{pet.recordNumber}</code>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 export default function AppShell() {
+  const { searchWorkspace } = useClinicData()
   const [searchOpen, setSearchOpen] = useState(false)
   const [workspacesOpen, setWorkspacesOpen] = useState(false)
   const location = useLocation()
@@ -159,42 +92,32 @@ export default function AppShell() {
     try { await signOut() } catch (error) { setSignOutError(authErrorMessage(error)) }
     finally { setSigningOut(false) }
   }
-  const overlayOpen = searchOpen || workspacesOpen
-
   useEffect(() => {
     const onKeyDown = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
-        setSearchOpen(true)
-      }
-      if (event.key === 'Escape') {
-        setSearchOpen(false)
-        setWorkspacesOpen(false)
+        if (!document.querySelector('[aria-modal="true"]')) setSearchOpen(true)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  useEffect(() => {
-    document.body.classList.toggle('overlay-open', overlayOpen)
-    return () => document.body.classList.remove('overlay-open')
-  }, [overlayOpen])
-
   return (
     <div className="app-shell spacious-shell">
+      <a className="skip-link" href="#clinic-main" onClick={() => document.getElementById('clinic-main')?.focus()}>Skip to clinic workspace</a>
       <header className="workspace-header">
         <div className="workspace-header-inner">
           <Brand />
-          <button className="workspace-trigger" onClick={() => setWorkspacesOpen(true)} aria-label="Open workspaces">
+          <button className="workspace-trigger" onClick={() => setWorkspacesOpen(true)} aria-label="Open workspaces" aria-haspopup="dialog" aria-expanded={workspacesOpen}>
             <SquaresFour size={20} weight="duotone" /><span>Workspaces</span><CaretDown size={13} weight="bold" />
           </button>
-          <button className="header-search" onClick={() => setSearchOpen(true)} aria-label="Search clinic records">
+          <button className="header-search" onClick={() => setSearchOpen(true)} aria-label="Search clinic records" aria-haspopup="dialog" aria-expanded={searchOpen} aria-keyshortcuts="Control+k Meta+k">
             <MagnifyingGlass size={18} /><span>Search clinic records</span><kbd>Ctrl K</kbd>
           </button>
           <div className="header-actions">
             {accountAccess?.isPlatformAdmin && <Link className="text-link" to="/admin">Platform admin</Link>}
-            <NotificationHub key={location.pathname} />
+            {!searchWorkspace && <NotificationHub key={location.pathname} />}
             <div className="profile-chip" title={`${name} · ${profile.role === 'owner' ? 'Clinic owner' : 'Clinical staff'}`}><span className="avatar small-avatar">{initials}</span><span><strong>{name}</strong><small>{profile.role === 'owner' ? 'Clinic owner' : 'Clinical staff'}</small></span></div>
             <button className="icon-button" onClick={handleSignOut} disabled={signingOut} aria-label={signingOut ? 'Signing out' : 'Sign out'} title="Sign out"><SignOut size={21} /></button>
           </div>
@@ -202,7 +125,7 @@ export default function AppShell() {
       </header>
       {signOutError && <p className="workspace-auth-error" role="alert">{signOutError}</p>}
       <SubscriptionTimer />
-      <main className="main-content spacious-content"><div key={location.pathname} className="workspace-page-transition"><Outlet /></div></main>
+      <main id="clinic-main" tabIndex={-1} className="main-content spacious-content"><div key={location.pathname} className="workspace-page-transition"><Outlet context={{ openSearch: () => setSearchOpen(true) }} /></div></main>
       {workspacesOpen && <WorkspaceSwitcher onClose={() => setWorkspacesOpen(false)} />}
       {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} />}
     </div>

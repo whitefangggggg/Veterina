@@ -32,7 +32,7 @@ assert.equal(sql('select count(*) from public.owners'), '0', 'Start with an empt
 const admin = createClient(env.TEST_SUPABASE_URL, env.TEST_SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 const checked = ({ data, error }) => { if (error) throw error; return data }
 await mkdir('test-artifacts.local', { recursive: true })
-for (const suite of ['security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'follow_up_arrivals', 'clinic_rbac', 'owner_staff_signup', 'google_account_registration', 'clinic_logo', 'owner_clinic_onboarding', 'platform_subscriptions', 'checkup_completion', 'historical_checkups', 'historical_vaccinations', 'unified_patient_visits', 'travel_certificates', 'veterinarian_tin_settings', 'veterinarian_professional_details', 'clinic_appearance_theme', 'preventive_care', 'manual_certificate_vaccines']) {
+for (const suite of ['private_schema_access', 'security_and_workflows', 'portal_workflows', 'queue_workflows', 'clinical_patient_services', 'visit_card_colors', 'service_note_edits', 'prescription_inventory', 'registration_clinical', 'laboratory_observations', 'follow_up_arrivals', 'clinic_rbac', 'owner_staff_signup', 'google_account_registration', 'clinic_logo', 'owner_clinic_onboarding', 'platform_subscriptions', 'checkup_completion', 'historical_checkups', 'historical_vaccinations', 'unified_patient_visits', 'travel_certificates', 'veterinarian_tin_settings', 'veterinarian_professional_details', 'clinic_appearance_theme', 'preventive_care', 'manual_certificate_vaccines']) {
   const result = spawnSync('psql', [env.TEST_DATABASE_URL, '-X', '-v', 'ON_ERROR_STOP=1', '-f', `supabase/tests/${suite}.sql`], { encoding: 'utf8', windowsHide: true })
   await writeFile(`test-artifacts.local/${suite}.log`, (result.stdout || '') + (result.stderr || ''))
   if (result.error) throw result.error
@@ -60,7 +60,7 @@ const travelConcurrency = spawnSync(process.execPath, ['scripts/check-travel-cer
 await writeFile('test-artifacts.local/travel-certificate-concurrency.log', (travelConcurrency.stdout || '') + (travelConcurrency.stderr || ''))
 assert.equal(travelConcurrency.status, 0, 'Travel certificate concurrency failed; see test-artifacts.local/travel-certificate-concurrency.log')
 console.log('PASS isolated travel certificate concurrency')
-for (const suite of ['admissions-database', 'admission-concurrency', 'admissions']) {
+for (const suite of ['admissions-database', 'admission-concurrency', 'admissions', 'admission-tracking-migration', 'admission-tracking-database', 'admission-tracking-concurrency', 'admission-tracking', 'clinic-search-migration', 'clinic-search-database', 'clinic-search-scale', 'clinic-search']) {
   const result = spawnSync(process.execPath, [`scripts/check-${suite}.mjs`], { encoding: 'utf8', windowsHide: true })
   await writeFile(`test-artifacts.local/${suite}.log`, (result.stdout || '') + (result.stderr || ''))
   assert.equal(result.status, 0, `${suite} failed; see test-artifacts.local/${suite}.log`)
@@ -105,7 +105,7 @@ try {
   }
   await signIn(owner)
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/)
-  await expect(page.locator('main h1')).toContainText('Welcome back')
+  await expect(page.locator('.shift-command-bar')).toBeVisible()
   await page.goto(app.origin + '/patients')
   await page.getByRole('button', { name: 'Add owner', exact: true }).click()
   await page.getByLabel('Full name', { exact: false }).fill('Integration household')
@@ -149,6 +149,8 @@ try {
   await page.getByRole('button', { name: 'Edit Vitals & condition', exact: true }).click()
   await page.getByLabel('Chief complaint', { exact: false }).fill('Synthetic follow-up check')
   await page.getByLabel('Clinical notes', { exact: true }).fill('Observed gait improving after rest.')
+  await page.getByLabel('Laboratory Requests', { exact: true }).fill('CBC\nChemistry <panel>')
+  await page.getByLabel('Laboratory Results', { exact: true }).fill('No parasites\nInitial finding')
   await page.getByLabel('Weight (kg)', { exact: false }).fill('4.5')
   const followUp = new Date(future.getTime() + 86400000)
   await page.getByLabel('Follow-up date', { exact: false }).fill(new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(followUp))
@@ -160,6 +162,9 @@ try {
   await expect(page.getByLabel('Chief complaint', { exact: false })).toBeDisabled()
   await expect(page.getByLabel('Weight (kg)', { exact: false })).toBeDisabled()
   await expect(page.getByLabel('Clinical notes', { exact: true })).toHaveValue('Observed gait improving after rest.')
+  await expect(page.getByLabel('Laboratory Requests', { exact: true })).toHaveValue('CBC\nChemistry <panel>')
+  await expect(page.getByLabel('Laboratory Results', { exact: true })).toHaveValue('No parasites\nInitial finding')
+  await page.getByLabel('Laboratory Results', { exact: true }).fill('No parasites\nReviewed finding')
   // Lose one acknowledgement after the real RPC commits; retry must not duplicate care.
   let dropAcknowledgement = true
   await page.route('**/rest/v1/rpc/portal_mutation', async (route) => {
@@ -177,6 +182,8 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.unroute('**/rest/v1/rpc/portal_mutation')
   const visits = checked(await admin.from('visits').select('*').eq('pet_id', patient.id))
+  assert.equal(visits[0].laboratory_requests, 'CBC\nChemistry <panel>')
+  assert.equal(visits[0].laboratory_results, 'No parasites\nReviewed finding')
   const reminders = checked(await admin.from('reminders').select('*').eq('pet_id', patient.id))
   const appointments = checked(await admin.from('appointments').select('*').eq('pet_id', patient.id))
   assert.equal(visits.length, 1)
@@ -231,11 +238,10 @@ try {
   const ledger = checked(await admin.from('inventory_movements').select('quantity_delta').eq('batch_id', batchId))
   assert.equal(ledger.reduce((total, row) => total + Number(row.quantity_delta), 0), 8)
   await page.goto(app.origin + '/dashboard')
-  await expect(page.locator('.glance-metrics > div').nth(0)).toContainText('1')
-  await expect(page.locator('.glance-metrics > div').nth(2)).toContainText('0')
-  await expect(page.locator('.next-patients a')).toHaveCount(0)
-  await expect(page.locator('.daily-work-grid')).toContainText('Care at the clinic (0)')
-  await expect(page.locator('.daily-work-grid')).toContainText('Stock watch (0)')
+  await expect(page.locator('.stream-appointment')).toHaveCount(1)
+  await expect(page.locator('.stock-watch-row')).toHaveCount(0)
+  await expect(page.locator('.clinic-floor')).toContainText('All quiet on the clinic floor')
+  await expect(page.locator('.stock-radar')).toContainText('Stock is ready for care')
   await page.goto(app.origin + '/reports')
   const downloadPromise = page.waitForEvent('download')
   await page.locator('.report-card').filter({ hasText: 'Inventory status' }).getByRole('button', { name: 'Prepare report' }).click()
@@ -382,7 +388,10 @@ try {
   checked(await admin.from('profiles').update({ tin_number: 'Changed TIN' }).eq('id', owner.id))
   checked(await admin.from('vaccinations').update({ brand: 'Changed source brand' }).eq('id', travelVaccine.id))
   checked(await admin.from('owners').update({ address: 'Changed clinic owner address' }).eq('id', patient.owner_id))
-  await travelDialog.getByRole('button', { name: 'Close', exact: true }).click()
+  // Returning from the anonymous window may refresh and close this preview.
+  // Escape safely dismisses it in either state without waiting on a stale modal.
+  await page.keyboard.press('Escape')
+  await expect(travelDialog).toHaveCount(0)
   await page.reload()
   await page.getByRole('button', { name: 'View', exact: true }).click()
   await expect(travelPreview.locator('body')).toContainText('Original travel brand')
@@ -396,7 +405,8 @@ try {
   await travelDialog.getByLabel('Reason for voiding').fill('Synthetic correction check')
   await travelDialog.getByRole('button', { name: 'Confirm void', exact: true }).click()
   await expect(travelDialog.getByRole('status').filter({ hasText: 'VOID CERTIFICATE' })).toBeVisible()
-  await travelDialog.getByRole('button', { name: 'Close', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await expect(travelDialog).toHaveCount(0)
   console.log('PASS real certificate issue → anonymous QR access/revocation → PostgREST list/detail → source change → snapshot-preserving reload → owner void')
 
   await page.goto(app.origin + '/inventory')

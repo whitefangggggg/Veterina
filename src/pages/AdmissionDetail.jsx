@@ -11,6 +11,7 @@ import { clinicErrorMessage } from '../lib/clinicRepository'
 import { admissionSource, admissionStatuses, clinicalConditions, displayAdmissionTime, effectiveObservations, fetchAdmissionDetail, fetchAdmissionPage, openAdmission, openTask, overdueTask, printAdmissionSummary, stayDuration, vitalLabels } from '../lib/admissions'
 import { Badge, Field, SectionCard } from '../components/ui'
 import { AdmissionActionDialog } from '../components/AdmissionDialogs'
+import AdmissionSharing from '../components/AdmissionSharing'
 import './Admissions.css'
 
 export default function AdmissionDetail() {
@@ -92,8 +93,9 @@ export default function AdmissionDetail() {
       {a.status !== 'cancelled' && <ol className="admission-progression" aria-label="Admission progression">{['admitted', 'under_treatment', 'ready_for_discharge', 'discharged'].map((status) => <li key={status} aria-current={status === a.status ? 'step' : undefined}><span aria-hidden="true">{status === a.status ? <Heartbeat size={15} /> : <span />}</span>{admissionStatuses[status]}</li>)}</ol>}
       <div className="admission-actions">{live && <><button className="button button-secondary" onClick={() => open('transfer')}>Assign / transfer</button><button className="button button-secondary" onClick={() => open('transition')}>{a.status === 'ready_for_discharge' ? 'Resume treatment' : 'Change status'}</button>{a.status === 'ready_for_discharge' && <button className="button button-primary" onClick={() => open('discharge')}>Discharge patient</button>}{profile.role === 'owner' && a.status === 'admitted' && <button className="text-link danger-text" onClick={() => open('cancel')}>Cancel mistaken admission</button>}</>}{detail.summary && <button className="button button-primary" disabled={loading} onClick={print}>Print / Save PDF summary</button>}</div>
     </SectionCard>
-    <div className="admission-tabs" role="group" aria-label="Admission workspace">{[['care', 'Care board', ClipboardText], ['monitoring', 'Monitoring & notes', Heartbeat], ['history', 'Activity & summary', Clock]].map(([key, label, Icon]) => <button key={key} className="button" aria-pressed={tab === key} onClick={() => setTab(key)}><Icon size={18} aria-hidden="true" />{label}</button>)}</div>
+    <div className="admission-tabs" role="group" aria-label="Admission workspace">{[['care', 'Care board', ClipboardText], ['monitoring', 'Monitoring & notes', Heartbeat], ['history', 'Activity & summary', Clock], ['sharing', 'Public tracking', PawPrint]].map(([key, label, Icon]) => <button key={key} className="button" aria-pressed={tab === key} onClick={() => setTab(key)}><Icon size={18} aria-hidden="true" />{label}</button>)}</div>
     <div key={tab} className="admission-workspace">
+    {tab === 'sharing' && <AdmissionSharing key={admissionId} admission={a} clinic={clinic} />}
     {tab === 'care' && <>
       <SectionCard title="Care tasks" description="Overdue tasks remain open until a staff member records an outcome. No stock is deducted for held, missed or delayed care.">
         <div className="admission-actions">{live && <><button className="button button-primary" disabled={a.status === 'ready_for_discharge'} onClick={() => open('order')}><Plus size={17} aria-hidden="true" />Add care order</button><button className="button button-secondary" onClick={() => open('unscheduled')}>Record unscheduled care</button></>}<VeterinaCheckbox label="Show resolved tasks" checked={showClosedTasks} onChange={setShowClosedTasks} /></div>

@@ -4,6 +4,14 @@ import { historyHtml } from './reports'
 import { csvCell, csvStream, reportCsv } from '../../supabase/functions/_shared/csv'
 
 describe('clinical exports', () => {
+  it('prints optional laboratory text from database exports with escaped multiline content', () => {
+    const html = historyHtml({ patient: { name: 'Pet' }, visits: [{
+      laboratory_requests: 'CBC <test>\nChemistry & urinalysis', laboratory_results: 'WBC <reference>\nNo parasites',
+    }] })
+    for (const text of ['Laboratory Requests', 'Laboratory Results', 'CBC &lt;test&gt;\nChemistry &amp; urinalysis', 'WBC &lt;reference&gt;\nNo parasites']) expect(html).toContain(text)
+    expect(html).not.toContain('<test>')
+    expect(historyHtml({ patient: { name: 'Pet' }, visits: [{}] })).not.toContain('Laboratory Results')
+  })
   it('prints the current observation headings and preserves historical assessment notes', () => {
     const html = historyHtml({ patient: { name: 'Pet' }, visits: [{ subjective: 'History <note>', objective: 'Current finding', assessment: 'Legacy finding', plan: 'Treatment <instructions>' }] })
     for (const text of ['History', 'Clinical Assessment', 'Treatment Plan', 'History &lt;note&gt;', 'Current finding', 'Legacy finding', 'Treatment &lt;instructions&gt;']) expect(html).toContain(text)

@@ -66,7 +66,7 @@ export function filterClinicalHistory(visits, filters = {}, timezone = 'Asia/Man
 
     const text = normalize([
       visit.type, visit.serviceName, visit.service, visit.serviceNotes, visit.notes, visit.queueNumber, visit.historyKind, visit.complaint, visit.diagnosis, visit.subjective, visit.objective,
-      visit.assessment, visit.plan, visit.clinicalNotes, visit.veterinarian, status, visit.reference, visit.conditionLabel, visit.unitName,
+      visit.assessment, visit.plan, visit.laboratoryRequests, visit.laboratoryResults, visit.clinicalNotes, visit.veterinarian, status, visit.reference, visit.conditionLabel, visit.unitName,
       visit.finalizedAt ? 'Finalized' : '', visit.is_historical ? 'Historical' : '', date, visit.followUpDate, visit.hydration,
       visit.careQueue?.queueNumber,
       visit.weightKg != null ? `${visit.weightKg} kg` : '',

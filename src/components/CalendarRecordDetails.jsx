@@ -66,6 +66,7 @@ function QueueDetails({ entry, data, onEdit }) {
   const preventive = data.preventiveCare.find((record) => record.id === entry.preventive_record_id)
   const draftLabels = { clinicalNotes: 'Clinical notes', complaint: 'Chief complaint', diagnosis: 'Diagnosis', subjective: 'History', objective: 'Clinical Assessment', plan: 'Treatment Plan',
     weightKg: 'Weight (kg)', temperatureC: 'Temperature (°C)', heartRate: 'Heart rate (bpm)', respiratoryRate: 'Respiratory rate (rpm)', bodyConditionScore: 'Body condition', hydration: 'Hydration',
+    laboratoryRequests: 'Laboratory Requests', laboratoryResults: 'Laboratory Results',
     followUpDate: 'Follow-up date', serviceNotes: 'Service notes', dose: 'Dose', administeredAt: 'Vaccination date', nextDueAt: 'Next due date' }
   const draftValues = { ...entry.careDraft, objective: clinicalAssessmentText(entry.careDraft || {}) }
   const draft = Object.entries(draftValues).filter(([key, value]) => draftLabels[key] && value != null && value !== '').map(([key, value]) => [draftLabels[key], value])

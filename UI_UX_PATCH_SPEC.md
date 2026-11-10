@@ -15,7 +15,7 @@ This specification defines a comprehensive UI/UX overhaul for **Veterina** — a
 4. **Functional Header Notification Hub:** Upgrade the bland bell into a dynamic "Today's Agenda" popover driven by real-time appointment counts and urgent care tasks.
 5. **Smooth Page & Workspace Transitions:** Implement subtle, hardware-accelerated transitions that communicate context switching.
 6. **Dashboard Decluttering:** Remove the redundant bottom "Choose a workspace" section.
-7. **Spacing System Normalization:** Use `/reports` (Clinical History card) as the benchmark to enforce consistent vertical rhythm and gap standards across cards and forms.
+7. **Spacing System Normalization:** Use `/eports` (Clinical History card) as the benchmark to enforce consistent vertical rhythm and gap standards across cards and forms.
 8. **Branded Custom Checkboxes:** Replace system checkboxes with animated, brand-tinted controls.
 9. **Patient Record Quick Skim View:** Add a folder-style, low-density summary view for clinical history cards with on-demand detailed modals.
 10. **Patients & Owners Page Glow-Up:** Integrate clinic branding, enhanced avatar stickers, and rapid contact actions without overwhelming busy staff.

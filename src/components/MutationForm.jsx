@@ -12,7 +12,7 @@ export default function MutationForm({ onSubmit, children, className }) {
     catch (e) { setError(e.message || 'Could not save. Please retry.') }
     finally { busy.current=false; setSaving(false) }
   }
-  return <form onSubmit={submit} className={className}>
+  return <form onSubmit={submit} className={className} aria-busy={saving}>
     {error && <p role="alert" className="form-error">{error}</p>}
     {saving && <p role="status">Saving…</p>}
     <fieldset disabled={saving} className="mutation-fields">{children}</fieldset>

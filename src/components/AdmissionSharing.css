@@ -1,0 +1,7 @@
+.admission-sharing{display:grid;gap:20px;max-width:780px;overflow-wrap:anywhere}.admission-sharing>p{margin:0;line-height:1.7;color:var(--muted)}
+.admission-sharing .mutation-fields,.admission-sharing-fields{display:grid;gap:14px}.admission-sharing h3{margin:0 0 4px}
+.admission-sharing-fields{padding-bottom:20px;border-bottom:1px solid var(--line)}
+.admission-sharing-controls{display:grid;gap:12px}.admission-sharing .button{justify-self:start;max-width:100%;white-space:normal}
+.admission-tracking-card{display:grid;justify-items:start;gap:12px;background:var(--surface-soft);border:1px solid var(--line);border-radius:16px;padding:20px}
+.admission-tracking-card>img{max-width:100%;height:auto;border-radius:8px;background:white}.admission-tracking-code{font:700 clamp(18px,5vw,28px) monospace;letter-spacing:.13em;color:var(--brand-ink)}
+.admission-tracking-card .field{width:100%;min-width:0}.admission-tracking-card input{width:100%;min-width:0}

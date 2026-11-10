@@ -1,5 +1,12 @@
 # Veterina — Product Requirements Document
 
+Implementation note, 9 November 2026: KAN-23 replaces browser-only patient search
+with grouped server-backed clinic search from the header, Enter full results,
+cursor pagination, role-aware navigation and focused persisted-record views.
+Search/detail routes load a minimal clinic context. Coverage and exclusions are
+documented in [KAN-23 release notes](docs/kan-23-global-search.md); wider workspace
+loading remains part of UPG-04.
+
 | Document field | Value |
 | --- | --- |
 | Version | 1.0 |

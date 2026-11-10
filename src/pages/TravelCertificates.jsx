@@ -211,7 +211,8 @@ function CertificateViewer({ id, reference, mutate, onChanged, onClose }) {
 export default function TravelCertificates() {
   const [params, setParams] = useSearchParams()
   const [mutate] = useState(() => createMutationRunner(supabase))
-  const [modal, setModal] = useState(() => params.get('petId') ? { type: 'issue', petId: params.get('petId') } : null)
+  const [modal, setModal] = useState(() => params.get('certificateId') ? { type: 'view', id: params.get('certificateId') } : params.get('petId') ? { type: 'issue', petId: params.get('petId') } : null)
+  useEffect(() => { if (params.get('certificateId')) setModal({ type: 'view', id: params.get('certificateId') }) }, [params])
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(0)
   const [revision, setRevision] = useState(0)
@@ -251,6 +252,6 @@ export default function TravelCertificates() {
     {!loading && !error && !result.records.length && <EmptyState icon={FileText} title="No travel certificates found" description="Issue a certificate for a pet or try another reference, pet or owner name." />}
     <div className="travel-pagination"><button className="button button-secondary" disabled={loading || page === 0} onClick={() => setPage((value) => value - 1)}>Previous</button><span>Page {page + 1} of {pageCount}</span><button className="button button-secondary" disabled={loading || page + 1 >= pageCount} onClick={() => setPage((value) => value + 1)}>Next</button></div>
     {modal?.type === 'issue' && <IssueCertificate initialPetId={modal.petId} mutate={mutate} onClose={() => setModal(null)} onIssued={(saved) => { setModal({ type: 'view', id: saved.id, reference: saved.referenceNumber }); setPage(0); reload() }} />}
-    {modal?.type === 'view' && <CertificateViewer key={modal.id} id={modal.id} reference={modal.reference} mutate={mutate} onChanged={reload} onClose={() => setModal(null)} />}
+    {modal?.type === 'view' && <CertificateViewer key={modal.id} id={modal.id} reference={modal.reference} mutate={mutate} onChanged={reload} onClose={() => { setModal(null); if (params.has('certificateId')) { const next = new URLSearchParams(params); next.delete('certificateId'); setParams(next, { replace: true }) } }} />}
   </div>
 }

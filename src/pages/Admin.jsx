@@ -2,7 +2,7 @@ import { SelectField } from '../components/VeterinaSelect'
 import VeterinaCheckbox from '../components/VeterinaCheckbox'
 import { ForbiddenView } from '../components/ErrorViews'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ClipboardText, ClockCountdown, FileText, PawPrint, ShieldCheck, Syringe } from '@phosphor-icons/react'
 import { PageHeader, SectionCard } from '../components/ui'
 import { AsyncForm } from '../components/RecordForm'
@@ -81,7 +81,11 @@ export function Reports() {
 export function Settings() {
   const { settings, execute } = useClinicData()
   const { profile, refreshAccess } = useAuth()
-  const [tab, setTab] = useState('profile')
+  const [params, setParams] = useSearchParams()
+  const requestedTab = params.get('tab')
+  const allowedTabs = profile.role === 'owner' ? ['profile', 'appearance', 'staff', 'veterinarians', 'services'] : ['profile', 'appearance']
+  const tab = allowedTabs.includes(requestedTab) ? requestedTab : 'profile'
+  const setTab = value => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next) }
   const [saved, setSaved] = useState(false)
   if (profile.role !== 'owner') return <div className="page"><PageHeader title="Clinic settings" description="Choose your display mode. Clinic settings and staff administration are managed by the clinic owner." /><div className="tabs"><button className={tab === 'profile' ? 'active' : ''} aria-pressed={tab === 'profile'} onClick={() => setTab('profile')}>Clinic profile</button><button className={tab === 'appearance' ? 'active' : ''} aria-pressed={tab === 'appearance'} onClick={() => setTab('appearance')}>Appearance</button></div>{tab === 'appearance' ? <AppearanceSettings /> : <SectionCard title={settings?.clinic_name}><div className="directory-card"><p>{settings?.address}</p><p>{settings?.phone}</p><p>{settings?.email}</p><p>Clinic timezone: {settings?.timezone}</p></div></SectionCard>}</div>
   return <div className="page">

@@ -1,0 +1,85 @@
+.public-admission{display:grid;align-content:start;gap:20px;box-sizing:border-box;width:100%;max-width:1560px;margin:auto;padding:20px 32px 28px;min-height:100svh;color:var(--ink);overflow-wrap:anywhere}
+.public-admission-brand,.public-admission-result-heading,.public-admission-result footer{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.public-admission-brand img{object-fit:contain;height:44px;width:140px}
+.public-admission-brand .text-link{font-size:13px}
+.public-admission-topbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,.8fr);gap:24px;align-items:center}
+.public-admission-intro{display:flex;align-items:center;gap:16px;min-width:0}
+.public-admission-icon{display:grid;place-items:center;flex:none;width:52px;height:52px;border:1px solid var(--brand-border);border-radius:var(--radius-lg);background:var(--brand-soft);color:var(--brand-ink)}
+.public-admission-intro h1{font-size:clamp(26px,2.5vw,36px);line-height:1.2;margin:6px 0}
+.public-admission-intro p{color:var(--muted);font-size:14px;line-height:1.5;margin:0;max-width:46ch}
+.public-admission-card{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:24px;margin:0;box-shadow:var(--shadow-card,var(--shadow))}
+.public-admission-card h2{margin:0 0 16px;font-size:20px;line-height:1.4;letter-spacing:-.02em}
+.public-admission-card h3{font-size:16px;line-height:1.5}
+.public-admission-card label{font-size:13px;font-weight:650;display:block;margin-bottom:8px}
+.public-admission-lookup{padding:18px 20px;background:var(--surface-soft)}
+.public-tracking-entry{display:flex;gap:10px}
+.public-tracking-entry input{min-width:0;flex:1;min-height:44px;font-family:monospace;font-size:17px;letter-spacing:.07em;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);color:inherit}
+.public-tracking-entry input:focus-visible{outline:2px solid var(--brand-ink);outline-offset:2px}
+.public-admission-card form p,.public-admission-caption,.public-admission-privacy{color:var(--muted);font-size:13px;line-height:1.6}
+.public-admission-card form p{margin:8px 0 0}
+.public-admission-card #tracking-help{font-size:12px}
+.public-admission-card #tracking-validation:empty{display:none}
+.public-admission-summary-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:28px;align-items:start}
+.public-admission-result-heading h2{font-size:28px;margin:5px 0 0}
+.public-admission-result-heading p{font-size:13px;color:var(--muted);margin:3px 0 0}
+.public-admission-result .public-admission-caption{margin:12px 0}
+.public-admission-status{flex:none;border-radius:999px;padding:8px 12px;background:var(--brand-soft);color:var(--brand-ink);font-weight:700;font-size:12px}
+.public-admission-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px;margin:16px 0 0}
+.public-admission-facts>div{min-width:0}
+.public-admission-facts dt{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:4px}
+.public-admission-facts dd{font-size:14px;line-height:1.5;margin:0}
+.public-admission-update{padding:18px 20px;border:1px solid var(--brand-border);border-radius:var(--radius-md);background:var(--surface-soft);min-width:0}
+.public-admission-update h3{margin:0 0 10px;color:var(--brand-strong-ink,var(--ink))}
+.public-admission-update p{margin:8px 0 0;font-size:14px}
+.public-admission-update time{font-size:12px;color:var(--muted)}
+.public-admission-result footer{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.public-admission-result footer small{color:var(--muted);line-height:1.6}
+.public-admission-result>.public-admission-caption:last-child{margin:8px 0 0;font-size:12px}
+.public-admission-prose{white-space:pre-wrap;line-height:1.6}
+.public-admission-privacy{text-align:center;margin:0;padding:4px 12px}
+.public-clinical-sections{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start;min-width:0}
+.public-clinical-activity{grid-column:1/-1}
+.public-clinical-activity-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px 24px}
+.public-clinical-sections .public-admission-card>h2{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.public-clinical-sections h2>svg{flex:none;color:var(--brand-ink)}
+.public-clinical-entry{padding:12px 0;border-bottom:1px solid var(--line)}
+.public-clinical-entry h3,.public-clinical-entry h4{margin:0 0 6px;font-size:14px;line-height:1.5}
+.public-clinical-entry p{margin:6px 0;line-height:1.5;font-size:13px}
+.public-clinical-attribution,.public-clinical-entry small{color:var(--muted);font-size:12px;line-height:1.6}
+.public-clinical-sections .public-admission-card>h3{margin:22px 0 8px}
+.public-clinical-sections .public-admission-card>p{font-size:13px;line-height:1.6}
+.public-clinical-sections .button{margin:16px 0 0}
+.public-clinical-superseded{border-left:3px solid var(--line);padding-left:12px}
+.public-clinical-metric{max-width:260px}
+.public-clinical-table{overflow-x:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);border-radius:var(--radius-sm)}
+.public-clinical-table table{border-collapse:collapse;width:100%;font-size:12px}
+.public-clinical-table th,.public-clinical-table td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.public-clinical-table th{background:var(--surface-soft)}
+.public-clinical-table caption{text-align:left;padding:10px 12px;color:var(--muted)}
+.public-clinical-trend{width:100%;min-width:0;height:220px;margin:16px 0;overflow:hidden}
+.public-clinical-medication dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin:12px 0}
+.public-clinical-medication dt{font-size:12px;color:var(--muted)}
+.public-clinical-medication dd{margin:4px 0;font-size:13px;white-space:pre-wrap}
+.public-admission ~ .pwa-status .pwa-install-button{display:none}
+@media(max-width:959px){
+  .public-admission{padding:20px 24px;gap:18px}
+  .public-admission-topbar{grid-template-columns:minmax(0,1fr)}
+  .public-admission-summary-grid{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px}
+  .public-clinical-sections{grid-template-columns:minmax(0,1fr);gap:18px}
+}
+@media(max-width:600px){
+  .public-admission{padding:16px;gap:16px}
+  .public-admission-card{padding:20px}
+  .public-admission-intro{gap:12px}
+  .public-admission-icon{width:44px;height:44px}
+  .public-admission-intro h1{font-size:26px}
+  .public-admission-intro p{font-size:13px}
+  .public-admission-summary-grid,.public-admission-facts{grid-template-columns:minmax(0,1fr);gap:16px}
+  .public-tracking-entry,.public-admission-result footer{flex-direction:column;align-items:stretch}
+  .public-tracking-entry input{width:100%;box-sizing:border-box}
+  .public-admission-result-heading{align-items:flex-start;gap:10px}
+  .public-admission-result-heading h2{font-size:25px}
+  .public-admission-status{align-self:flex-start;padding:7px 10px}
+  .public-admission-brand{gap:8px}
+  .public-admission-brand img{width:130px}
+}

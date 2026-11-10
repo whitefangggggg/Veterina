@@ -136,7 +136,7 @@ function CheckupEditor({ pet, record, queueEntry, onSaved, onClose, purpose, ser
       { name: 'hydration', label: 'Hydration', type: 'select', options: [...(recordOnly ? [''] : []), 'Normal', 'Mild dehydration', 'Moderate dehydration', 'Severe dehydration'] },
       ] },
       { name: 'soap', title: 'Clinical observations', description: 'Record the history, clinical assessment, and treatment plan.', hidden: !recordOnly && careQueue?.status !== 'in_progress', fields: [
-      ...clinicalObservationFields.map(({ name, label }) => ({ name, label, type: 'textarea', ...(name === 'objective' && initial.assessment ? { hint: `Previously recorded notes: ${initial.assessment}` } : {}) })),
+      ...clinicalObservationFields.map(({ name, label, maxLength, span }) => ({ name, label, maxLength, span, type: 'textarea', ...(name === 'objective' && initial.assessment ? { hint: `Previously recorded notes: ${initial.assessment}` } : {}) })),
       { name: 'assessment', render: () => <input type="hidden" name="assessment" value={initial.assessment || ''} /> },
       { name: 'clinicalNotes', label: 'Clinical notes', type: 'textarea', maxLength: 10000, span: true },
       ] },

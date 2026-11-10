@@ -9,6 +9,7 @@ export function AsyncForm({ onSave, onSaveDraft, onClose, children, submitLabel 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const submitter = useRef(null)
+  const saving = useRef(false)
   const formRef = useRef(null)
   const wizard = useRecordWizard(steps, formRef, setError)
   useEffect(() => {
@@ -16,7 +17,7 @@ export function AsyncForm({ onSave, onSaveDraft, onClose, children, submitLabel 
   }, [error, busy])
   const submit = async (event) => {
     event.preventDefault()
-    if (busy) return
+    if (saving.current) return
     const saveDraft = event.nativeEvent.submitter?.value === 'draft'
     if (!saveDraft && steps) {
       submitter.current = null
@@ -40,6 +41,7 @@ export function AsyncForm({ onSave, onSaveDraft, onClose, children, submitLabel 
       }
       values = Object.fromEntries(new FormData(form))
     } finally { lockedSections.forEach((section) => { section.disabled = true }) }
+    saving.current = true
     setBusy(true)
     setError('')
     try {
@@ -47,11 +49,12 @@ export function AsyncForm({ onSave, onSaveDraft, onClose, children, submitLabel 
       if (result !== false) onClose?.()
     }
     catch (error) { setError(error.message || 'Unable to save. Please try again.') }
-    finally { setBusy(false) }
+    finally { saving.current = false; setBusy(false) }
   }
   const reviewing = !steps || wizard.index === steps.length
   return <form ref={formRef} onSubmit={submit} noValidate={Boolean(steps)} className={`${className || ''}${steps ? ' record-wizard' : ''}`} aria-busy={busy}>
     {error && <p className="auth-message auth-error" role="alert">{error}</p>}
+    <p className="form-progress" role="status">{busy ? 'Saving changes. Keep this window open until the save finishes.' : ''}</p>
     <fieldset disabled={busy} className="record-fieldset">
       {steps && <><RecordStepper {...wizard.navigationProps} busy={busy} />{steps.map((step, index) => <section key={step.id} className="record-step-panel" data-record-step={step.id} hidden={wizard.index !== index} aria-label={step.label}>
         <h3 data-step-heading tabIndex={-1}>{step.label}</h3>{step.description && <p className="record-step-description">{step.description}</p>}{step.content}
