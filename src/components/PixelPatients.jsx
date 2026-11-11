@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import './PixelPatients.css'
 
 const subscribe = (notify) => {
@@ -8,12 +8,10 @@ const subscribe = (notify) => {
 }
 const snapshot = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 function PixelPatient({ children, className, label }) {
-  const reducedMotion = useSyncExternalStore(subscribe, snapshot, () => true)
-  const [choice, setChoice] = useState(null)
-  const playing = choice ?? !reducedMotion
+  const reducedMotion = useSyncExternalStore(subscribe, snapshot, () => false)
+  const playing = !reducedMotion
   return <div className={`vt-pixel-patient ${className}${playing ? ' is-playing' : ''}`}>
     <div role="img" aria-label={label}>{children}</div>
-    <button type="button" className="vt-patient-toggle" aria-pressed={playing} aria-label={`${playing ? 'Pause' : 'Play'} ${className === 'vt-sleepy-cat' ? 'sleeping cat' : 'excited dog'} animation`} onClick={() => setChoice(!playing)}>{playing ? 'Pause animation' : 'Play animation'}</button>
   </div>
 }
 

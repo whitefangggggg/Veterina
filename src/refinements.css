@@ -95,7 +95,6 @@
 @keyframes workspaceFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* Patient identity and contact actions remain independent, valid links. */
-.patient-table.section-card { border-top: 3px solid var(--brand-ink); }
 .patient-table .clinical-flags { flex-flow: row wrap; align-items: center; gap: 6px; }
 .patient-table .patient-cell { min-width: 0; border-radius: var(--radius-sm); }
 .patient-table .table-row { position: relative; }

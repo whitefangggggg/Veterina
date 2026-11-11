@@ -1,0 +1,6 @@
+p='tmp/pdfs/revise_notes.py'
+s=open(p,encoding='utf-8-sig').read().replace("page.get_text(sort=True).splitlines()","page.get_text().splitlines()")
+s=s.replace("first=lines[0]\n  story.append(p(first,head))", "first=lines[0]\n  headings={1:'Microbial Spoilage of Canned Food',2:'Learning outcomes',3:'Factors Affecting Microbial Spoilage',4:'Microbial spoilage',5:'Factors determining microbial unsoundness',6:'Flat Souring',7:'Flat Souring (continued)',8:'Chemical spoilage - Hydrogen swell',9:'Hydrogen swell (continued)',10:'Judgement',11:'Sulphiding',12:'Prevention, Treatment and Judgement',13:'Rust or Damage',14:'Pin holing and self-sealing cans',15:'Common can distortions',16:'Unfilled cans and damage',17:'Judgement of damaged cans',18:'Springer and Leaker',19:'Examination of containers'}\n  topic=headings.get(i+1,first) if filename.startswith('Lesson') else first\n  story.append(p(topic,head))")
+# Preserve the original first line when a descriptive heading replaces it.
+s=s.replace("if not first_removed and g.startswith(first): g=g[len(first):].strip();first_removed=True", "if not first_removed and g.startswith(first) and topic==first: g=g[len(first):].strip();first_removed=True")
+open(p,'w',encoding='utf-8').write(s)

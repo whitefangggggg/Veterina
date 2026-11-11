@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import './DoctorDino.css'
 
 const motionQuery = () => window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -11,9 +11,8 @@ const getReducedMotion = () => motionQuery().matches
 
 /** Pixel mascot with an explicit play override for reduced-motion visitors. */
 export default function DoctorDino() {
-  const reducedMotion = useSyncExternalStore(subscribeToMotion, getReducedMotion, () => true)
-  const [motionChoice, setMotionChoice] = useState(null)
-  const playing = motionChoice ?? !reducedMotion
+  const reducedMotion = useSyncExternalStore(subscribeToMotion, getReducedMotion, () => false)
+  const playing = !reducedMotion
   return (
     <div className={`vt-dino-lane${playing ? ' is-playing' : ''}`}>
       <div className="vt-dino-track" aria-hidden="true">
@@ -40,7 +39,6 @@ export default function DoctorDino() {
           </svg>
         </div></div>
       </div>
-      <button className="vt-dino-toggle" type="button" onClick={() => setMotionChoice(!playing)} aria-pressed={playing} aria-label={playing ? 'Pause dinosaur animation' : 'Play dinosaur animation'}>{playing ? 'Pause animation' : 'Play animation'}</button>
     </div>
   )
 }
