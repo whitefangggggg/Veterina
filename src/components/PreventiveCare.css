@@ -9,6 +9,15 @@
 .preventive-history-items dl { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 12px 0 0; font-size: 13px; }
 .preventive-history-items dt { color: var(--muted); margin-bottom: 5px; }
 .preventive-history-items dd { margin: 0; color: var(--ink); }
+.preventive-vitals { margin: 20px 0 24px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.preventive-vitals header { display: block; margin-bottom: 14px; }
+.preventive-vitals h3, .preventive-record-vitals h4 { margin: 0; color: var(--ink); font-size: 15px; }
+.preventive-vitals header p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+.preventive-record-vitals { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.preventive-record-vitals dl { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 12px; margin: 12px 0 0; font-size: 13px; }
+.preventive-record-vitals dt { margin-bottom: 4px; color: var(--muted); }
+.preventive-record-vitals dd { margin: 0; color: var(--ink); }
+.preventive-record-vitals p { margin: 12px 0 0; font-size: 12px; }
 @media(max-width:600px) { .preventive-history-items dl { grid-template-columns: minmax(0,1fr); } }
 
 .preventive-section > .preventive-section-header {

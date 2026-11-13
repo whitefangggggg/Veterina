@@ -7,6 +7,15 @@ import './PreventiveCare.css'
 export default function PreventiveCareCard({ record, onEdit, onDelete }) {
   const historical = record.recordingPurpose === 'record_only'
   const date = record.administeredAt ? parseISO(record.administeredAt) : null
+  const vitals = record.vitals || {}
+  const measured = [
+    ["Weight", vitals.weightKg !== '' && vitals.weightKg != null ? `${vitals.weightKg} kg` : ''],
+    ['Temperature', vitals.temperatureC !== '' && vitals.temperatureC != null ? `${vitals.temperatureC} °C` : ''],
+    ['Heart rate', vitals.heartRate !== '' && vitals.heartRate != null ? `${vitals.heartRate} bpm` : ''],
+    ['Respiratory rate', vitals.respiratoryRate !== '' && vitals.respiratoryRate != null ? `${vitals.respiratoryRate} breaths/minute` : ''],
+    ['Body condition', vitals.bodyConditionScore !== '' && vitals.bodyConditionScore != null ? `${vitals.bodyConditionScore}/5` : ''],
+    ['Hydration', vitals.hydration || ''],
+  ].filter(([, value]) => value)
   return <article className="visit-card section-card preventive-history-card preventive-care-card" id={`preventive-${record.id}`}>
     <div className="visit-date">{date && !Number.isNaN(date.getTime()) ? <><span>{format(date, 'MMM')}</span><strong>{format(date, 'dd')}</strong><small>{format(date, 'yyyy')}</small></> : <small>Not recorded</small>}</div>
     <div className="visit-content">
@@ -16,6 +25,10 @@ export default function PreventiveCareCard({ record, onEdit, onDelete }) {
       {!historical && <Badge tone={item.nextDoseStatus === 'Overdue' ? 'danger' : item.nextDoseStatus === 'Due today' ? 'warning' : 'neutral'}>{item.nextDoseStatus || record.nextDoseStatus}</Badge>}
       {item.consumed && <p className="muted">Deducted {item.dispenseQuantity} {item.dispenseUnit || 'units'} from inventory.</p>}
     </li>)}</ol>
+    {measured.length > 0 && <section className="preventive-record-vitals" aria-label="Vitals & condition">
+      <h4>Vitals &amp; condition</h4><dl>{measured.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      {vitals.measuredByName && <p className="muted">Recorded by {vitals.measuredByName}</p>}
+    </section>}
     <div className="record-actions">{['Waiting', 'In progress'].includes(record.careStatus) ? <Link className="button button-secondary small-button" to="/queue">Open queued care</Link> : onEdit && <button className="button button-secondary small-button" onClick={() => onEdit(record)}>Edit {record.kind === 'deworming' ? 'deworming' : 'vaccination record'}</button>}
       {onDelete && <button className="button button-secondary small-button danger-text" disabled={record.items.some((item) => item.consumed)} title={record.items.some((item) => item.consumed) ? 'Stock history must be retained. Use Inventory for stock corrections.' : undefined} onClick={() => onDelete(record)}>Delete record</button>}
     </div>

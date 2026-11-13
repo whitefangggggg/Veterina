@@ -326,6 +326,12 @@ permissions, cancellation/deletion, reminders, reports and legacy adapters.
 The real `test:database` workflow also exercises both live types through Auth,
 PostgREST and the browser, including a deliberately lost completion response.
 
+KAN-28 extends `preventive_care.sql` and `preventiveCare.test.js` with grouped
+vaccination vitals, partial deworming values, blank and historical records,
+draft retention, range validation, clinic isolation, history search, and audited
+corrections. Apply `20261113125359_preventive_record_vitals.sql` before releasing
+the updated frontend in another environment. See [KAN-28 release notes](docs/kan-28-preventive-vitals.md).
+
 Settings > Appearance is available to every approved staff member. Light, Dark,
 and System apply across clinic, public, authentication, account and platform
 pages. The preference is browser-local (`veterina-appearance`), defaults to System,

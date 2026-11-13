@@ -18,20 +18,33 @@ do $$ declare person uuid;patient uuid;vaccine uuid;batch uuid;medicine uuid;med
   perform public.portal_mutation('record_inventory_movement',jsonb_build_object('id',medicine,'batchId',med_batch,'delta',5,'reason','Delivery'),gen_random_uuid());
   select (now() at time zone timezone)::date::text,((now() at time zone timezone)::date+30)::text into today,due from public.clinic_settings limit 1;
   line:=jsonb_build_object('id',gen_random_uuid(),'inventoryItemId',vaccine,'batchId',batch,'dispenseQuantity',2,'lotNumber','MANUAL-LOT','dose','Recorded dose','nextDueAt',due);
-  payload:=jsonb_build_object('petId',patient,'kind','vaccination','recordingPurpose','queue','administeredAt',today,'veterinarianId',auth.uid(),'vaccines',jsonb_build_array(line,line||jsonb_build_object('id',gen_random_uuid(),'dispenseQuantity',1)));
+  payload:=jsonb_build_object('petId',patient,'kind','vaccination','recordingPurpose','queue','administeredAt',today,'veterinarianId',auth.uid(),
+    'vitals',jsonb_build_object('weightKg',5.125,'temperatureC',38.65,'heartRate',120,'respiratoryRate',32,'bodyConditionScore',3,'hydration','Normal'),
+    'vaccines',jsonb_build_array(line,line||jsonb_build_object('id',gen_random_uuid(),'dispenseQuantity',1)));
   perform pg_temp.reject_pc('create_preventive_care',jsonb_set(payload,'{vaccines,0,lotNumber}','"   "'),'VALIDATION_FAILED: lot number required');
   response:=public.portal_mutation('create_preventive_care',payload,key);record_id:=(response->>'id')::uuid;queue_id:=(response->>'queueEntryId')::uuid;
   if public.portal_mutation('create_preventive_care',payload,key)<>response then raise exception 'TEST: retry changed response'; end if;
   if (select count(*) from public.vaccinations where preventive_record_id=record_id)<>2 then raise exception 'TEST: vaccines not grouped'; end if;
+  if (select count(*) from public.preventive_record_vitals where preventive_record_id=record_id)<>1
+    or not exists(select 1 from public.preventive_record_vitals where preventive_record_id=record_id and weight_kg=5.125 and temperature_c=38.65
+      and heart_rate_bpm=120 and respiratory_rate_rpm=32 and body_condition_score=3 and hydration='Normal' and measured_by=auth.uid()) then
+    raise exception 'TEST: grouped preventive vitals were not stored once with attribution'; end if;
   if (select sum(quantity_delta) from public.inventory_movements where batch_id=batch)<>10 then raise exception 'TEST: waiting care consumed stock'; end if;
   if (select count(*) from public.reminders where vaccination_id in(select id from public.vaccinations where preventive_record_id=record_id))<>2 then raise exception 'TEST: per-vaccine reminders missing'; end if;
   perform public.portal_mutation('start_queue_entry',jsonb_build_object('id',queue_id,'veterinarianId',auth.uid()),gen_random_uuid());
   perform public.portal_mutation('save_queue_draft',jsonb_build_object('id',queue_id,'draftVersion',0,'record',payload-'serviceId'),gen_random_uuid());
+  if (select care_draft->'vitals' from public.queue_entries where id=queue_id) is distinct from payload->'vitals' then raise exception 'TEST: preventive vitals draft was not retained'; end if;
   perform pg_temp.reject_pc('complete_queue_entry',jsonb_build_object('id',queue_id,'draftVersion',0,'record',payload),'DRAFT_CONFLICT');
   perform public.portal_mutation('complete_queue_entry',jsonb_build_object('id',queue_id,'draftVersion',1,'record',payload||jsonb_build_object('id',record_id,'version',0)),gen_random_uuid());
   if (select sum(quantity_delta) from public.inventory_movements where batch_id=batch)<>7 then raise exception 'TEST: completion did not consume once'; end if;
   if exists(select 1 from public.vaccinations where preventive_record_id=record_id and consumed_at is null) then raise exception 'TEST: consumption receipt missing'; end if;
   payload:=payload||jsonb_build_object('id',record_id,'version',1);
+  perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('vitals','{"weightKg":-1}'::jsonb),'VALIDATION_FAILED');
+  perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('vitals','{"temperatureC":-0.5}'::jsonb),'VALIDATION_FAILED');
+  perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('vitals','{"heartRate":120.5}'::jsonb),'VALIDATION_FAILED');
+  perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('vitals','{"respiratoryRate":32.5}'::jsonb),'VALIDATION_FAILED');
+  perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('vitals','{"bodyConditionScore":6}'::jsonb),'VALIDATION_FAILED');
+  perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('vitals','{"hydration":"Unknown"}'::jsonb),'VALIDATION_FAILED');
   perform public.portal_mutation('update_preventive_care',payload,gen_random_uuid());
   if (select sum(quantity_delta) from public.inventory_movements where batch_id=batch)<>7 then raise exception 'TEST: editing consumed twice'; end if;
   perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('version',2,'vaccines',jsonb_build_array(line||'{"dispenseQuantity":3}',(payload->'vaccines')->1)),'DISPENSING_LOCKED');
@@ -39,11 +52,16 @@ do $$ declare person uuid;patient uuid;vaccine uuid;batch uuid;medicine uuid;med
   perform pg_temp.reject_pc('update_vaccination',jsonb_build_object('id',line->>'id','dose','Legacy edit'),'VALIDATION_FAILED');
   perform pg_temp.reject_pc('delete_record',jsonb_build_object('entity','vaccination','id',line->>'id','reason','Legacy delete'),'VALIDATION_FAILED');
   -- Correcting the clinical lot is audited and does not consume or unlock stock.
+  payload:=jsonb_set(payload,'{vitals,weightKg}','5.25');
   perform public.portal_mutation('update_preventive_care',jsonb_set(payload||'{"version":2}','{vaccines,0,lotNumber}','"CORRECTED-LOT"'),gen_random_uuid());
   if (select lot_number from public.vaccinations where id=(line->>'id')::uuid)<>'CORRECTED-LOT' then raise exception 'TEST: completed lot correction ignored'; end if;
   if (select sum(quantity_delta) from public.inventory_movements where batch_id=batch)<>7 then raise exception 'TEST: lot correction consumed stock'; end if;
   if not exists(select 1 from public.audit_logs a where a.table_name='vaccinations' and a.record_id=line->>'id' and a.new_data->>'lot_number'='CORRECTED-LOT') then raise exception 'TEST: lot correction not audited'; end if;
+  if not exists(select 1 from public.audit_logs a join public.preventive_record_vitals v on v.id::text=a.record_id
+    where a.table_name='preventive_record_vitals' and v.preventive_record_id=record_id and a.actor_id=auth.uid()
+      and a.old_data->>'weight_kg'='5.125' and a.new_data->>'weight_kg'='5.25') then raise exception 'TEST: completed vitals correction was not attributed and audited'; end if;
   -- Restore the original lot and version expected by the append checks below.
+  payload:=jsonb_set(payload,'{vitals,weightKg}','5.125');
   perform public.portal_mutation('update_preventive_care',payload||'{"version":3}',gen_random_uuid());
   payload:=payload||'{"version":4}';
   -- Adding to completed care consumes only the new stable item and retries safely.
@@ -53,8 +71,12 @@ do $$ declare person uuid;patient uuid;vaccine uuid;batch uuid;medicine uuid;med
   perform pg_temp.reject_pc('update_preventive_care',payload||jsonb_build_object('version',5,'vaccines',jsonb_build_array(line)),'DISPENSING_LOCKED');
 
   -- One deworming item, using Medicine inventory, without entering vaccination evidence.
-  payload:=jsonb_build_object('petId',patient,'kind','deworming','recordingPurpose','queue','administeredAt',today,'veterinarianId',auth.uid(),'deworming',jsonb_build_object('id',gen_random_uuid(),'inventoryItemId',medicine,'batchId',med_batch,'dispenseQuantity',1,'dose','Recorded dose','nextDueAt',due));
+  payload:=jsonb_build_object('petId',patient,'kind','deworming','recordingPurpose','queue','administeredAt',today,'veterinarianId',auth.uid(),
+    'vitals',jsonb_build_object('weightKg',7.35,'temperatureC',null,'heartRate',null,'respiratoryRate',null,'bodyConditionScore',null,'hydration',null),
+    'deworming',jsonb_build_object('id',gen_random_uuid(),'inventoryItemId',medicine,'batchId',med_batch,'dispenseQuantity',1,'dose','Recorded dose','nextDueAt',due));
   response:=public.portal_mutation('create_preventive_care',payload,gen_random_uuid());record_id:=(response->>'id')::uuid;queue_id:=(response->>'queueEntryId')::uuid;
+  if (select count(*) from public.preventive_record_vitals where preventive_record_id=record_id)<>1
+    or (select weight_kg from public.preventive_record_vitals where preventive_record_id=record_id)<>7.35 then raise exception 'TEST: partial deworming vitals were not stored'; end if;
   if exists(select 1 from public.vaccinations where preventive_record_id=record_id) then raise exception 'TEST: deworming entered vaccine evidence'; end if;
   if (select count(*) from public.deworming_administrations where preventive_record_id=record_id)<>1 then raise exception 'TEST: single deworming missing'; end if;
   perform public.portal_mutation('start_queue_entry',jsonb_build_object('id',queue_id,'veterinarianId',auth.uid()),gen_random_uuid());
@@ -86,13 +108,27 @@ do $$ declare person uuid;patient uuid;vaccine uuid;batch uuid;medicine uuid;med
   batch:=(public.portal_mutation('create_batch',jsonb_build_object('itemId',medicine,'lotNumber','EXPIRED','expirationDate','2000-01-01'),gen_random_uuid())->>'id')::uuid;
   perform pg_temp.reject_pc('create_preventive_care',jsonb_set(payload,'{deworming,batchId}',to_jsonb(batch::text)),'INVENTORY_UNAVAILABLE');
   -- Historical multiple vaccines and a single deworming administration create no operations.
-  payload:=jsonb_build_object('petId',patient,'kind','vaccination','recordingPurpose','record_only','administeredAt',today,'veterinarianName','Outside clinician','vaccines',jsonb_build_array(jsonb_build_object('id',gen_random_uuid(),'vaccine','Past vaccine one','dose','Old dose','nextDueAt',due),jsonb_build_object('id',gen_random_uuid(),'vaccine','Past vaccine two')));
+  payload:=jsonb_build_object('petId',patient,'kind','vaccination','recordingPurpose','record_only','administeredAt',today,'veterinarianName','Outside clinician',
+    'vitals',jsonb_build_object('weightKg',null,'temperatureC',null,'heartRate',null,'respiratoryRate',null,'bodyConditionScore',null,'hydration',null),
+    'vaccines',jsonb_build_array(jsonb_build_object('id',gen_random_uuid(),'vaccine','Past vaccine one','dose','Old dose','nextDueAt',due),jsonb_build_object('id',gen_random_uuid(),'vaccine','Past vaccine two')));
   response:=public.portal_mutation('create_preventive_care',payload,gen_random_uuid());record_id:=(response->>'id')::uuid;
+  if exists(select 1 from public.preventive_record_vitals where preventive_record_id=record_id) then raise exception 'TEST: empty vital fields created measured observations'; end if;
   if exists(select 1 from public.queue_entries where preventive_record_id=record_id) or exists(select 1 from public.reminders where vaccination_id in(select id from public.vaccinations where preventive_record_id=record_id)) then raise exception 'TEST: historical side effects'; end if;
+  payload:=jsonb_build_object('petId',patient,'kind','deworming','recordingPurpose','record_only','administeredAt',today,'veterinarianName','Outside clinician',
+    'vitals',jsonb_build_object('weightKg',null,'temperatureC',39.15,'heartRate',null,'respiratoryRate',null,'bodyConditionScore',4,'hydration','Mild dehydration'),
+    'deworming',jsonb_build_object('id',gen_random_uuid(),'vaccine','Historical dewormer','dose','Original dose'));
+  response:=public.portal_mutation('create_preventive_care',payload,gen_random_uuid());record_id:=(response->>'id')::uuid;
+  if not exists(select 1 from public.preventive_record_vitals where preventive_record_id=record_id and temperature_c=39.15 and body_condition_score=4
+    and hydration='Mild dehydration' and measured_by=auth.uid()) or exists(select 1 from public.queue_entries where preventive_record_id=record_id) then
+    raise exception 'TEST: historical partial vitals or no-side-effect semantics failed'; end if;
   perform pg_temp.reject_pc('create_preventive_care',payload||'{"deworming":{}}','VALIDATION_FAILED');
   perform pg_temp.reject_pc('create_preventive_care',payload||'{"vaccines":[]}','VALIDATION_FAILED');
   perform set_config('pc.patient',patient::text,true);perform set_config('pc.history',record_id::text,true);
-  if has_table_privilege('authenticated','public.preventive_care_records','INSERT,UPDATE,DELETE') or has_table_privilege('anon','public.preventive_care_records','SELECT') or has_table_privilege('authenticated','public.deworming_administrations','INSERT,UPDATE,DELETE') or has_function_privilege('authenticated','private.save_preventive_care(jsonb,boolean,boolean)','EXECUTE') then raise exception 'TEST: direct writes exposed'; end if;
+  if has_table_privilege('authenticated','public.preventive_care_records','INSERT,UPDATE,DELETE') or has_table_privilege('anon','public.preventive_care_records','SELECT')
+    or has_table_privilege('authenticated','public.deworming_administrations','INSERT,UPDATE,DELETE')
+    or has_table_privilege('authenticated','public.preventive_record_vitals','INSERT,UPDATE,DELETE')
+    or has_table_privilege('anon','public.preventive_record_vitals','SELECT')
+    or has_function_privilege('authenticated','private.save_preventive_care(jsonb,boolean,boolean)','EXECUTE') then raise exception 'TEST: direct writes exposed'; end if;
 end $$;
 reset role;
 select set_config('pc.staff',gen_random_uuid()::text,true);
@@ -114,7 +150,8 @@ select pg_temp.reject_pc('create_preventive_care','{}','FORBIDDEN');
 reset role;
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('pc.foreign'),'role','authenticated')::text,true);
 set local role authenticated;
-do $$ begin if exists(select 1 from public.preventive_care_records) or exists(select 1 from public.deworming_administrations) then raise exception 'TEST: cross-clinic read'; end if;end $$;
+do $$ begin if exists(select 1 from public.preventive_care_records) or exists(select 1 from public.deworming_administrations)
+  or exists(select 1 from public.preventive_record_vitals) then raise exception 'TEST: cross-clinic read'; end if;end $$;
 select pg_temp.reject_pc('update_preventive_care',jsonb_build_object('id',current_setting('pc.history'),'petId',current_setting('pc.patient'),'kind','vaccination','recordingPurpose','record_only'),'NOT_FOUND');
 reset role;
 select set_config('request.jwt.claims','{}',true);

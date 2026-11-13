@@ -2,7 +2,7 @@ import { vaccinationStatus } from '../utils/clinicRules'
 import { normalizePreventiveCare } from './preventiveCare'
 
 const tableNames = ['owners', 'pets', 'pet_alerts', 'visits', 'visit_vitals', 'vaccinations', 'appointments', 'queue_entries',
-  'patient_service_records', 'preventive_care_records', 'deworming_administrations', 'reminder_worklist', 'reminder_activity', 'inventory_items', 'inventory_batches', 'inventory_movements',
+  'patient_service_records', 'preventive_care_records', 'preventive_record_vitals', 'deworming_administrations', 'reminder_worklist', 'reminder_activity', 'inventory_items', 'inventory_batches', 'inventory_movements',
   'item_suppliers', 'suppliers', 'service_types', 'clinic_settings', 'profiles', 'prescriptions', 'visit_corrections', 'kb_documents',
   'admissions', 'admission_wards', 'admission_units', 'admission_occupancy']
 

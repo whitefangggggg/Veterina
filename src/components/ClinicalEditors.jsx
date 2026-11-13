@@ -15,6 +15,7 @@ import PreventiveCareEditor from './PreventiveCareEditor'
 import { format, parseISO } from 'date-fns'
 import { RecordFlowContext } from '../context/RecordFlowContext'
 import { clinicalObservationFields } from '../lib/clinicalObservations'
+import { hydrationOptions } from '../lib/clinicalOptions'
 
 export function VisitEditor(props) {
   const [purpose, setPurpose] = useState(props.purpose || null)
@@ -133,7 +134,7 @@ function CheckupEditor({ pet, record, queueEntry, onSaved, onClose, purpose, ser
       { name: 'heartRate', label: 'Heart rate (bpm)', type: 'number', min: '1', step: '1' },
       { name: 'respiratoryRate', label: 'Respiratory rate', type: 'number', min: '1', step: '1' },
       { name: 'bodyConditionScore', render: () => <BodyConditionField record={record} draft={draft.values} /> },
-      { name: 'hydration', label: 'Hydration', type: 'select', options: [...(recordOnly ? [''] : []), 'Normal', 'Mild dehydration', 'Moderate dehydration', 'Severe dehydration'] },
+      { name: 'hydration', label: 'Hydration', type: 'select', options: [...(recordOnly ? [''] : []), ...hydrationOptions] },
       ] },
       { name: 'soap', title: 'Clinical observations', description: 'Record the history, clinical assessment, and treatment plan.', hidden: !recordOnly && careQueue?.status !== 'in_progress', fields: [
       ...clinicalObservationFields.map(({ name, label, maxLength, span }) => ({ name, label, maxLength, span, type: 'textarea', ...(name === 'objective' && initial.assessment ? { hint: `Previously recorded notes: ${initial.assessment}` } : {}) })),

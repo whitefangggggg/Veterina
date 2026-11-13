@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { normalizeClinicData } from './clinicRepository'
 import { preventiveHistoryRecords, preventivePayload } from './preventiveCare'
 import { filterPatientRecords } from './patientRecordHistory'
+import { combinedClinicalHistory, filterClinicalHistory } from './clinicalHistory'
 import { buildPatientTimeline } from './dailyWorkflow'
 
 const raw = {
@@ -12,6 +13,8 @@ const raw = {
   profiles: [{ id: 'doctor', full_name: 'Clinic doctor' }],
   vaccinations: ['Anti-Rabies', 'Combination vaccine'].map((vaccine_name, index) => ({ id: `item${index}`, preventive_record_id: 'group', pet_id: 'pet', vaccine_name, administered_at: '2026-11-01', next_due_at: index ? '2027-02-01' : '2027-11-01', brand: 'Known brand' })),
   deworming_administrations: [{ id: 'worm-item', preventive_record_id: 'worm', product_name: 'Dewormer', dose: 'Recorded dose' }],
+  preventive_record_vitals: [{ id: 'group-vitals', preventive_record_id: 'group', weight_kg: '5.125', temperature_c: '38.65', heart_rate_bpm: 120,
+    respiratory_rate_rpm: 32, body_condition_score: 3, hydration: 'Normal', measured_by: 'doctor', measured_at: '2026-11-01T10:00:00Z' }],
   queue_entries: [{ id: 'queue', preventive_record_id: 'group', vaccination_id: 'item0', status: 'waiting', arrived_at: '2026-11-01T00:00:00Z' }],
 }
 
@@ -21,6 +24,8 @@ describe('preventive care projections', () => {
     expect(data.preventiveCare).toHaveLength(2)
     expect(data.preventiveCare[0]).toMatchObject({ id: 'group', careStatus: 'Waiting', nextDueAt: '2027-02-01', veterinarianName: 'Clinic doctor' })
     expect(data.preventiveCare[0].items).toHaveLength(2)
+    expect(data.preventiveCare[0].vitals).toMatchObject({ weightKg: '5.125', temperatureC: '38.65', heartRate: '120', respiratoryRate: '32', bodyConditionScore: '3', hydration: 'Normal', measuredByName: 'Clinic doctor' })
+    expect(data.preventiveCare[1].vitals).toMatchObject({ weightKg: '', hydration: '' })
     expect(data.vaccinations.every((vaccine) => vaccine.careStatus === 'Waiting')).toBe(true)
     expect(data.vaccinations).toHaveLength(2)
     expect(data.preventiveCare[1].items[0].vaccine).toBe('Dewormer')
@@ -30,6 +35,15 @@ describe('preventive care projections', () => {
     const records = preventiveHistoryRecords(normalizeClinicData(raw).preventiveCare)
     expect(filterPatientRecords(records, { query: 'combination known brand' }).map((row) => row.id)).toEqual(['group'])
     expect(filterPatientRecords(records, { kind: 'Deworming' }).map((row) => row.id)).toEqual(['worm'])
+  })
+
+  it('includes preventive measurements in unified patient history search and timeline details', () => {
+    const data = normalizeClinicData(raw)
+    const records = combinedClinicalHistory([], [], data.preventiveCare)
+    expect(filterClinicalHistory(records, { query: '5.125 kg Normal' })).toHaveLength(1)
+    const event = buildPatientTimeline(data, 'pet').find((row) => row.kind === 'Vaccination')
+    expect(event.detail).toContain('5.125 kg')
+    expect(event.detail).toContain('Normal')
   })
 
   it('keeps a legacy single vaccine visible without a parent response', () => {
@@ -48,6 +62,11 @@ describe('preventive care projections', () => {
   it('separates stock units from clinical dose and excludes stock from history', () => {
     const items = [{ id: 'item', inventoryItemId: 'product', batchId: 'batch', dispenseQuantity: '0.25', dose: ' 1 mL ', vaccine: ' Vaccine ', brand: ' Brand ', lotNumber: 'Lot' }]
     expect(preventivePayload({ kind: 'vaccination' }, items, false).vaccines[0]).toMatchObject({ id: 'item', dispenseQuantity: 0.25, dose: '1 mL', batchId: 'batch', lotNumber: 'Lot' })
-    expect(preventivePayload({ kind: 'deworming' }, items, true)).toEqual({ kind: 'deworming', deworming: { id: 'item', vaccine: 'Vaccine', brand: 'Brand', lotNumber: 'Lot', dose: '1 mL', nextDueAt: '' } })
+    expect(preventivePayload({ kind: 'deworming' }, items, true)).toEqual({ kind: 'deworming', vitals: { weightKg: null, temperatureC: null, heartRate: null, respiratoryRate: null, bodyConditionScore: null, hydration: null }, deworming: { id: 'item', vaccine: 'Vaccine', brand: 'Brand', lotNumber: 'Lot', dose: '1 mL', nextDueAt: '' } })
+  })
+
+  it('preserves optional decimal precision and does not fill unmeasured values', () => {
+    expect(preventivePayload({ kind: 'vaccination', vitals: { weightKg: '5.125', temperatureC: '', hydration: '' } }, [{ id: 'vaccine', dose: '', nextDueAt: '' }], false).vitals)
+      .toEqual({ weightKg: 5.125, temperatureC: null, heartRate: null, respiratoryRate: null, bodyConditionScore: null, hydration: null })
   })
 })

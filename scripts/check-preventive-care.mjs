@@ -24,7 +24,7 @@ const raw = {
   ],
   inventory_batches: ['vax', 'med'].map((id) => ({ id: `${id}-batch`, item_id: id, lot_number: `${id}-lot`, is_active: true, expiration_date: '2028-12-31' })),
   inventory_movements: ['vax', 'med'].map((id) => ({ id: `${id}-delivery`, item_id: id, batch_id: `${id}-batch`, quantity_delta: 10, created_at: now.toISOString() })),
-  vaccinations: [], preventive_care_records: [], deworming_administrations: [], queue_entries: [],
+  vaccinations: [], preventive_care_records: [], preventive_record_vitals: [], deworming_administrations: [], queue_entries: [],
 }
 const calls = [], errors = [], receipts = new Map()
 let failSave = true, failCompletion = true
@@ -33,6 +33,15 @@ function saveRecord(data, completed = false) {
   const parent = raw.preventive_care_records.find((row) => row.id === id) || { id, pet_id: petId, kind: data.kind, recording_purpose: data.recordingPurpose, version: -1 }
   Object.assign(parent, { administered_at: data.administeredAt, administered_by: data.veterinarianId || null, administered_by_name: data.veterinarianName || '', version: parent.version + 1 })
   if (!raw.preventive_care_records.includes(parent)) raw.preventive_care_records.push(parent)
+  const values = data.vitals || {}
+  const measurements = { weight_kg: values.weightKg ?? null, temperature_c: values.temperatureC ?? null, heart_rate_bpm: values.heartRate ?? null,
+    respiratory_rate_rpm: values.respiratoryRate ?? null, body_condition_score: values.bodyConditionScore ?? null, hydration: values.hydration || null }
+  const existingVitals = raw.preventive_record_vitals.find((row) => row.preventive_record_id === id)
+  if (Object.values(measurements).some((value) => value != null && value !== '')) {
+    const row = existingVitals || { id: crypto.randomUUID(), preventive_record_id: id, clinic_id: 'clinic' }
+    Object.assign(row, measurements, { measured_by: actor, measured_at: now.toISOString() })
+    if (!existingVitals) raw.preventive_record_vitals.push(row)
+  } else if (existingVitals) raw.preventive_record_vitals.splice(raw.preventive_record_vitals.indexOf(existingVitals), 1)
   const table = data.kind === 'vaccination' ? raw.vaccinations : raw.deworming_administrations
   for (const item of data.kind === 'vaccination' ? data.vaccines : [data.deworming]) {
     const product = raw.inventory_items.find((entry) => entry.id === item.inventoryItemId)
@@ -100,6 +109,16 @@ try {
   await page.getByLabel('Date administered').fill('2020-01-02')
   await page.getByLabel('Veterinarian', { exact: true }).fill('Outside clinician')
   await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await expect(page.getByLabel('Weight (kg)')).toHaveValue('')
+  await expect(selectControl(page.getByLabel('Hydration'))).toHaveValue('')
+  await page.getByLabel('Weight (kg)').fill('5.125')
+  await chooseSelectOption(page.getByLabel('Body condition (1–5)'), '3')
+  await chooseSelectOption(page.getByLabel('Hydration'), 'Normal')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page.getByLabel('Weight (kg)')).toHaveValue('5.125')
+  await expect(selectControl(page.getByLabel('Hydration'))).toHaveValue('Normal')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
   await page.getByLabel('Product name 1', { exact: true }).fill('Historical Anti-Rabies')
   await page.getByLabel('Brand 1', { exact: true }).fill('Original brand')
   await page.getByLabel('Batch / lot number 1', { exact: true }).fill('OLD-01')
@@ -128,11 +147,18 @@ try {
   assert.equal(calls[1].action, 'create_preventive_care')
   assert.equal(calls[1].data.vaccines.length, 2)
   assert.equal(calls[1].data.vaccines[0].inventoryItemId, undefined)
+  assert.deepEqual(calls[1].data.vitals, { weightKg: 5.125, temperatureC: null, heartRate: null, respiratoryRate: null, bodyConditionScore: 3, hydration: 'Normal' })
+  assert.equal(raw.preventive_record_vitals.length, 1)
   assert.equal(raw.queue_entries.length, 0)
   const historyId = raw.preventive_care_records[0].id
   await page.goto(`${app.origin}/patients/${petId}?tab=vaccines#vaccination-${raw.vaccinations[1].id}`)
   await expect(page.locator('.preventive-history-card')).toHaveCount(1)
   await expect(page.locator('.preventive-history-card')).toContainText('2 vaccines')
+  await expect(page.locator('.preventive-history-card')).toContainText('5.125 kg')
+  await expect(page.locator('.preventive-history-card')).toContainText('Body condition')
+  await expect(page.locator('.preventive-history-card')).toContainText('Recorded by Care recorder')
+  await page.getByLabel('Search vaccinations and deworming').fill('5.125 kg')
+  await expect(page.locator('.preventive-history-card')).toHaveCount(1)
   await page.getByLabel('Search vaccinations and deworming').fill('combination')
   await expect(page.locator('.preventive-history-card')).toHaveCount(1)
   await page.getByLabel('Search vaccinations and deworming').fill('not found')
@@ -140,6 +166,9 @@ try {
   await page.getByRole('button', { name: 'Clear filters' }).click()
   await page.getByRole('button', { name: 'Edit vaccination record', exact: true }).click()
   await expect(page.getByLabel('Product name 2', { exact: true })).toHaveValue('Historical combination')
+  await expect(page.getByLabel('Weight (kg)')).toHaveValue('5.125')
+  await expect(selectControl(page.getByLabel('Body condition (1–5)'))).toHaveValue('3')
+  await expect(selectControl(page.getByLabel('Hydration'))).toHaveValue('Normal')
   await page.getByLabel('Dose 2', { exact: true }).fill('Updated dose')
   await page.getByRole('button', { name: 'Save historical record' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -148,6 +177,9 @@ try {
   await chooseSelectOption(page.getByLabel('Record type', { exact: true }), 'deworming')
   await expect(page.getByRole('button', { name: 'Add another vaccine' })).toHaveCount(0)
   await page.getByLabel('Date administered').fill('2020-02-03')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await page.getByLabel('Temperature (°C)').fill('39.15')
+  await page.getByLabel('Respiratory rate (breaths/minute)').fill('22')
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await page.getByLabel('Product name 1', { exact: true }).fill('Historical dewormer')
   await reviewRecord(page)
@@ -159,6 +191,7 @@ try {
   await chooseSelectOption(page.getByLabel('Filter record type'), 'Deworming')
   await expect(page.locator('.preventive-history-card')).toHaveCount(1)
   await expect(page.locator('.preventive-history-card')).toContainText('Historical dewormer')
+  await expect(page.locator('.preventive-history-card')).toContainText('39.15 °C')
   await page.getByRole('button', { name: 'Clear filters' }).click()
   await add(false)
   await expect(selectControl(page.getByLabel('Inventory product 1'))).toContainText('Anti-Rabies')
@@ -176,6 +209,13 @@ try {
     await page.getByLabel(`Dose ${index}`, { exact: true }).fill('Clinical dose')
   }
   await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await page.getByLabel('Weight (kg)').fill('6.275')
+  await page.getByLabel('Heart rate (bpm)').fill('120.5')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await expect(page.getByLabel('Heart rate (bpm)')).toHaveValue('120.5')
+  await expect(page.getByLabel('Weight (kg)')).toHaveValue('6.275')
+  await page.getByLabel('Heart rate (bpm)').fill('120')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
   await fillStock(1)
   await page.getByRole('button', { name: 'Add another vaccine' }).click()
   await fillStock(2)
@@ -187,11 +227,14 @@ try {
   await page.goto(`${app.origin}/queue`)
   await page.getByRole('button', { name: 'Record vaccinations / deworming', exact: true }).click()
   await page.getByLabel('Dose 2', { exact: true }).fill('Draft clinical dose')
+  await page.getByLabel('Weight (kg)').fill('8.125')
   await page.getByRole('button', { name: 'Save as draft' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   assert.equal(calls.at(-1).data.record.vaccines.length, 2)
+  assert.equal(calls.at(-1).data.record.vitals.weightKg, 8.125)
   await page.getByRole('button', { name: 'Resume vaccinations / deworming', exact: true }).click()
   await expect(page.getByLabel('Dose 2', { exact: true })).toHaveValue('Draft clinical dose')
+  await expect(page.getByLabel('Weight (kg)')).toHaveValue('8.125')
   await page.getByRole('button', { name: 'Save and complete care' }).click()
   await expect(page.getByRole('alert')).toContainText('enough stock')
   await page.getByRole('button', { name: 'Save and complete care' }).click()
@@ -227,6 +270,6 @@ try {
   assert.deepEqual(errors, [])
   await mkdir('test-artifacts.local', { recursive: true })
   await page.screenshot({ path: 'test-artifacts.local/preventive-care-dark.png', fullPage: true })
-  console.log('PASS grouped vaccines, deworming, historical editing, search/type filter, inventory categories, drafts, retry, completion locks, legacy links, staff controls and light/dark mobile layouts')
+  console.log('PASS grouped vaccines, preventive vitals, deworming, historical editing, search/type filter, inventory categories, drafts, retry, completion locks, legacy links, staff controls and light/dark mobile layouts')
   await context.close()
 } finally { await app.close() }

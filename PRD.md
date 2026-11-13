@@ -114,7 +114,7 @@ These IDs describe current behavior that upgrades must preserve. Configuration/d
 | SYS-05 | Add Record in one modal: service → recording method → detail steps → review → final save. Back/visited steps retain input; review permits edits. Existing queue editors remain direct entry points. | [NewVisitDialog](src/components/NewVisitDialog.jsx), [RecordWizard](src/components/RecordWizard.jsx), [RecordForm](src/components/RecordForm.jsx) |
 | SYS-06 | Checkups include visit details, vitals, notes, diagnosis and follow-up. History, Clinical Assessment, and Treatment Plan labels retain legacy storage/assessment content. Completion, prescribing, finalization and corrections have distinct rules. | [clinical editors](src/components/ClinicalEditors.jsx), [observations](src/lib/clinicalObservations.js) |
 | SYS-07 | Record-only checkups, preventive care and services retain past dates/clinicians without queue, live reminder or stock effects. Recorder attribution remains separate. | [NewVisitDialog](src/components/NewVisitDialog.jsx), [SQL coverage](supabase/tests/unified_patient_visits.sql) |
-| SYS-08 | Vaccination groups contain one or more vaccines; deworming contains one administration. Live items use inventory/batch/quantity separate from dose. Drafts/waiting records consume no stock; completion is atomic; edits consume only added vaccines. | [editor](src/components/PreventiveCareEditor.jsx), [domain](src/lib/preventiveCare.js), [SQL tests](supabase/tests/preventive_care.sql) |
+| SYS-08 | Vaccination groups contain one or more vaccines and one optional attributed vitals set; deworming contains one administration and one optional vitals set. Vitals are clinic-scoped and appear in preventive detail/unified history. Live items use inventory/batch/quantity separate from dose. Drafts/waiting records consume no stock; completion is atomic; edits consume only added vaccines; vitals corrections retain audit snapshots. | [editor](src/components/PreventiveCareEditor.jsx), [vitals fields](src/components/PreventiveVitalsFields.jsx), [domain](src/lib/preventiveCare.js), [SQL tests](supabase/tests/preventive_care.sql) |
 | SYS-09 | Live vaccines require manual lots separate from stock batch. Audited lot corrections preserve stock and issued evidence. Deworming retains batch-based lots. | [migration](supabase/migrations/20261107084400_manual_vaccine_lots_and_certificate_entries.sql), [verification notes](TESTING.md) |
 | SYS-10 | Multi-medicine prescriptions, dose/route/frequency/duration/instructions, inventory dispensing, historical medicines, print/Save as PDF and PNG; consumed links protected against repeated dispensing/destructive edits. | [clinical editors](src/components/ClinicalEditors.jsx), [prescription actions](src/components/PrescriptionActions.jsx), [helpers](src/lib/prescriptions.js) |
 | SYS-11 | Clinical history, calendar, timeline/source navigation, search/type filters, vitals/growth, preventive history and scheduling. Timeline pagination displays already loaded activity. | [PetDetail](src/pages/PetDetail.jsx), [timeline](src/components/PatientTimeline.jsx), [record browser](src/components/PatientRecordBrowser.jsx) |
@@ -243,6 +243,12 @@ pages, role-aware navigation and focused record views. Search/detail routes use
 bounded reads and preserve INV-01, INV-12 and INV-14. Broader clinical workspace
 startup/refresh loading, date windows and selective invalidation remain UPG-04
 work. See [the search release notes and verification](docs/kan-23-global-search.md).
+
+KAN-28 adds optional, clinic-scoped vitals and condition to grouped vaccinations
+and deworming administrations. Draft saves, completion and historical record-only
+entries retain entered observations; blank fields create no measured values.
+Completed-record changes use the existing portal authorization and before/after
+audit snapshots. See [the KAN-28 release notes](docs/kan-28-preventive-vitals.md).
 
 Priorities apply to future work: **P0** blocks the next production-ready release; **P1** follows foundations; **P2** requires discovery or a separate gate. Sequence by dependencies and clinic impact.
 

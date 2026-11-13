@@ -7,6 +7,7 @@ import { useClinicData } from '../context/ClinicDataContext'
 import { useAuth } from '../context/AuthContext'
 import { emptyPreventiveItem, preventivePayload } from '../lib/preventiveCare'
 import { prescriptionInventoryBatches } from '../lib/prescriptions'
+import PreventiveVitalsFields from './PreventiveVitalsFields'
 import './PreventiveCare.css'
 
 export default function PreventiveCareEditor({ pet, record: inputRecord, queueEntry, purpose, service, onSaved, onClose, embedded = false, wizard = false }) {
@@ -15,6 +16,7 @@ export default function PreventiveCareEditor({ pet, record: inputRecord, queueEn
   const record = inputRecord?.items ? inputRecord : preventiveCare.find((group) => group.id === (inputRecord?.preventive_record_id || inputRecord?.id))
   const [draft] = useState(() => ({ ...queueEntry?.careDraft }))
   const historical = (record?.recordingPurpose || purpose) === 'record_only'
+  const [vitals, setVitals] = useState(() => ({ weightKg: '', temperatureC: '', heartRate: '', respiratoryRate: '', bodyConditionScore: '', hydration: '', ...(record?.vitals || {}), ...(draft.vitals || {}) }))
   const [kind, setKind] = useState(record?.kind || draft.kind || 'vaccination')
   const [items, setItems] = useState(() => {
     const initial = draft.kind === 'deworming' ? [draft.deworming] : draft.vaccines || (Object.keys(draft).length && !draft.kind ? [{ ...record?.items[0], ...draft }] : null)
@@ -24,6 +26,7 @@ export default function PreventiveCareEditor({ pet, record: inputRecord, queueEn
   const [clinician, setClinician] = useState({ id: queueEntry?.veterinarianId || draft.veterinarianId || record?.veterinarianId || (historical ? '' : user.id), name: draft.veterinarianName || record?.veterinarianName || '' })
   const change = (id, values) => setItems((current) => current.map((item) => item.id === id ? { ...item, ...values } : item))
   const payload = () => preventivePayload({ kind, petId: pet.id, administeredAt: date, veterinarianId: clinician.id, veterinarianName: clinician.name,
+    vitals,
     recordingPurpose: historical ? 'record_only' : 'queue', ...(record ? { id: record.id, version: record.version } : {}), ...(service ? { serviceId: service.id } : {}),
   }, items, historical)
   const save = async () => {
@@ -79,12 +82,14 @@ export default function PreventiveCareEditor({ pet, record: inputRecord, queueEn
         </fieldset>
       })
   const addVaccine = kind === 'vaccination' && <button type="button" className="button button-secondary" disabled={items.length >= 50} onClick={() => setItems((current) => [...current, emptyPreventiveItem()])}>Add another vaccine</button>
+  const vitalsFields = <PreventiveVitalsFields value={vitals} onChange={setVitals} />
   return <Modal title={`${record ? 'Edit' : 'Record'} ${kind === 'deworming' ? 'deworming' : 'vaccination'} for ${pet.name}`} wide onClose={onClose} embedded={embedded}
     description={historical ? 'Record past care without a queue entry, live reminder, or stock deduction.' : queueEntry ? `${queueEntry.queueNumber} · Complete care to deduct stock. Drafts do not deduct stock.` : record ? 'Consumed products, batches and stock quantities are fixed. Additional vaccines deduct stock once.' : 'Saving creates a waiting queue entry. Stock is deducted when care is completed.'}>
     <AsyncForm steps={wizard ? [{ id: 'details', label: 'Details', description: 'Choose the record type, administration date, and veterinarian.', content: details },
+      { id: 'vitals', label: 'Vitals & condition', content: vitalsFields },
       ...itemEditors.map((editor, index) => ({ id: items[index].id, label: kind === 'vaccination' ? `Vaccine ${index + 1}` : 'Deworming', content: <div className="preventive-items">{editor}{addVaccine}</div> }))] : undefined} onClose={onClose} onSave={save} submitLabel={queueEntry ? 'Save and complete care' : historical ? 'Save historical record' : 'Save record'}
       onSaveDraft={queueEntry ? async () => { const { serviceId: _serviceId, ...values } = payload(); await execute('save_queue_draft', { id: queueEntry.id, record: values, draftVersion: queueEntry.draftVersion }) } : undefined}>
-      {!wizard && <>{details}<div className="preventive-items">{itemEditors}</div>{addVaccine}</>}
+      {!wizard && <>{details}{vitalsFields}<div className="preventive-items">{itemEditors}</div>{addVaccine}</>}
 
     </AsyncForm>
   </Modal>

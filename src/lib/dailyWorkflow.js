@@ -57,7 +57,16 @@ export function buildPatientTimeline(data, patientId) {
     if (service.petId === patientId) add('Service', service.id, service.arrivedAt, service.service, 'Record only', service.serviceNotes, patientSource(patientId, 'history', `service-${service.id}`))
   }
   for (const record of data.preventiveCare || []) {
-    if (record.petId === patientId) add(record.kind === 'deworming' ? 'Deworming' : 'Vaccination', record.id, record.administeredAt, record.vaccine, record.recordingPurpose === 'record_only' ? 'Record only' : record.careStatus, record.items.map((item) => item.vaccine).join(', '), patientSource(patientId, 'vaccines', `preventive-${record.id}`))
+    if (record.petId === patientId) {
+      const vitals = record.vitals || {}
+      const measurements = [vitals.weightKg && `${vitals.weightKg} kg`, vitals.temperatureC && `${vitals.temperatureC} °C`,
+        vitals.heartRate && `${vitals.heartRate} bpm`, vitals.respiratoryRate && `${vitals.respiratoryRate} breaths/minute`,
+        vitals.bodyConditionScore && `Body condition ${vitals.bodyConditionScore}/5`, vitals.hydration].filter(Boolean)
+      add(record.kind === 'deworming' ? 'Deworming' : 'Vaccination', record.id, record.administeredAt, record.vaccine,
+        record.recordingPurpose === 'record_only' ? 'Record only' : record.careStatus,
+        [record.items.map((item) => item.vaccine).join(', '), ...measurements].filter(Boolean).join(' · '),
+        patientSource(patientId, 'vaccines', `preventive-${record.id}`))
+    }
   }
   for (const vaccine of data.vaccinations || []) {
     if (data.preventiveCare?.some((record) => record.items.some((item) => item.id === vaccine.id))) continue

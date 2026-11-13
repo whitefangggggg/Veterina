@@ -19,7 +19,12 @@ export function combinedClinicalHistory(visits, services, preventive = [], admis
       visitedAt: admission.admitted_at, type: 'Hospitalization', complaint: admission.reason,
       veterinarian: admission.veterinarianName || 'Not recorded', careStatus: admissionStatuses[admission.status] || admission.status,
       conditionLabel: clinicalConditions[admission.condition] || admission.condition })),
-    ...preventive.map((record) => ({ ...record, historyKind: 'preventive', historyKey: `preventive:${record.id}`, sourceRecord: record, visitedAt: record.administeredAt, type: record.kind === 'deworming' ? 'Deworming' : 'Vaccination', veterinarian: record.veterinarianName || 'Not recorded', clinicalNotes: record.items.map((item) => [item.vaccine,item.brand,item.dose,item.lotNumber].filter(Boolean).join(' ')).join(' ') })),
+    ...preventive.map((record) => ({ ...record, historyKind: 'preventive', historyKey: `preventive:${record.id}`, sourceRecord: record, visitedAt: record.administeredAt, type: record.kind === 'deworming' ? 'Deworming' : 'Vaccination', veterinarian: record.veterinarianName || 'Not recorded', clinicalNotes: [
+      ...record.items.map((item) => [item.vaccine,item.brand,item.dose,item.lotNumber].filter(Boolean).join(' ')),
+      record.vitals?.weightKg && `${record.vitals.weightKg} kg`, record.vitals?.temperatureC && `${record.vitals.temperatureC} °C`,
+      record.vitals?.heartRate && `${record.vitals.heartRate} bpm`, record.vitals?.respiratoryRate && `${record.vitals.respiratoryRate} breaths/minute`,
+      record.vitals?.bodyConditionScore && `Body condition ${record.vitals.bodyConditionScore}/5`, record.vitals?.hydration,
+    ].filter(Boolean).join(' ') })),
     ...services.map((service) => ({ ...service, historyKind: 'service', historyKey: `service:${service.id}`, sourceRecord: service,
       visitedAt: service.arrivedAt, type: service.service, careStatus: serviceStatus(service.status),
       veterinarian: service.veterinarian || 'Not recorded' }))]
