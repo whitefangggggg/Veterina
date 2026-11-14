@@ -1,0 +1,71 @@
+.vt-founders{max-width:1320px;margin:auto;padding:90px 48px 100px;scroll-margin-top:24px}
+.vt-founders-heading{display:flex;justify-content:space-between;gap:32px;align-items:end;margin-bottom:40px}.vt-founders-heading .vt-eyebrow{color:#397869;margin-bottom:18px}.vt-founders-heading>p{font-size:14px;line-height:1.8;color:var(--muted);margin:0}.vt-founders-heading>p>span{display:block;margin-top:8px;font-size:12px}
+.vt-founders-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;align-items:stretch}
+.vt-founder{min-width:0;display:flex;flex-direction:column}
+.vt-founder-avatar{display:block;width:100%;flex:1;border:0;padding:0;background:none;color:#24574b;cursor:pointer;text-align:left;font:inherit;perspective:1400px;border-radius:20px}
+.vt-founder-avatar:focus-visible{outline:3px solid #2a6f62;outline-offset:6px}
+/* Both faces reserve their natural height, even when rotated out of view. */
+.vt-founder-flipper{display:grid;height:100%;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.22,.7,.2,1)}
+.vt-founder.is-revealed .vt-founder-flipper{transform:rotateY(180deg)}
+.vt-founder-face{grid-area:1/1;min-width:0;min-height:470px;display:flex;flex-direction:column;padding:24px;border:1px solid #cdded3;border-radius:20px;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 8px 24px #1d554b08}
+.vt-founder-front{background:radial-gradient(ellipse at 50% 45%,#faf8e9,#e1ecdc);transform:rotateY(0deg)}
+.vt-founder:nth-child(2) .vt-founder-front{background:radial-gradient(ellipse at 50% 45%,#fff6e6,#efe1ca)}
+.vt-founder:nth-child(3) .vt-founder-front{background:radial-gradient(ellipse at 50% 45%,#f4f8e8,#dcebe2)}
+.vt-founder-number{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:9px;letter-spacing:1.4px;font-weight:650}.vt-founder-number>span{border:1px solid currentColor;border-radius:30px;padding:6px 10px;letter-spacing:1px}
+.vt-founder-pet{display:flex;justify-content:center;align-items:center;flex:1;min-height:230px}.vt-founder-pet svg{width:190px;height:220px;image-rendering:pixelated}
+.vt-founder-front-line{font-size:23px;line-height:1.25;letter-spacing:-.7px;font-weight:550;max-width:230px;margin:12px 0 24px}
+.vt-founder-hint{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:10px;line-height:1.5;border-top:1px dashed #52816d55;padding-top:16px}.vt-founder-hint svg{flex:none}
+.vt-founder-back{transform:rotateY(180deg);background:linear-gradient(145deg,#348875,#1d554b 85%);color:#f6f9ee;border-color:#2a6f62}
+.vt-founder-monogram{display:flex;align-items:center;gap:18px;font-size:52px;line-height:1;letter-spacing:-3px;font-weight:600;color:#d5ebc7;margin:24px 0 18px}.vt-founder-monogram>span{font-size:10px;letter-spacing:1px;border-left:1px solid #ffffff40;padding-left:16px}
+.vt-founder-back-name{font-size:21px;line-height:1.3;letter-spacing:-.5px;font-weight:550;margin-bottom:16px}
+.vt-founder-bio{font-size:13px;line-height:1.8;color:#e2eee6;display:block}
+.vt-founder-tags{display:flex;flex-wrap:wrap;gap:7px;margin:20px 0 24px}.vt-founder-tags>span{font-size:9px;border:1px solid #ffffff30;border-radius:5px;padding:6px 8px;color:#e4efcf}
+.vt-founder-back .vt-founder-hint{margin-top:auto;border-color:#ffffff35;color:#d4e7dc}
+.vt-founder-caption{padding:24px 3px 0}.vt-founder-caption>span{font-size:10px;letter-spacing:1.6px;color:#397869;font-weight:650}.vt-founder-caption h3{font-size:21px;letter-spacing:-.6px;font-weight:600;line-height:1.35;margin:10px 0}
+@media(max-width:1050px) and (min-width:681px){.vt-founders-grid{gap:16px}.vt-founder-face{padding:20px 16px}.vt-founder-number{font-size:8px;letter-spacing:.7px}.vt-founder-monogram{gap:10px}.vt-founder-monogram>span{padding-left:10px}.vt-founder-front-line{font-size:21px}}
+@media(max-width:900px){.vt-founders{padding:65px 30px}.vt-founder-caption h3{font-size:19px}}
+@media(max-width:680px){.vt-founders{padding:55px 24px}.vt-founders-heading{display:block}.vt-founders-heading>p{margin-top:22px}.vt-founders-grid{grid-template-columns:1fr;gap:36px}.vt-founder-face{min-height:470px}.vt-founder-caption{padding-top:20px}}
+@media(prefers-reduced-motion:reduce){.vt-founder-flipper{transition:none}}
+/* Rigid pixel groups move together so the faces never stretch. */
+.vt-pup-head{transform-origin:32px 42px}
+.vt-pup-tail{transform-origin:46px 44px}
+.vt-pup-eyes{transform-origin:32px 29px}
+.vt-founders.pups-playing .vt-founder-sprite--white .vt-pup-body{animation:vt-pup-calm 4.8s steps(2,end) infinite!important}
+.vt-founders.pups-playing .vt-founder-sprite--white .vt-pup-eyes{animation:vt-pup-blink 5.4s steps(1,end) infinite!important}
+.vt-founders.pups-playing .vt-founder-sprite--fluffy .vt-pup-body{animation:vt-pup-happy 1.6s steps(2,end) infinite!important}
+.vt-founders.pups-playing .vt-founder-sprite--fluffy .vt-pup-tail{animation:vt-pup-wag .5s steps(2,end) infinite!important}
+.vt-founders.pups-playing .vt-founder-sprite--short .vt-pup-head{animation:vt-pup-curious 6s steps(2,end) infinite!important}
+.vt-founders.pups-playing .vt-founder-sprite--short .vt-pup-tail{animation:vt-pup-soft-wag 3s steps(2,end) infinite!important}
+.vt-founders.pups-playing .vt-founder-sprite--short .vt-pup-eyes{animation:vt-pup-blink 6.8s steps(1,end) infinite!important}
+.vt-founders.pups-playing .is-revealed .vt-founder-sprite *{animation-play-state:paused!important}
+.vt-pup-motion-toggle{display:block;margin-top:12px;padding:7px 12px;border:1px solid #b9cdc0;border-radius:20px;background:transparent;color:#2a6f62;font:inherit;font-size:11px;cursor:pointer}
+.vt-pup-motion-toggle:hover{background:#e4eddf}.vt-pup-motion-toggle:focus-visible{outline:3px solid #2a6f62;outline-offset:3px}
+@keyframes vt-pup-calm{0%,70%,100%{transform:translateY(0)}35%{transform:translateY(-1px)}}
+@keyframes vt-pup-happy{0%,45%,100%{transform:translateY(0)}15%,30%{transform:translateY(-2px)}65%,80%{transform:translateY(-1px)}}
+@keyframes vt-pup-wag{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(12deg)}}
+@keyframes vt-pup-soft-wag{0%,60%,100%{transform:rotate(0)}15%,40%{transform:rotate(8deg)}30%{transform:rotate(-6deg)}}
+@keyframes vt-pup-curious{0%,25%,85%,100%{transform:rotate(0)}40%,65%{transform:rotate(-7deg)}}
+@keyframes vt-pup-blink{0%,42%,47%,100%{transform:scaleY(1)}44%,46%{transform:scaleY(.15)}}
+/* Margin illustrations leave the sprite and copy clear. */
+.vt-founder-front{position:relative;isolation:isolate;overflow:hidden}
+.vt-founder-front>span:not(.vt-founder-ambience){position:relative;z-index:1}
+.vt-founder-ambience{position:absolute;inset:46px 0 105px;z-index:0;pointer-events:none;color:#367e6c;opacity:.23}
+.vt-founder-ambience svg{width:100%;height:100%}
+.vt-founder:nth-child(2) .vt-founder-ambience{color:#886237;opacity:.25}
+.vt-founder-ambience.is-tech{background-image:radial-gradient(#437c6030 .8px,transparent .8px);background-size:18px 18px}
+.vt-founder-ambience.is-vet{color:#2a8069;opacity:.28}
+/* Bold little role stickers, with enough inset for their raised edges. */
+.vt-founder-number{align-items:center}
+.vt-founder-number>.vt-founder-role-title{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:62px;max-width:none;padding:9px 12px;
+  border:2px solid #24574b;border-radius:8px;
+  background:#d9f294;color:#244b43;
+  box-shadow:3px 4px 0 #24574b;
+  font-size:14px;font-weight:850;line-height:1;letter-spacing:1px;
+  transform:rotate(7deg);text-align:center;
+}
+.vt-founder:nth-child(2) .vt-founder-role-title{background:#ffce83;transform:rotate(-7deg);border-color:#71502f;box-shadow:3px 4px 0 #71502f;color:#513b29}
+.vt-founder:nth-child(3) .vt-founder-role-title{background:#b5e5dd;transform:rotate(6deg)}
+.vt-founder-back .vt-founder-role-title{border-color:#f2f6dd;box-shadow:3px 4px 0 #102f2a}
+@media(min-width:681px) and (max-width:1050px){.vt-founder-number>.vt-founder-role-title{min-width:50px;padding:8px;font-size:12px}}

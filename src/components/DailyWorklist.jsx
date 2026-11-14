@@ -15,7 +15,7 @@ function RadarCard({ title, icon: Icon, children, action, className = '' }) {
   </section>
 }
 
-export function LiveClinicFloor({ work, onOpen, onWalkIn }) {
+export function LiveClinicFloor({ work, onOpen, onWalkIn, activeLane = 'waiting', onLaneChange }) {
   const { getPet, getOwner } = useClinicData()
   const count = work.waiting.length + work.inCare.length + work.ready.length
   const lanes = [{ title: 'Waiting in lobby', rows: work.waiting, type: 'waiting' },
@@ -23,7 +23,7 @@ export function LiveClinicFloor({ work, onOpen, onWalkIn }) {
   return <section className="clinic-floor" aria-labelledby="clinic-floor-title">
     <header className="command-card-header"><div><span className="eyebrow">Live clinic floor</span><h2 id="clinic-floor-title">Care in motion</h2></div><Link className="text-link" to="/queue">Open queue <ArrowRight size={14} aria-hidden="true" /></Link></header>
     {!count ? <div className="floor-zero"><SleepingPatientCat /><h3>All quiet on the clinic floor!</h3><p>Ready for today’s walk-ins or scheduled check-ins.</p><button className="button button-primary small-button" onClick={onWalkIn}>Check-in a Walk-in Patient</button></div>
-      : <div className="floor-lanes">{lanes.map(({ title, rows, type }) => <section className={`floor-lane lane-${type}`} key={type} aria-label={title}>
+      : <><div className="floor-filters" role="group" aria-label="Patient status">{lanes.map((lane) => <button key={lane.type} type="button" aria-pressed={activeLane === lane.type} onClick={() => onLaneChange?.(lane.type)}>{lane.title}<span>{lane.rows.length}</span></button>)}</div><div className="floor-lanes">{lanes.filter((lane) => lane.type === activeLane).map(({ title, rows, type }) => <section className={`floor-lane lane-${type}`} key={type} aria-label={title}>
         <h3>{title}{rows.length > 0 && <span>{rows.length}</span>}</h3>
         <div className="floor-lane-body">{rows.map((entry) => {
           const pet = getPet(entry.petId), owner = getOwner(pet?.ownerId)
@@ -35,18 +35,20 @@ export function LiveClinicFloor({ work, onOpen, onWalkIn }) {
               : <button className="button button-secondary small-button" onClick={() => onOpen({ type: type === 'waiting' ? 'start' : 'care', entry })}>{type === 'waiting' ? 'Start care' : entry.draftSavedAt ? 'Resume draft' : 'Resume care'}</button>}
           </article>
         })}{!rows.length && <p className="command-empty">{type === 'waiting' ? 'No one waiting.' : type === 'in_progress' ? 'No consultations in progress.' : 'No admissions awaiting discharge.'}</p>}</div>
-      </section>)}</div>}
+      </section>)}</div></>}
   </section>
 }
 
 export function IncompleteChartsCard({ charts, onOpen }) {
   const { getPet, timezone } = useClinicData()
+  const [expanded, setExpanded] = useState(false)
   return <RadarCard title="Incomplete charts & drafts" icon={ClipboardText} action={<Link to="/patients" className="text-link">Patients</Link>} className="charts-radar">
     {!charts.length && <p className="command-empty"><CheckCircle size={18} aria-hidden="true" />Charts are up to date.</p>}
-    {charts.map((chart) => <article className="radar-row chart-row" key={chart.id}>
+    {(expanded ? charts : charts.slice(0, 3)).map((chart) => <article className="radar-row chart-row" key={chart.id}>
       <div><Link to={patientSource(chart.petId)} title={chart.mine ? 'Assigned to you' : chart.entry?.veterinarian || chart.visit?.veterinarian || 'Clinic care'}>{getPet(chart.petId)?.name || 'Patient unavailable'}{chart.mine && <span className="chart-assignee"> · Yours</span>}</Link><small>{chart.description || 'Clinical notes'} · {chart.at && Number.isFinite(Date.parse(chart.at)) ? new Intl.DateTimeFormat('en', { timeZone: timezone, month: 'short', day: 'numeric' }).format(new Date(chart.at)) : 'Date unavailable'}</small></div>
       <button className="text-link" onClick={() => onOpen(chart.entry ? { type: chart.entry.status === 'waiting' ? 'start' : 'care', entry: chart.entry } : { type: 'chart', visit: chart.visit })}>{chart.entry?.status === 'waiting' ? 'Start care' : chart.draft ? 'Resume draft' : 'Edit SOAP'}</button>
     </article>)}
+    {charts.length > 3 && <button className="text-link" type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Show fewer charts' : `View all ${charts.length} charts`}</button>}
   </RadarCard>
 }
 
@@ -109,5 +111,12 @@ export function StockWatchCard({ stock }) {
 }
 
 export function ActionRadar({ work, onOpen }) {
-  return <aside className="action-radar" aria-label="Clinic action radar"><IncompleteChartsCard charts={work.charts} onOpen={onOpen} /><CallsDueCard calls={work.calls} /><StockWatchCard stock={work.stock} /></aside>
+  const urgentStock = work.stock.some(({ item, expired }) => expired.length > 0 || item.quantity <= 0)
+  return <aside className="action-radar" aria-label="Clinic action radar">
+    <div className="attention-heading"><span className="eyebrow">Keep the day on track</span><h2>Needs attention</h2><p>Follow-ups, unfinished notes, and supplies.</p></div>
+    {urgentStock && <StockWatchCard stock={work.stock} />}
+    <IncompleteChartsCard charts={work.charts} onOpen={onOpen} />
+    <CallsDueCard calls={work.calls} />
+    {!urgentStock && <StockWatchCard stock={work.stock} />}
+  </aside>
 }

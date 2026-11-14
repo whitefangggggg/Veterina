@@ -3,6 +3,7 @@ import { ArrowUpRight, ArrowRight, CalendarBlank, ClipboardText, Syringe, Packag
 import './Landing.css'
 import ClinicDoodle from '../components/ClinicDoodle'
 import DoctorDino from '../components/DoctorDino'
+import Founders from '../components/Founders'
 import { SleepingPatientCat, ExcitedPatientDog } from '../components/PixelPatients'
 
 const features = [
@@ -51,9 +52,11 @@ export default function Landing() {
           <div className="vt-journey-copy"><p className="vt-eyebrow">A DAY AT THE CLINIC</p><h2>Different steps.<br />The same patient.</h2><p>The record should follow the care. Bring the day’s work back to the pet and the person behind each visit.</p><ExcitedPatientDog /><svg className="vt-arrow-doodle" viewBox="0 0 180 70" fill="none" aria-hidden="true"><path d="M5 18c50 57 106 35 143 2m-22 3 24-6-4 23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
           <div className="vt-record"><header><span className="vt-initial">M</span><div><h3>Milo’s visit</h3><p>Illustrative care journey</p></div><span className="vt-record-label">PATIENT RECORD</span></header>{journey.map(([title, copy], i) => <div className="vt-record-row" key={title}><span className="vt-step">0{i + 1}</span><div><h3>{title}</h3><p>{copy}</p></div><Check size={18} /></div>)}</div>
         </section>
+        <Founders />
         <section className="vt-closing"><ClinicDoodle kind="heart" className="vt-margin-heart" /><div><p className="vt-eyebrow">MEET YOUR CLINIC’S NEXT CHAPTER</p><h2>More connected work.<br />More considered care.</h2></div><div><Link className="vt-button" to="/create-account">Get started with Veterina <ArrowUpRight size={20} /></Link><p>Already have an account? <Link to="/sign-in">Sign in</Link></p></div></section>
       </main>
       <footer className="vt-footer"><img src="/brand/veterina-logo.png" alt="Veterina" width="150" height="50" /><p>Veterinary care, better connected.</p><Link to="/track-admission">Track admission</Link><span>© {new Date().getFullYear()} Veterina</span></footer>
     </div>
   )
 }
+
